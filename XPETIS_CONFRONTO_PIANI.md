@@ -1,5 +1,5 @@
 # XPETIS · Confronto fra i due piani di sviluppo
-
+ 
 **4 agosto 2026**
 
 Confronto fra il `PIANO.md` di Simone (versione del 2 agosto 2026) e il `PIANO_XPETIS.md` di Alessandro (versione 2 del 29 luglio, sessioni 1-7 eseguite fra il 29 e il 31 luglio).
