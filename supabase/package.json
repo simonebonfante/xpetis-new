@@ -1,0 +1,11 @@
+{
+  "name": "xpetis-supabase",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:schema": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4"
+  }
+}

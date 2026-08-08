@@ -1,0 +1,830 @@
+# XPETIS — piano di sviluppo
+pwd db-> Xpet1s2026@
+File unico di lavoro: piano, task, avanzamenti. Si aggiorna qui, spuntando le
+caselle, e si aggiunge una riga al registro in fondo a ogni sessione.
+
+- Contesto tecnico: `CLAUDE.md`
+- Fonte di verità sul prodotto: `XPETIS Flusso Completo.docx` — **attenzione:
+  superato su cinque punti, vedi "Deviazioni dal Flusso"**
+- Documentazione dello schema: `supabase/README.md`
+- Mappatura form vetrina → schema, con le 11 migration da scrivere:
+  `supabase/MAPPATURA_VETRINA.md`
+- Confronto con il piano di Alessandro: `XPETIS_CONFRONTO_PIANI.md`
+
+**Regola di ingaggio:** si lavora solo su via esplicito di Simone. Gli
+avanzamenti li detta lui.
+
+**Perimetro:** solo la parte tecnica. Design, flusso, tassonomia e contenuti dei
+25 Travel Designer esistono già e arrivano come input. Non sono task nostri e
+non li stimiamo.
+
+Legenda: **[C]** lo faccio io (Claude) · **[S]** lo fai tu (Simone) · **[B]**
+business (Alessandro e Andrea)
+
+---
+
+## Materiali in arrivo
+
+| Materiale | Serve per | Stato |
+|---|---|---|
+| Link Figma delle pagine | Milestone 3, 4, 6, 7, 8 | ⏳ me lo linki |
+| Dataset geografico (129 stati, 244 regioni, 1.220 città) | Import geo, suggeritore, bande del match | ⏳ me lo incolli — versione normalizzata da Alessandro |
+| `GUIDA_PONTE_CALCOM.md` + fixture dei 7 messaggi veri | Nomi veri dei campi Cal.com e prove del ponte | ⏳ me lo incolli |
+| JSON delle 25 vetrine compilate | Import profili TD | ⏳ da produrre dal form HTML |
+| `Vetrina TD (2).html` | È il form che produce quel JSON | ✅ in cartella |
+| `XPETIS_CONFRONTO_PIANI.md` | Merge dei due piani | ✅ in cartella, lavorato |
+| Testi delle mail transazionali | Milestone 4 in poi | ✅ deciso: si costruisce con segnaposto e si sostituisce dopo |
+
+---
+
+## Deviazioni dai documenti di riferimento
+
+Il Flusso dice di sé che va aggiornato quando una decisione cambia. **Non lo
+aggiorniamo ora per scelta:** le deviazioni vivono qui. Chi legge il `.docx` su
+questi punti sta leggendo regole superate. L'ultima riga devia invece dalla
+tassonomia geografica.
+
+| # | Il Flusso dice | Facciamo | Perché | Data |
+|---|---|---|---|---|
+| 1 | Payment Link fissi creati a mano dal pannello Stripe (§4) | La cassa la apre il nostro server, con l'importo letto dal database | Un Payment Link è un indirizzo pubblico e riusabile: niente lo lega al prezzo di *quella* prenotazione. Chi ha il link da 89€ può pagarci una consulenza da 149€. E il prezzo esiste in un posto solo invece di due | 4 ago |
+| 2 | L'algoritmo di match gira nel sito (§2) | Funzione Postgres per i numeri, route server Next.js per le frasi. Mai nel browser | Calcolarlo nel browser richiede di esporre livelli dei paesi e valori degli assi, che il Flusso stesso dice invisibili. La mia vista `public_td_profiles` li esponeva davvero: era un difetto, non una scelta | 4 ago |
+| 3 | Quiz e filtri anonimi vivono in `sessionStorage` e si perdono chiudendo la scheda (§1) | Al primo login il quiz si salva sul profilo | Il briefing che il designer riceve prima della call contiene il profilo quiz. Senza salvataggio arriva vuoto proprio nel pezzo che il designer legge | 4 ago |
+| 4 | Il TD non può cancellare una consulenza pagata, può solo riprogrammare (§5) | Il tasto *Request reschedule* di Cal.com **è** una cancellazione secca. Lo riconosciamo dai due segni (motivo che inizia per `Please reschedule.`, `cancelledBy` uguale alla mail del designer), blocchiamo l'ordine, alert critico al team, rimborso eseguito a mano | Cal.com non manda nessuna prenotazione nuova e non lega la vecchia alla nuova: su una call già pagata il viaggiatore resterebbe senza call e senza soldi | 4 ago |
+| 5 | Non ne parla | Le mail native di Cal.com restano accese e i testi XPETIS sono scritti per convivere con loro | Spegnerle potrebbe richiedere un piano a pagamento su 25 account. Costo zero e nessuna dipendenza dal piano | 4 ago |
+| 6 | "La barra di ricerca normalizza qualunque input a un paese" (§1) | Filtrano **paesi e macro-aree**. Città e continenti sono solo navigazione: la città porta al suo paese, il continente alle sue macro-aree | La tassonomia dichiara selezionabili anche le macro-aree, e cercare "Sud America" è una richiesta legittima | 8 ago |
+| 7 | *(deviazione dalla tassonomia)* Le 20 regioni italiane sono dichiarate selezionabili | **Non filtrano.** Nessun quinto livello di filtro: come trattarle si deciderà | Il dato della tassonomia non si perde: `is_selectable` conserva la sua intenzione, `is_filterable` dice cosa filtra oggi. Sono le uniche 20 righe su cui i due valori differiscono, e l'harness lo verifica | 8 ago |
+
+**Conseguenza della 5, da non perdere di vista.** Le mail native di Cal.com
+contengono i link *cancella* e *riprogramma*, e cancellare su Cal.com richiede
+solo il codice della prenotazione, senza credenziali. Il viaggiatore ha quindi
+**sempre** una via per cancellare fuori dal nostro flusso, e non possiamo
+impedirlo. Le regole di rimborso non si difendono controllando l'accesso al
+link: **si applicano da n8n sul webhook `BOOKING_CANCELLED`**, guardando quanto
+manca alla call. Vale anche per il caso 4.
+
+---
+
+## Quadro d'insieme
+
+| # | Milestone | Stato | Lavoro con me | Lavoro tuo |
+|---|---|---|---|---|
+| 0 | Fondazioni database e correzioni | ✅ **chiusa** | — | — |
+| 1 | Import dei dati reali | 🟡 **a metà** — geografia dentro; le 25 vetrine per ultime, per scelta | 2-3 sessioni | 8-12 h |
+| 2 | Infrastruttura e accessi | 🟡 **in corso** | 2 sessioni | 7-9 h |
+| 3 | Sito pubblico: ricerca, quiz, match, vetrina | ⚪ | 6-8 sessioni | — |
+| 4 | Prenotazione e pagamento consulenza | ⚪ | 5-6 sessioni | 3-4 h |
+| 5 | Prima della call: riprogrammazioni e reminder | ⚪ | 2-3 sessioni | — |
+| 6 | Post-call e Itinerario su misura | ⚪ | 5-6 sessioni | — |
+| 7 | All Inclusive | ⚪ | 4-5 sessioni | 4-6 h |
+| 8 | Recensioni e chiusura del ciclo | ⚪ | 2-3 sessioni | — |
+| 9 | Operatività e validazione Beta | ⚪ | 3-4 sessioni | 12-18 h |
+|   | **Totale** | | **34-41 sessioni** | **34-49 h** |
+
+Una "sessione" è circa due ore in cui costruisco e tu rivedi.
+
+---
+
+## Stima tempi
+
+| Sessioni a settimana | Ore tue a settimana | Alla Beta privata |
+|---|---|---|
+| 2 | ~4 h | 17-21 settimane (dicembre 2026) |
+| 3 | ~6 h | **12-14 settimane (inizio novembre 2026)** |
+| 5 | ~10 h | 7-9 settimane (inizio ottobre 2026) |
+| 8 | ~16 h | 5-6 settimane (metà settembre 2026) |
+
+**Il merge col lavoro di Alessandro non accorcia il calendario: riduce la
+varianza.** Le 16-18 sessioni di risparmio calcolate nel suo confronto valevano
+solo adottando il suo codice come base; avendo scelto il mio schema, quel
+risparmio non si applica. Quello che il merge porta davvero è:
+
+- **S-05 è chiuso con prove sul campo**, e con lui sparisce una coda di rischio
+  che il piano stimava fino a 2-3 settimane;
+- l'onboarding non deve più raccogliere 25 chiavi API di Cal.com: per cancellare
+  basta il codice della prenotazione;
+- i nomi veri dei campi del payload sono noti (`payload.type`, non
+  `eventType.slug`), quindi il ponte non si scrive due volte;
+- la forma dell'output del modulo vetrina è nota, e con lei i due problemi che ci
+  aspettano sull'import;
+- sparisce il task S-10 (30 Payment Link a mano, più mezza giornata a ogni nuovo
+  designer);
+- in cambio si aggiunge una sessione di correzioni allo schema.
+
+Cosa può ancora far slittare, in ordine di probabilità:
+
+1. **Le correzioni a mano dei 25 profili.** Import fedele più correzione su
+   Studio: 8-12 ore del team, e nessuno le può fare al posto suo.
+2. **Il verso dei sei assi.** Nel nostro seed solo `pace` ha etichette vere; le
+   altre cinque sono segnaposto. Il verso si fissa nel momento in cui si
+   scrivono le etichette, ed è l'errore che nessuna prova tecnica intercetta.
+3. **L'attivazione Stripe dell'agenzia** e la verifica fiscale del 74-ter.
+4. **Le condizioni generali**, che richiedono un legale.
+
+---
+
+## Milestone 0 — Fondazioni database e correzioni ✅
+
+**Chiusa il 6 agosto 2026.** 31 migration, 177 asserzioni verdi.
+
+- [x] **[C]** Enum, tabelle di base, profili TD, geografia, parametri
+- [x] **[C]** Prenotazioni e ordini con macchine a stati imposte dal database
+- [x] **[C]** RLS chiusa, viste pubbliche, bucket di storage
+- [x] **[C]** Seed dei parametri e dati finti
+- [x] **[C]** Harness di verifica (~60 asserzioni, `npm run test:schema`)
+
+### Correzioni
+
+Si applicano come migration nuove, mai modificando quelle esistenti.
+
+- [x] **[C]** `0018` — `match_designers()` in `SECURITY DEFINER` al posto di
+      `public_td_profiles`, che consegnava ad `anon` livelli dei paesi e valori
+      degli assi. Tolti anche i pesi da `public_quiz_axes` e i parametri di
+      matching da `public_config`: spostato il calcolo lato server, il browser
+      non ne ha più bisogno
+- [x] **[C]** `0019` — viste `my_bookings` e `my_orders` filtrate su
+      `auth.uid()` al posto del `grant select on bookings`. Senza
+      `cal_booking_uid`, che dopo S-05 è di fatto una credenziale
+- [x] **[C]** `0020` — `td_publish_blockers()` e `td_publish_warnings()`, vista
+      di readiness estesa, e trigger che **impedisce davvero** di pubblicare un
+      profilo senza paesi di livello 1
+- [x] **[C]** `0021` — assi allineati al form: `aesthetics` → `curated_vs_real`,
+      cinque opzioni per `companions`, il verso di ogni asse salvato come dato in
+      `label_min`/`label_max`, tag "Aree estreme/polari"
+- [x] **[C]** `0022` — campi di profilo del form: hero bio, manifesto, Instagram,
+      anni di esperienza, copertura legale, disponibilità sui viaggi di gruppo
+- [x] **[C]** `0023` — campi per paese: note sulle aree, temi fuori tassonomia,
+      durata e budget tipici
+- [x] **[C]** `0024` — i cinque servizi del form, prezzo deciso dal designer,
+      punti dei box
+- [x] **[C]** `0025-0027` — viaggi firma con foto, itinerari pronti, recensioni
+      portate da fuori (tabella separata, non esposta)
+- [x] **[C]** `0028` — la vetrina completa su `public_td_showcase`, e limite del
+      bucket immagini alzato
+- [ ] **[B]** Scrivere le due etichette intermedie di ogni asse continuo. Gli
+      estremi ora vengono dal form: restano da scrivere i valori 2 e 3
+
+---
+
+## Decisioni sull'infrastruttura e costi
+
+Chiuse il 2 agosto 2026, dopo verifica dei prezzi correnti.
+
+| Servizio | Scelta | Costo | Perché |
+|---|---|---|---|
+| **Supabase** | Cloud, free in sviluppo → **Pro al go-live** | €0 → $25/mese | Il free non fa backup, e l'architettura poggia su "Supabase è l'unica fonte di verità". Anche 1 GB di storage sono 200-400 documenti di viaggio |
+| **n8n** | **Self-hosted su Railway** | ~$5-14/mese | Il Cloud Starter (€24/mese) dà 2.500 esecuzioni: il solo workflow insoluti ogni 5 minuti ne fa ~8.640. Self-hosted sono illimitate. Railway anziché VPS perché il vincolo del progetto è il tempo di Simone, non €5 |
+| **Cal.com** | Free, un account per TD | €0 | Si paga solo per gestire più profili da un account: guidiamo i TD a crearsi il proprio |
+| **Vercel** | **Pro, obbligatorio** | $20/mese | Il piano Hobby è solo per uso non commerciale: qualunque deployment che incassa pagamenti richiede Pro |
+| **Provider email** | Da scegliere (S-04) | €0-20/mese | — |
+
+### Recap dei costi
+
+**Fisso mensile**
+
+| Voce | Sviluppo | Produzione Beta | A regime (~500 consulenze/mese) |
+|---|---|---|---|
+| Supabase | €0 free | $25 Pro | $25 |
+| Vercel | $20 Pro | $20 | $20 **per postazione** |
+| n8n su Railway | ~$5 | ~$5-14 | ~$15-25 |
+| Cal.com | €0 | €0 | €0 |
+| Provider email | €0 (Resend free, 3.000 mail/mese) | €0 | $20 (Resend Pro, 50.000) |
+| **Totale** | **~$25** | **~$50-60** | **~$80-90** |
+
+**Variabile: commissioni Stripe.** 1,5% + €0,25 su carta europea, 3,25% + €0,25
+su carta extra-UE. L'All Inclusive incassa sul conto dell'agenzia, merchant of
+record: quelle commissioni **non sono un costo XPETIS**. A volume Beta (50
+consulenze da €65 e 7 itinerari da €1.200 al mese) sono circa €190 su €11.650
+incassati, l'1,6%.
+
+**Una volta o fuori dal cloud**
+
+| Voce | Nota |
+|---|---|
+| Dominio `xpetis.it` | ~€15/anno |
+| Condizioni generali, privacy, cookie policy | Da preventivare con un legale: la voce meno prevedibile e la sola fuori dal nostro controllo |
+| Onboarding Cal.com dei 25 TD | 12-15 ore del team |
+| Correzione a mano dei 25 profili importati | 8-12 ore del team |
+| Google Workspace | Se serve, ~$7 per persona/mese |
+
+**Due soglie da tenere d'occhio**
+
+- **Vercel Pro è per postazione.** Oggi $20 perché lavora solo Simone. Con
+  quattro persone Vercel costa più di tutto il resto dello stack messo insieme.
+- **Cal.com resta gratis finché ogni TD ha il suo account.** Il giorno in cui
+  servisse gestire i 25 profili da un account unico, il prezzo diventa per
+  utente al mese: con 25 designer supera il costo di scrivere il motore di
+  prenotazione proprietario. È l'argomento economico che deciderà quella
+  migrazione, prima di quello tecnico.
+
+**Scartate e perché**
+
+- **n8n Cloud**: quota esecuzioni incompatibile con i timer del flusso.
+- **Piani gratuiti con sleep** (Render, Fly free): un'istanza dormiente non fa
+  girare il workflow insoluti e perde i webhook di pagamento Stripe.
+- **Hetzner o VPS**: quattro volte le risorse a parità di prezzo, ma la
+  manutenzione è tempo di Simone. Da riconsiderare dopo la Beta.
+- **Timer in `pg_cron` con n8n Cloud** (la "strada C" del confronto): sensata se
+  si restasse su n8n Cloud, ma con Railway costerebbe **più** ($24 di Starter
+  contro $5-14) e dividerebbe le automazioni fra due sistemi, uno dei quali
+  Alessandro non può leggere. Le 60.000 esecuzioni/mese citate nel confronto
+  presuppongono sette cron separati a 5 minuti: **un orologio unico che verifica
+  tutte le scadenze dovute costa 8.640 esecuzioni al mese in totale.**
+
+**Note operative per n8n**
+
+- Postgres di n8n **separato** da Supabase.
+- Pruning dello storico esecuzioni a 7-14 giorni.
+- Licenza: la Sustainable Use License copre il self-hosting per uso interno
+  d'impresa. Da rinegoziare solo se esponessimo la costruzione di workflow ai TD
+  o alle agenzie come funzione di prodotto.
+
+---
+
+## Milestone 1 — Import dei dati reali 🟡
+
+**La geografia è dentro. L'import delle 25 vetrine si fa per ultimo, per
+scelta:** serve prima che il sito esista, altrimenti si caricano dati che nessuno
+guarda. Il lavoro qui sotto resta in coda fino ad allora.
+
+Deciso: **import fedele, correzioni a mano su Studio.** Si carica quello che il
+modulo dice, senza logica di normalizzazione da fidarsi; il team corregge dopo,
+guidato da una coda di lavoro.
+
+- [x] **[C]** Leggere il form `Vetrina TD (2).html` e fissare la forma esatta del
+      JSON che produce → `supabase/MAPPATURA_VETRINA.md`
+- [x] **[C]** Import del dataset geografico e riallineamento delle tabelle
+      `geo_*` → migration `0029`, generatore `scripts/genera_geo.mjs`, seed
+      `0002_geo.sql`
+- [x] **[C]** `0030` — la destinazione può essere un paese o una macro-area;
+      città e continenti sollevano errore. Regola di ricerca decisa l'8 agosto
+- [x] **[C]** `0031` — le regioni italiane non filtrano (decisione dell'8
+      agosto). `is_filterable` dice cosa filtra oggi, `is_selectable` conserva
+      cosa dichiara la tassonomia
+- [ ] **[S]** *Rimandato:* come trattare le regioni italiane nella ricerca
+- [ ] **[C]** Importatore fedele dei profili TD, idempotente e rilanciabile: non
+      normalizza, ma **segnala** ogni voce che non ha saputo agganciare
+- [ ] **[C]** Coda di correzione per il team: per ogni TD, cosa non è entrato e
+      perché. I due casi che ci aspettano, già visti sui dati veri di un designer
+      reale: **tutti i paesi dichiarati "Base"** (senza correzione quel TD non
+      prende mai il badge e finisce sotto a chiunque) e **circa un terzo delle
+      voci che non sono stati** (California, Florida, Texas, New York, Hawaii →
+      US; Scozia → GB; "Balcani" e "Caraibi" da scorporare)
+- [ ] **[C]** Controllo del verso degli assi: per tre o quattro designer, stampare
+      cosa hanno dichiarato nel foglio accanto a cosa dice il database. Un asse
+      girato si vede a occhio in trenta secondi, e nessun'altra prova lo trova
+- [ ] **[S]** Correggere i 25 profili su Studio seguendo la coda (8-12 h) →
+      **S-16**
+
+---
+
+## Milestone 2 — Infrastruttura e accessi 🟡
+
+**L'ordine non è quello d'uso, è quello dei tempi di attesa.** Verifica Stripe e
+propagazione DNS non dipendono da noi e possono costare giorni: si avviano
+subito, anche se serviranno dopo.
+
+*Blocco A — si avviano oggi, perché fanno partire attese lunghe*
+
+- [x] **[S]** Progetto Supabase → **S-01 fatto l'8 agosto.** Ref
+      `rsgyxbqzsxahsbdfgtbm`, 31 migration e i tre seed applicati, le query di
+      verifica rispondono
+- [ ] **[S]** ~~Dominio, provider email, record DNS~~ → **S-04 rimandato l'8
+      agosto.** Su `xpetis.it` c'è una landing page attiva e non si tocca il DNS
+      ora. In sviluppo si usa l'URL provvisorio di Vercel e la modalità di prova
+      di Resend. *Conseguenza:* la reputazione di invio si scalderà solo alla
+      fine, quindi fra dominio autenticato e Beta va lasciata **almeno una
+      settimana** di margine
+- [ ] **[S]** Account Stripe XPETIS e verifica dell'attività → **S-06**
+
+*Blocco B — quando il blocco A è avviato*
+
+- [ ] **[S]** Repo Git e progetto Vercel Pro → **S-02**
+- [ ] **[S]** Login Google (Google Cloud + credenziali in Supabase) → **S-07**
+
+*Blocco C — chiude la milestone*
+
+- [ ] **[S]** Istanza n8n self-hosted su Railway → **S-03**
+- [ ] **[S]** Account Cal.com di regia e event type modello → **S-09**
+- [ ] **[S]** Numero WhatsApp XPETIS → **S-08**
+- [x] **[S]** ~~Le tre verifiche su Cal.com~~ → **S-05 chiuso**, vedi sotto
+- [ ] **[C]** Bootstrap Next.js: TypeScript, Tailwind con la palette brand,
+      shadcn/ui, client Supabase (publishable lato browser, secret lato server)
+- [ ] **[C]** Applicare le migration al progetto Supabase e verificare le viste
+- [ ] **[C]** Struttura delle route server-side per le pagine token, con la
+      validazione già agganciata a `resolve_access_token`
+
+---
+
+## Milestone 3 — Sito pubblico: ricerca, quiz, match, vetrina
+
+- [ ] **[C]** Home dal Figma, con i due elementi e il Cerca che compare alla
+      selezione
+- [ ] **[C]** Suggeritore destinazioni sulla tassonomia
+- [ ] **[C]** Le 6 schermate del quiz (tutte obbligatorie, nessun quiz a metà),
+      in `sessionStorage` da anonimo e **salvato sul profilo al primo login**
+- [ ] **[C]** `match_designers()`: bande geografiche, punteggio quiz, punteggio
+      filtri, affinità, chiave di ordinamento, badge e salienza dei due assi più
+      forti. Restituisce posizione, banda, sezione e badge; **mai punteggi,
+      livelli o valori degli assi**
+- [ ] **[C]** Composizione della frase dai mattoncini nella route server, con
+      hash stabile sull'id del TD. In SQL i numeri, in TypeScript le concordanze
+- [ ] **[C]** Pagina risultati con ricalcolo a ogni cambio di filtro (una
+      chiamata indicizzata al server, non un ricalcolo nel browser)
+- [ ] **[C]** Vetrina del TD, con i due box acquistabili e la presentazione non
+      acquistabile di su misura e All Inclusive
+- [ ] **[C]** Test del match sui 25 profili veri: ordinamenti attesi, casi limite
+      (nessun quiz, nessuna destinazione, sezioni vuote)
+- [ ] **[S]** Decidere, guardando i risultati veri: badge "match forte" visibile
+      sì o no
+
+---
+
+## Milestone 4 — Prenotazione e pagamento della consulenza
+
+- [ ] **[S]** Account Cal.com di regia con l'event type modello → **S-09**
+- [ ] **[C]** Login Google al momento del Prenota, con registrazione automatica
+- [ ] **[C]** Embed Cal.com con nome, email e ID utente XPETIS precompilati.
+      Torna in `payload.responses.xpetis_user_id.value`
+- [ ] **[C]** Pagina form + pagamento nei tre stati (in attesa, confermata,
+      scaduta): cellulare, domanda di contesto, flag servizi
+- [ ] **[C]** **Cassa aperta dal server**: Checkout Session creata da una route
+      con l'importo letto dal database, più verifica dell'importo a valle in n8n
+      prima di portare la riga a "pagata"
+- [ ] **[C]** Ponte Cal.com → `bookings` (created, rescheduled, cancelled). Due
+      cose imparate dai messaggi veri: il designer si identifica con
+      **`cal_username` + slug** (i 25 copiano lo stesso event type modello,
+      quindi lo slug da solo non identifica nessuno), e **lo slug sta in
+      `payload.type`**, non in `eventType.slug`
+- [ ] **[C]** Workflow Stripe → conferma e mail. **Risponde sempre 2xx** anche
+      quando non ha niente da fare: un 500 ripetuto porta Stripe a disattivare
+      l'endpoint
+- [ ] **[C]** Orologio unico ogni 5 minuti: insoluti oltre i 30 minuti (annulla
+      su Cal.com col solo codice prenotazione, stato a "non pagata", mail
+      cortese) e tutte le altre scadenze dovute. **In produzione la cadenza deve
+      restare 5-10 minuti**: con finestra di 30 e controllo ogni 30 il caso
+      peggiore diventa 60 minuti, e la regola dice massimo 35
+- [ ] **[C]** Testi che convivono con le mail native di Cal.com: la nostra dice
+      che lo slot è tenuto 30 minuti e che la conferma vera arriva col pagamento
+- [ ] **[C]** Calendario admin degli appuntamenti
+- [ ] **[C]** Percorso "slot introvabile": link WhatsApp, prenotazione creata a
+      mano dal team che innesca gli stessi workflow
+- [ ] **[C]** Controllo periodico di vitalità dei 25 webhook Cal.com
+
+---
+
+## Milestone 5 — Prima della call
+
+- [ ] **[C]** Contatori di riprogrammazione aggiornati dai webhook
+- [ ] **[C]** **Le regole di rimborso si applicano sul webhook
+      `BOOKING_CANCELLED`**, non controllando l'accesso al link: le mail native
+      di Cal.com danno al viaggiatore una via di cancellazione che non possiamo
+      chiudere
+- [ ] **[C]** Riconoscimento del *Request reschedule* del designer (motivo che
+      inizia per `Please reschedule.` e `cancelledBy` uguale alla sua mail) su
+      una call pagata: ordine bloccato, alert critico al team, rimborso a mano
+- [ ] **[C]** Workflow di controllo dei limiti (6ª riprogrammazione del
+      viaggiatore, 3ª del TD, nuova data oltre i 20 giorni, cancellazione sotto
+      le 24 ore che pretende il rimborso) → alert in `team_alerts`
+- [ ] **[C]** Workflow reminder del giorno prima
+- [ ] **[C]** Procedura di rimborso documentata: come si esegue su Stripe e come
+      si flagga su Studio
+- [ ] **[S]** In onboarding, istruire i designer a usare *Reschedule* e mai
+      *Request reschedule* (cintura e bretelle: il riconoscimento automatico c'è
+      comunque)
+
+---
+
+## Milestone 6 — Post-call e Itinerario su misura
+
+- [ ] **[C]** Workflow mail post-call a fine call, con i bottoni dei soli servizi
+      attivi di quel TD
+- [ ] **[C]** Bottoni a token permanente che creano l'ordine e notificano il team
+- [ ] **[C]** Tasti eccezione del TD: no-show e "altro problema" → disputa
+- [ ] **[C]** Chiusura a 48 ore (dentro l'orologio unico)
+- [ ] **[C]** Pagina ordine del TD a stati (uno stato, una azione), con upload su
+      Storage
+- [ ] **[C]** Invio proposta: Checkout Session creata dal server con l'importo
+      scritto dal TD, pagina pubblica gemella, mail al viaggiatore, messaggio
+      pronto al TD
+- [ ] **[C]** Consegna, richiesta di revisione, chiusura a 5 giorni
+
+---
+
+## Milestone 7 — All Inclusive
+
+- [ ] **[S]** Decidere come custodire le credenziali Stripe delle agenzie →
+      **S-11**
+- [ ] **[S]** Attivazione tecnica della prima agenzia → **S-12**
+- [ ] **[B]** Verifica fiscale del 74-ter con l'agenzia e della quota XPETIS per
+      fatturazione tra le parti
+- [ ] **[C]** Assegnazione agenzia da Studio e workflow di verifica
+- [ ] **[C]** Pagina token di conferma dell'agenzia, che sblocca la cascata
+- [ ] **[C]** Acconto e saldo sul conto Stripe dell'agenzia, con i suoi webhook
+      che puntano al nostro n8n
+- [ ] **[C]** Inserimento dei tempi del saldo da parte del team e workflow
+      relativo
+- [ ] **[C]** Consegna del file finale
+
+---
+
+## Milestone 8 — Recensioni e chiusura del ciclo
+
+- [ ] **[C]** Buon viaggio, recensione consulenza, recensione viaggio (dentro
+      l'orologio unico)
+- [ ] **[C]** Pagina token monouso della recensione
+- [ ] **[C]** Pubblicazione automatica in vetrina e alert sotto le 3 stelle
+
+---
+
+## Milestone 9 — Operatività e validazione Beta
+
+- [ ] **[S]** Onboarding Cal.com dei 25 TD → **S-13**
+- [ ] **[S]** Condizioni generali, privacy e cookie policy → **S-14**
+- [ ] **[C]** Viste operative su Studio: ordini aperti, cosa manca a ciascuno,
+      coda degli alert, checklist di pubblicazione dei TD
+- [ ] **[C]** Come si modifica un profilo TD a regime: Studio a mano oppure una
+      form interna minima (da decidere dopo l'import, quando sappiamo quanto è
+      pesante correggerli)
+- [ ] **[C]** Prova end-to-end su ambiente di test: dalla ricerca alla
+      recensione, per tutti e tre i servizi
+- [ ] **[C]** Runbook: cosa fare quando un workflow fallisce, come si rilancia,
+      dove si guarda
+- [ ] **[B]** Taratura dei parametri di matching sui dati reali
+- [ ] **[Team]** Beta privata: primo viaggiatore vero su un TD vero
+
+---
+
+## La tua todo list
+
+### ✅ Chiuso
+
+**S-05 · Le tre verifiche sul piano gratuito di Cal.com** — verificate da
+Alessandro il 30-31 luglio, con prove sul campo:
+
+| Verifica | Esito |
+|---|---|
+| Webhook verso un URL esterno sul piano free? | **Sì**, 7 messaggi veri raccolti |
+| API key per cancellare una prenotazione dall'esterno? | **Non serve nessuna chiave**: basta il codice della prenotazione |
+| L'embed accetta il prefill di un campo custom e torna nel payload? | **Sì**, in `payload.responses.xpetis_user_id.value` |
+
+La seconda risposta è migliore di quella sperata e cancella dall'onboarding
+l'intera voce "raccogliere 25 chiavi Cal.com". Ha però un rovescio, registrato
+fra i rischi: chiunque conosca il codice di una prenotazione la può cancellare.
+
+**S-10 · Payment Link delle consulenze** — **annullato.** Con la cassa aperta
+dal server non esistono link da creare, né a mano ora né a ogni nuovo designer.
+
+### P0 — prima settimana
+
+**S-15 · Farsi passare i materiali di Alessandro** (30 min)
+`GUIDA_PONTE_CALCOM.md` con le fixture dei 7 messaggi veri, e il dataset
+geografico normalizzato. Non il codice: la conoscenza.
+*Blocca:* milestone 1 e 4.
+
+**S-01 · Progetto Supabase** (1 h)
+Organizzazione e progetto, regione europea. Due progetti se possibile, test e
+produzione. Salva URL, anon key e service key in un password manager e passami
+quelle di test.
+*Blocca:* tutto.
+
+**S-02 · Repo Git e Vercel Pro** (1 h)
+Repo privato, progetto Vercel collegato, dominio puntato, variabili d'ambiente.
+Serve il piano **Pro** ($20/mese): l'Hobby è riservato all'uso non commerciale.
+
+**S-04 · Provider di invio email e autenticazione del dominio** (2 h)
+Senza di lui n8n non manda nessuna delle quindici mail del funnel. Un provider
+transazionale (Resend, Postmark, SendGrid) e i record SPF/DKIM/DMARC su
+`xpetis.it`. Presto: la reputazione di invio si scalda in giorni, non in ore.
+*Blocca:* milestone 4 in poi.
+
+### P1 — seconde due settimane
+
+**S-03 · Istanza n8n self-hosted su Railway** (2-3 h)
+Template n8n, Postgres Railway separato da Supabase, pruning dello storico a
+7-14 giorni, credenziali Supabase/Stripe/email dentro n8n. Metti un tetto di
+spesa: la fatturazione è a consumo sopra i $5 inclusi.
+
+**S-06 · Account Stripe XPETIS** (2 h)
+Attivazione, verifica dell'attività, chiavi test e produzione, endpoint webhook
+verso n8n. **La chiave segreta va nelle variabili server di Vercel:** serve alla
+cassa aperta dal server.
+
+**S-07 · Login Google** (1 h)
+Progetto Google Cloud, credenziali OAuth, URI di redirect, client ID e secret in
+Supabase Auth. Google è l'unico provider previsto.
+
+**S-08 · Numero WhatsApp XPETIS** (1 h)
+Numero dedicato, WhatsApp Business, chi lo presidia e con quali orari.
+
+**S-09 · Account Cal.com di regia e event type modello** (1-2 h)
+"Consulenza XPETIS · 30 min": durata 30, buffer 10 dopo, preavviso 12 ore,
+orizzonte 30 giorni, redirect post-prenotazione. Decidi anche lo strumento video
+(Google Meet o Cal Video): non è bloccante.
+
+### P2 — quando serve
+
+**S-16 · Correzione a mano dei 25 profili importati** (8-12 h con il team)
+Guidata dalla coda di correzione prodotta dall'import. I due casi noti: paesi
+tutti dichiarati "Base" e voci che non sono stati.
+
+**S-11 · Come custodire le credenziali Stripe delle agenzie** (2 h di
+valutazione)
+Vale la pena guardare Stripe Connect prima di attivare la prima agenzia: stesso
+risultato (agenzia merchant of record, compatibile col 74-ter) senza che XPETIS
+custodisca credenziali di terzi.
+*Blocca:* milestone 7.
+
+**S-12 · Attivazione tecnica della prima agenzia** (2-3 h)
+Chiavi, webhook verso n8n, prova di un pagamento di test.
+
+**S-13 · Onboarding Cal.com dei 25 TD** (12-15 h con il team)
+Circa 30 minuti a TD: account, event type dal modello, disponibilità, webhook.
+Nessuna chiave API da raccogliere (vedi S-05). Si può fare in parallelo alla
+milestone 6.
+
+**S-14 · Condizioni generali, privacy e cookie policy** (esterno)
+Il flusso ci appoggia regole precise (15 minuti di attesa, rimborso pieno fino a
+24 ore prima, una revisione inclusa): devono stare in un documento che il
+viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
+
+---
+
+## Rischi
+
+| Rischio | Impatto | Cosa lo tiene sotto controllo |
+|---|---|---|
+| Il verso di un asse è girato: un designer *wild* risulta amante del comfort, prende la frase sbagliata e finisce nel posto sbagliato | Alto, e **nessuna prova tecnica lo intercetta** | Confronto a vista foglio-database su 3-4 designer all'import (milestone 1). È già successo nel lavoro di Alessandro: due assi su sei erano invertiti |
+| Detenere le chiavi Stripe delle agenzie | Alto | Valutare Stripe Connect prima della prima agenzia (S-11) |
+| Le mail finiscono in spam | Alto: il funnel vive di mail. **Aumentato l'8 agosto:** S-04 è stato rimandato alla fine, quindi la reputazione di invio resterà non provata fino a ridosso della Beta | Lasciare almeno una settimana fra l'autenticazione del dominio e il primo viaggiatore vero |
+| Supabase free non fa backup | Alto se si dimentica il passaggio a Pro | Pro il giorno del primo pagamento vero |
+| Le correzioni a mano dei 25 profili non vengono fatte, o fatte male | Alto: il match gira su dati sbagliati e sembra funzionare | I controlli di plausibilità in `td_publish_readiness` bloccano la pubblicazione, non solo segnalano |
+| Chiunque conosca il codice di una prenotazione Cal.com la può cancellare, e le mail native di Cal.com lo consegnano al viaggiatore | Medio | Le regole di rimborso si applicano sul webhook, non sull'accesso al link. `cal_booking_uid` non esce mai verso il browser |
+| I token dei TD e delle agenzie sono in chiaro nel database — **rischio accettato il 4 agosto** | Medio | La tabella `access_tokens` non è leggibile né da `anon` né dall'utente loggato; l'accesso al database resta al team. Rivedibile passando all'impronta |
+| 25 webhook Cal.com configurati uno per uno: se un designer tocca le impostazioni, le sue prenotazioni smettono di arrivarci in silenzio | Medio | Controllo periodico di vitalità (milestone 4) |
+| Insoluti oltre il 10-15% | Medio | Misurabile a schema; si sposta il pagamento prima dello slot |
+| Il `.docx` del Flusso è superato su cinque punti e nessuno lo aggiorna | Medio: qualcuno lavora su regole vecchie | La tabella "Deviazioni dal Flusso" qui sopra. Da riportare nel `.docx` prima di allargare il team |
+| Testi definitivi delle mail in ritardo | Basso | Si costruisce con segnaposto |
+| Cal.com non impone i limiti di riprogrammazione | Basso in Beta | n8n fa il controllore e avvisa il team |
+
+---
+
+## Registro avanzamenti
+
+**8 agosto 2026 — primo `db push` su Supabase vero**
+Fallito alla migration 0004: `gen_random_bytes does not exist`. Causa: **su
+Supabase le estensioni stanno nello schema `extensions`, non in `public`**,
+quindi `create extension if not exists pgcrypto` non fa niente (esiste già
+altrove) e le sue funzioni non sono sul search_path. Su PGlite finiscono in
+`public` e tutto passa: **l'harness non poteva accorgersene**, ed è il primo
+errore che il Postgres vero ha trovato e il nostro no.
+
+Corretto in 0001 (commento), 0002 (`set search_path` per `gin_trgm_ops`) e 0004
+(`search_path = public, extensions` sulla funzione). Uno schema inesistente nel
+search_path viene ignorato, quindi la stessa riga funziona in entrambi gli
+ambienti.
+
+*Deroga consapevole alla convenzione "mai modificare una migration applicata":*
+la catena non era mai arrivata in fondo da nessuna parte, quindi non c'era storia
+da proteggere. Su un database già popolato si sarebbe aggiunta una migration
+nuova. Regola aggiunta a `CLAUDE.md`.
+
+**S-01 chiuso.** Progetto `rsgyxbqzsxahsbdfgtbm`, 31 migration e i tre seed
+applicati, le query di verifica rispondono.
+
+*Decisione che cambia una convenzione: le chiavi Supabase.* Installata nel repo
+la skill `supabase/server`, che documenta il passaggio alle nuove chiavi API:
+`anon` e `service_role` sono **legacy e verranno rimosse**, si usano
+`sb_publishable_…` (browser) e `sb_secret_…` (solo server). Aggiornati
+`CLAUDE.md` e i task che le nominavano. La chiave secret non passa mai da una
+conversazione né da un file versionato.
+
+**8 agosto 2026 — import della tassonomia geografica**
+Caricato `xpetis_destinazioni.json`: 6 continenti, 14 macro-aree, 129 stati, 244
+regioni, 1.220 città. Harness a 166 asserzioni, tutte verdi. Il seed geografico
+non si scrive a mano: lo genera `scripts/genera_geo.mjs` dal file, e l'harness
+confronta i conteggi contro le statistiche dichiarate dal file stesso.
+
+Tre cose che il mio schema provvisorio non prevedeva. **Non esistono codici
+ISO:** ogni voce ha un identificatore testuale (`corea_del_sud`) e quello diventa
+la chiave; inventare una corrispondenza ISO per 129 stati sarebbe stato
+indovinare. **Una città può stare in due regioni** — Jaipur è in India del Nord e
+in Rajasthan, ed è corretto — quindi l'unicità è per regione, non per stato.
+
+E la terza, che è una decisione aperta e non un dettaglio: **la destinazione non
+è sempre uno stato.** La tassonomia dichiara selezionabili le 14 macro-aree, i
+129 stati e le 20 regioni italiane; continenti, città e regioni estere vivono
+solo nel suggeritore. Ma il Flusso dice "la barra di ricerca normalizza qualunque
+input a un paese", e `match_designers()` accetta un solo stato. I due documenti
+non dicono la stessa cosa, e il codice oggi segue il Flusso.
+
+*Verifica sulle voci paese di un designer reale:* 22 su 30 agganciano per nome
+esatto ai 129 stati. Le altre otto sono i casi noti (cinque stati USA, la Scozia
+che nella tassonomia è una regione estera del Regno Unito, Balcani e Caraibi da
+scorporare), ora documentate in `MAPPATURA_VETRINA.md` con l'identificatore di
+destinazione di ciascuna.
+
+**8 agosto 2026 — la regola di ricerca (migration 0030)**
+Decisa da Simone e implementata: città e continenti **non filtrano** (la città
+porta al suo paese, il continente alle sue macro-aree), paesi e macro-aree sì.
+Harness a 174 asserzioni, tutte verdi.
+
+`match_designers` accetta ora la destinazione come livello + identificatore, e
+**rifiuta i livelli che non filtrano sollevando un errore** invece di ignorarli.
+La regola di prodotto vive nella funzione, non nella buona volontà di chi la
+chiama: chi passa una città se ne accorge subito.
+
+Una conseguenza logica da segnalare: **con una macro-area la banda 2 sparisce.**
+"Un altro paese della stessa macro-area" è già dentro la banda 3, perché è
+esattamente ciò che l'utente ha chiesto. Restano tre bande e serve una etichetta
+nuova per la sezione (`esperti_macro_area`), che Gaia dovrà scrivere. Il livello
+che entra nell'ordinamento è il migliore fra i paesi coperti là dentro, e il
+badge chiede almeno un paese di livello 1 dentro quella macro-area.
+
+Aggiunto `parent_ref` a `geo_search`, che è il filo per la navigazione del
+suggeritore: continente → macro-aree → paesi.
+
+*Regioni italiane: rimandate (migration 0031).* La tassonomia le dichiara
+selezionabili, la regola dei quattro livelli non le nomina, e non si vuole un
+quinto filtro. Invece di riscrivere il dato della tassonomia — che ne
+perderebbe l'intenzione — il database tiene due fatti distinti: `is_selectable`
+è cosa dichiara la tassonomia, `is_filterable` è cosa filtra oggi in XPETIS, e
+il sito obbedisce al secondo. I due valori differiscono su venti righe soltanto,
+e c'è un'asserzione che lo verifica: se un giorno quella differenza cambia, se
+ne accorge qualcuno. Harness a 177 asserzioni.
+
+**1 agosto 2026**
+Lettura del flusso completo. Scelte due decisioni architetturali di fondo:
+pagine token servite da route server-side con service key, e nessuna lettura
+diretta delle tabelle dal browser. Costruito lo schema Supabase completo: 17
+migration, 2 file di seed, 30 tabelle, la macchina a stati degli ordini imposta
+da trigger, sette viste pubbliche, RLS chiusa. Scritto l'harness di verifica su
+PGlite: 60 asserzioni, tutte verdi.
+
+**2 agosto 2026**
+Piano rivisto: design, flusso, tassonomia e i 25 profili TD esistono già, quindi
+il perimetro è solo tecnico e il percorso critico non è più il design ma la
+disponibilità di Simone. Aggiunta la milestone sull'import dei dati reali.
+Chiuse le decisioni sull'infrastruttura: Supabase cloud free in sviluppo e Pro
+al go-live, n8n self-hosted su Railway, Cal.com free con un account per TD,
+Vercel Pro. Emersi due punti non previsti dal Flusso: il piano Hobby di Vercel
+non copre l'uso commerciale, e la quota esecuzioni di n8n Cloud è incompatibile
+con il workflow insoluti ogni 5 minuti.
+
+**4 agosto 2026 — merge col piano di Alessandro**
+Lavorato punto per punto `XPETIS_CONFRONTO_PIANI.md`. Undici decisioni.
+
+*Base.* Resta il mio schema, da correggere strada facendo. Conseguenza: il
+risparmio di 16-18 sessioni calcolato nel confronto non si applica, perché
+valeva solo adottando il suo codice. Il merge riduce la varianza, non il
+calendario.
+
+*Accolte perché aveva ragione lui.* Il match va in una funzione Postgres: la mia
+`public_td_profiles` esponeva ad `anon` livelli dei paesi e valori degli assi,
+cioè esattamente ciò che il Flusso dice invisibile — era un difetto, non una
+scelta. Il designer si identifica con `cal_username` + slug, perché i 25 copiano
+lo stesso event type modello e lo slug da solo non identifica nessuno. La cassa
+la apre il server: un Payment Link è pubblico e riusabile e niente lo lega al
+prezzo di quella prenotazione. Lo slug sta in `payload.type`. Il workflow Stripe
+risponde sempre 2xx. Il quiz si salva al primo login, altrimenti il briefing del
+designer arriva vuoto. `td_publish_readiness` controlla la plausibilità e non
+solo la completezza: un profilo tutto "Base" era completo e non funzionava.
+
+*Corretto un conto del confronto.* Le 60.000 esecuzioni n8n al mese
+presuppongono sette cron separati a 5 minuti. Un orologio unico che verifica
+tutte le scadenze dovute costa 8.640 esecuzioni in totale, e su Railway sono
+illimitate: la "strada C" con `pg_cron` costerebbe più e dividerebbe le
+automazioni fra due sistemi. Resta un orologio unico su n8n self-hosted.
+
+*Trovato incrociando i due documenti.* Se cancellare su Cal.com richiede solo il
+codice della prenotazione, `cal_booking_uid` è una credenziale, e il mio
+`grant select on bookings to authenticated` la consegnava al viaggiatore.
+Da chiudere con una vista senza quel campo. E poiché le mail native di Cal.com
+contengono i link di cancellazione, le regole di rimborso vanno applicate sul
+webhook `BOOKING_CANCELLED`: non c'è modo di chiudere quella porta.
+
+*Rischi accettati.* Token in chiaro nel database. Verso degli assi non ancora
+fissato (nel nostro seed solo `pace` ha etichette vere) con controllo a vista
+all'import. Mail native di Cal.com lasciate accese, con i nostri testi scritti
+per convivere. Import fedele e correzione a mano dei 25 profili, 8-12 ore del
+team. Il `.docx` del Flusso resta superato su cinque punti, tracciati qui.
+
+*Chiuso.* S-05, con prove sul campo: webhook sì, prefill sì, e per cancellare
+non serve nessuna chiave. Annullato S-10.
+
+In attesa di: `GUIDA_PONTE_CALCOM.md` con le fixture, dataset geografico, link
+Figma, JSON delle 25 vetrine, e via a procedere.
+
+**6 agosto 2026 — mappatura del form vetrina**
+Arrivati `vetrina-dennis-milello/` e `GUIDA_PONTE_CALCOM.md`. Letto il form e
+scritto `supabase/MAPPATURA_VETRINA.md`: 30 campi mappati, 11 migration
+individuate. Deciso di **non importare ora i dati di Dennis**: serve come
+struttura, non come carico dati.
+
+Tre scoperte. **Il livello dei paesi non è un campo del form:** non esiste come
+campo modificabile, ogni riga nasce "Base" e nessuna interfaccia la cambia.
+Quindi i designer non sono disattenti, il form non glielo chiede. L'unico segnale
+di rilievo è `topDestinazioni` ("fino a 3, saranno messe in evidenza"), da cui la
+regola: top destinazioni → livello 1, gli altri → livello 2, campo `livello`
+ignorato. **I viaggi di gruppo nel JSON non sono del designer:** `gruppo[]` non ha
+campi modificabili e resta il contenuto d'esempio (il "Argentina: Trekking in
+Patagonia" di Dennis è l'esempio dentro il form). Non si importa mai, e la sezione
+prevista dal Flusso resta senza sorgente. **Un'etichetta non aggancia:** il mio
+seed dice "Aree estreme e polari", il form "Aree estreme/polari".
+
+*Deciso.* Assi allineati al verso dichiarato nel form, con `aesthetics`
+rinominato `curated_vs_real` perché il nome suggeriva il verso opposto a quello
+vero, e `companions` portato a cinque opzioni. Recensioni di vetrina in una
+tabella separata `td_showcase_reviews`, non esposta finché non si affrontano le
+recensioni (milestone 8).
+
+*Ancora aperti, non bloccanti:* se `group_trip` e `private_guiding` entrano
+nell'enum dei servizi acquistabili; se la sezione viaggi di gruppo va aggiunta al
+form o caricata dal team; se `giorni` e `prezzo` degli itinerari sono solo
+etichette di vetrina; conferma della regola `topDestinazioni` → livello 1.
+
+**6 agosto 2026 — migration 0018-0020, le correzioni**
+Scritte e verificate le tre migration che chiudono i difetti aperti. Harness a 90
+asserzioni, tutte verdi.
+
+`0018` sostituisce `public_td_profiles` con `match_designers()` in
+`SECURITY DEFINER`: l'algoritmo completo del Flusso in SQL — bande geografiche,
+punteggio quiz sui sei assi, punteggio filtri in frazione, affinità pesata,
+chiave di ordinamento a quattro livelli, badge, sezioni. Restituisce posizione,
+banda, sezione, badge, paesi coperti per nome, i due assi più salienti e i temi
+agganciati: nessun punteggio, nessun livello, nessun valore di asse. Una scelta
+che vale la pena ricordare: **per comporre la frase non serve il valore dell'asse
+del designer.** La salienza pesa l'affinità, quindi un asse saliente è per
+costruzione un asse dove i due stanno dalla stessa parte, e il frammento si
+scrive dalla risposta del viaggiatore, che lui già conosce. Avendo spostato il
+match lato server sono caduti anche i pesi degli assi e i parametri di matching
+dalla superficie pubblica: il browser non ne ha più bisogno.
+
+`0019` sostituisce il grant su `bookings` e `orders` con `my_bookings` e
+`my_orders`, filtrate su `auth.uid()` e prive di `cal_booking_uid`.
+
+`0020` aggiunge `td_publish_blockers()` — foto, bio, paesi, **almeno un paese di
+livello 1**, sei assi, consulenza attiva, account Cal.com — e un trigger di
+vincolo differito che rifiuta la pubblicazione elencando i motivi. Più
+`td_publish_warnings()` per ciò che non blocca ma fa perdere punteggio: paesi
+senza tema, paesi senza contesto, più di tre livelli 1, assi tutti sullo stesso
+valore, nessun servizio oltre la consulenza. Il caso del designer con 32 paesi
+tutti "Base" ora non si pubblica, e il messaggio dice perché.
+
+Aggiunti al seed tre paesi non coperti da nessuno (Cambogia, Corea del Sud,
+India) per poter provare le bande 2 e 1, che senza di loro non erano
+verificabili.
+
+**6 agosto 2026 — migration 0021-0024, allineamento al form**
+Harness a 133 asserzioni, tutte verdi.
+
+`0021` chiude il rischio numero uno del piano. Il verso degli assi non è più
+un'interpretazione: `quiz_axes.label_min` e `label_max` contengono gli estremi
+dichiarati nel form, e si legge il verso da lì. L'asse `aesthetics` è diventato
+`curated_vs_real`, perché il vecchio nome su scala crescente si leggeva "più
+estetica" mentre nel form crescere significa *meno* estetica curata. `companions`
+è passato a cinque opzioni con le parole esatte del form. Corretta l'etichetta
+"Aree estreme/polari", che con la nostra "Aree estreme e polari" avrebbe fatto
+perdere quel tag in silenzio a ogni import.
+
+`0022` e `0023` danno casa ai campi di profilo e ai campi per paese, con vincoli
+sulle liste chiuse: se il form cambia le parole, l'import fallisce in modo
+visibile invece di scrivere una stringa che nessuno leggerà mai bene. La
+copertura legale non è un campo decorativo: "ho già un'agenzia" è l'informazione
+che popola `agency_id` per gli ordini All Inclusive.
+
+`0024` porta i servizi da quattro a cinque. `group_trip` e `private_guiding`
+entrano nell'enum perché il designer li attiva e la vetrina li mostra, ma il
+vincolo su `orders.service_type` impedisce che nasca un ordine: **il database
+registra la decisione ancora aperta invece di lasciarla a un commento.**
+
+Da qui in avanti ogni tabella nuova nasce con RLS accesa e privilegi revocati in
+modo esplicito: su Supabase i privilegi di default concedono `anon` e
+`authenticated` sulle tabelle create dopo, quindi la revoca della 0016 non si
+eredita. L'harness lo verifica a ogni run e ha già trovato la prima dimenticanza.
+
+**6 agosto 2026 — migration 0025-0028, il contenuto di vetrina**
+Harness a 150 asserzioni, tutte verdi. Con questo blocco **lo schema ha una casa
+per ogni campo del form**: era il buco più grosso trovato leggendo il JSON, dove
+circa quattro quinti del form non aveva dove atterrare.
+
+Una tabella per sezione — viaggi firma con le foto, itinerari pronti, recensioni
+esterne — con righe ordinate e uniche per designer. Il vincolo sul titolo non
+vuoto serve all'import: il form nasce con tre righe di viaggio precompilate e
+vuote, e senza quel vincolo finirebbero in vetrina.
+
+Deroga consapevole alla convenzione degli importi in centesimi su
+`td_ready_itineraries`: durata e prezzo arrivano dal form come testo
+("5-7 giorni", "850€") e sono indicazioni di vetrina, non casse. La convenzione
+`*_cents` vale dove passa denaro vero.
+
+`public_td_showcase` serve ora tutta la vetrina in una query. Alzato a 15 MB il
+limite del bucket immagini: le foto di un pacchetto reale arrivano a 6 MB l'una,
+33 MB per 25 file. L'import dovrà comunque ridimensionarle — 1 GB di Storage sul
+piano gratuito basta per una trentina di designer e noi ne abbiamo 25.
+
+*Verifica strutturale sul JSON reale, senza importarlo.* Tutti i valori di lista
+chiusa del pacchetto di Dennis — temi, contesti, durate, budget, "con chi
+viaggi", copertura legale — sono riconosciuti dallo schema: **zero valori
+inattesi**. Restano confermati i tre problemi già noti, che sono di dato e non di
+struttura: due righe paese vuote, due nomi con spazio in coda ("Perù ",
+"Vietnam "), e le voci che non sono stati.

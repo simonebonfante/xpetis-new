@@ -1,0 +1,11 @@
+PACCHETTO VETRINA XPETIS
+
+Contenuto:
+- vetrina.json  -> i dati della tua vetrina
+- images/       -> le foto che hai caricato (25 file)
+
+Come usarlo:
+Invia l'intera cartella (o questo file .zip) a XPETIS.
+Il sito legge vetrina.json e collega automaticamente le foto
+dalla cartella images/ tramite i nomi file indicati nel JSON.
+Non rinominare i file dentro images/.

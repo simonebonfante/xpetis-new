@@ -1,0 +1,686 @@
+{
+  "brand": "XPETIS",
+  "nome": "Dennis Milello",
+  "nomeProfessionale": "",
+  "rating": "",
+  "fotoProfilo": "images/foto-profilo.jpg",
+  "competenze": "",
+  "esperienza": "15",
+  "membro": "1",
+  "callPrezzoLibero": true,
+  "lingue": "Inglese, Spagnolo, Francese, Italiano, Russo",
+  "heroBio": "Cerco itinerari intensi ma mai frenetici, cerco tappe con un significato e un incontro che mi lascia qualcosa. Il lusso, per me, è tornare con una storia da raccontare.",
+  "storia": "Per me viaggiare significa andare oltre la semplice visita di una destinazione. Negli anni ho esplorato 89 Paesi, spesso fuori dalle rotte più battute, con un approccio basato su autenticità, natura, cultura e incontri con le persone del posto. Come Travel Designer non parto da un itinerario predefinito, ma dalla persona che ho davanti: ascolto le sue aspettative, il suo modo di viaggiare e costruisco un'esperienza che la rappresenti davvero. Mi piace trovare il giusto equilibrio tra organizzazione e libertà, curando ogni dettaglio senza perdere quella spontaneità che rende un viaggio indimenticabile. Il mio obiettivo non è farti vedere il maggior numero di luoghi possibile, ma farti vivere un'esperienza che ti lasci qualcosa anche dopo il ritorno.",
+  "callPrezzo": "20",
+  "callDescrizione": "Durante la consulenza voglio capire chi sei, come ti piace viaggiare, cosa cerchi davvero e cosa, invece, vuoi evitare. Non parleremo solo di destinazioni, ma di esperienze, ritmo, aspettative e stile di viaggio. I TUOI.",
+  "callPunti": [
+    "Analisi del tuo stile di viaggio e delle tue aspettative",
+    "Scelta della destinazione più adatta ai tuoi interessi",
+    "Itinerario completamente personalizzato",
+    "Supporto nella pianificazione del viaggio e risposte ai tuoi dubbi"
+  ],
+  "viaggi": [
+    {
+      "titolo": "Australia, il richiamo dell'infinito",
+      "descrizione": "È l'alba sull'oceano, il silenzio dell'Outback, la fauna incredibile, la costa tropicale del Queensland e le città dove culture diverse convivono in perfetto equilibrio. Progetto questo viaggio per chi ama gli spazi immensi, i road trip, la natura e quella sensazione unica di avere davanti infinite possibilità, con il giusto mix tra organizzazione e scoperta.",
+      "imgs": [
+        "images/viaggio-1-foto-1.jpg",
+        "images/viaggio-1-foto-2.jpg",
+        "images/viaggio-1-foto-3.jpg"
+      ]
+    },
+    {
+      "titolo": "Nuova Zelanda, il viaggio che ti cambia prospettiva",
+      "descrizione": "C'è un motivo se la Nuova Zelanda è diventata la Terra di Mezzo. Tutti gli scorci entrano in un mondo diverso: montagne, fiordi, vulcani, laghi cristallini e vallate infinite. È un viaggio per chi sogna di rivivere le atmosfere del Signore degli Anelli, ma anche per chi cerca libertà, natura e avventura. Un road trip che alterna trekking e panorami mozzafiato...",
+      "imgs": [
+        "images/viaggio-2-foto-1.jpg",
+        "images/viaggio-2-foto-2.jpg",
+        "images/viaggio-2-foto-3.jpg"
+      ]
+    },
+    {
+      "titolo": "Bosnia-Erzegovina, il viaggio che non ti aspetti",
+      "descrizione": "La Bosnia sorprende chiunque le conceda una possibilità. È un Paese che racconta la sua storia attraverso le persone, i mercati, i ponti, i caffè e i paesaggi. Qui non si corre da un'attrazione all'altra: si ascolta, si osserva e ci si lascia coinvolgere. È il viaggio che consiglio a chi vuole uscire dai percorsi più battuti e scoprire un volto dei Balcani autentico, intenso e incredibili...",
+      "imgs": [
+        "images/viaggio-3-foto-1.jpg",
+        "images/viaggio-3-foto-2.jpg",
+        "images/viaggio-3-foto-3.jpg"
+      ]
+    }
+  ],
+  "itinerari": [
+    {
+      "titolo": "Bosnia 360 On the Road",
+      "giorni": "5-7 giorni",
+      "prezzo": "850€",
+      "img": "images/itinerario-1.jpg"
+    },
+    {
+      "titolo": "Nuova Zelanda, alla scoperta delle due isole",
+      "giorni": "15 giorni",
+      "prezzo": "3650€",
+      "img": "images/itinerario-2.jpg"
+    },
+    {
+      "titolo": "Australia: Avventura nel Queensland ",
+      "giorni": "12-17 giorni",
+      "prezzo": "3550€",
+      "img": "images/itinerario-3.jpg"
+    },
+    {
+      "titolo": "Perù, nel regno degli Incas",
+      "giorni": "10-15 giorni",
+      "prezzo": "2850€",
+      "img": "images/itinerario-4.jpg"
+    },
+    {
+      "titolo": "Hawaii, il giardino dell'Eden",
+      "giorni": "12-17 giorni",
+      "prezzo": "3850€",
+      "img": "images/itinerario-5.jpg"
+    },
+    {
+      "titolo": "I Caraibi inesplorati: Saint Vincent and the Grenadines",
+      "giorni": "7-10 giorni",
+      "prezzo": "2850€",
+      "img": "images/itinerario-6.jpg"
+    },
+    {
+      "titolo": "Safari in Tanzania + Zanzibar ",
+      "giorni": "10-14 giorni",
+      "prezzo": "3800€",
+      "img": "images/itinerario-7.jpg"
+    },
+    {
+      "titolo": "Giappone, nel regno dei Samurai",
+      "giorni": "10-12 giorni",
+      "prezzo": "2900€",
+      "img": "images/itinerario-8.jpg"
+    },
+    {
+      "titolo": "Colombia, la moderna perla del Sud America",
+      "giorni": "10-14 giorni",
+      "prezzo": "2750€",
+      "img": "images/itinerario-9.jpg"
+    },
+    {
+      "titolo": "Viaggio dentro \"Harry Potter\", tutti i luoghi del film",
+      "giorni": "7-10 giorni",
+      "prezzo": "2250€",
+      "img": "images/itinerario-10.jpg"
+    },
+    {
+      "titolo": "Viaggio dentro \"Il Signore degli Anelli\", tutti i luoghi del film",
+      "giorni": "15 giorni",
+      "prezzo": "3900€",
+      "img": "images/itinerario-11.jpg"
+    },
+    {
+      "titolo": "Viaggio dentro \"Lost\", tutti i luoghi della serie",
+      "giorni": "12 giorni",
+      "prezzo": "3900€",
+      "img": "images/itinerario-12.jpg"
+    },
+    {
+      "titolo": "L'Aeroporto più Folle del mondo, Saint Maarten",
+      "giorni": "7-10 giorni",
+      "prezzo": "2850€",
+      "img": "images/itinerario-13.jpg"
+    },
+    {
+      "titolo": "Paesi Baschi, la cultura inesplorata",
+      "giorni": "5-7 giorni",
+      "prezzo": "1350€",
+      "img": "images/itinerario-14.jpg"
+    },
+    {
+      "titolo": "La via della Seta, Uzbekistan",
+      "giorni": "7-10 giorni",
+      "prezzo": "1850€",
+      "img": "images/itinerario-15.jpg"
+    }
+  ],
+  "gruppo": [
+    {
+      "titolo": "Argentina: Trekking in Patagonia",
+      "date": "14 – 25 set 2025",
+      "giorni": "12 giorni",
+      "persone": "10 persone",
+      "prezzo": "1.380€",
+      "img": ""
+    },
+    {
+      "titolo": "Marocco: tra deserto e medine",
+      "date": "9 – 18 ott 2025",
+      "giorni": "10 giorni",
+      "persone": "8 persone",
+      "prezzo": "1.250€",
+      "img": ""
+    },
+    {
+      "titolo": "Giappone in autunno",
+      "date": "3 – 16 nov 2025",
+      "giorni": "14 giorni",
+      "persone": "12 persone",
+      "prezzo": "2.900€",
+      "img": ""
+    }
+  ],
+  "recensioni": [
+    {
+      "titolo": "Isole Lofoten (Norvegia) ",
+      "nome": "Nico",
+      "stelle": 5,
+      "data": "Febbraio 2026",
+      "testo": "A mani basse il viaggio più entusiasmante e sorprendente che abbia mai fatto . Costantemente a bocca aperta per le meraviglie che la natura ci proponeva, devo ancora realizzare le 1000 cose che abbiamo fatto e visto, i limiti che abbiamo superato e la comprensione del mondo che abbiamo assimilato .\n\nCon Dennis ci siamo sentiti sempre al sicuro , non solo perché in ogni momento sapeva cosa fare e come affrontare eventuali intoppi, ma anche perché è una persona colma di esperienze , che sa trasmetterti stimolarti con semplicità e umanità.\n\nIl gruppetto è subito diventato affiatato, ci siamo sentiti immediatamente amici, poi perfino una famiglia. Non avrei potuto chiedere di meglio!\n\nOra è già tempo di pensare al prossimo viaggio e non esiterei un attimo a sceglierlo di nuovo tra le vostre proposte ! Immensamente grazie ! Nico."
+    },
+    {
+      "titolo": "Viaggio in Vietnam",
+      "nome": "Claudia",
+      "stelle": 5,
+      "data": "Marzo 2026",
+      "testo": "Viaggio in Vietnam a marzo 2026, coordinatore Dennis Milello: bello oltre ogni aspettativa! Sono rimasta incantata dalla bellezza dei luoghi che abbiamo visitato, dalla diversità e unicità dei villaggi di montagna tra le risaie, dalla dignità e accoglienza delle persone che abbiamo incontrato, dalla passione con la quale ci hanno raccontato la storia più recente del paese, dalla serenità che sembrano aver trovato nella vita tra corse in scooter o in bicicletta, sorrisi di condivisione aldilà di ogni parola, tai chi praticato in un parco o su una nave da crociera e tanto, tanto altro ancora!\nTutto questo è stato possibile grazie all'organizzazione del nostro coordinatore Dennis, alla sua grande curiosità verso la storia e la cultura del paese, alla sua capacità di entrare in comunicazione con le persone in maniera diretta e rispettosa, con grande sensibilità  e attenzione all'ascolto. Spero di poter ripartire presto con lui per poter vivere altre esperienze sorprendenti ed incontri emozionanti!"
+    },
+    {
+      "titolo": "Viaggio Svalbard ",
+      "nome": "Angela",
+      "stelle": 5,
+      "data": "agosto 2025",
+      "testo": "Viaggio magnifico in un posto unico al mondo! Dennis è un bravissimo coordinatore e una persona estremamente curiosa ed entusiasta di ciò che vede. Tutto perfettamente organizzato! Felice di aver condiviso trekking, kayak e cruise  insieme ad un gruppo spettacolare di persone in una zona così estrema del pianeta. Se siete persone interessate a trichechi, volpi artiche, belughe e belle camminate su ghiacciai, è il viaggio perfetto!"
+    },
+    {
+      "titolo": "Viaggio in Scozia",
+      "nome": "Martina",
+      "stelle": 5,
+      "data": "Maggio 2026",
+      "testo": "Il viaggio di gruppo in Scozia è stato semplicemente indimenticabile. Paesaggi mozzafiato, castelli incantati, natura selvaggia e cieli infiniti: ogni tappa ci ha regalato emozioni diverse e momenti da custodire per sempre. Ma ciò che ha reso tutto ancora più speciale è stata la guida attenta e coinvolgente del nostro coordinatore Dennis.\n\nDennis non è stato solo un punto di riferimento, ma anche un compagno di viaggio eccezionale: sempre disponibile, solare, organizzato e pronto a trasmettere entusiasmo. Ha saputo creare un’atmosfera di gruppo bellissima, facendo sentire tutti parte di una piccola famiglia, e trasformando anche gli imprevisti in occasioni per sorridere"
+    },
+    {
+      "titolo": "Viaggio Andalucia con Dennis Milello",
+      "nome": "Catia",
+      "stelle": 5,
+      "data": " settembre 2025",
+      "testo": "Esperienza davvero positiva! Dennis, nostro accompagnatore, si è dimostrato professionale, disponibile e sempre attento alle esigenze del gruppo. Ha saputo gestire al meglio i tempi del viaggio, fornendo spiegazioni chiare e interessanti sui luoghi visitati, con grande competenza e passione. Ha contribuito a creare un’atmosfera piacevole e serena, rendendo il viaggio non solo ben organizzato ma anche ricco di emozioni e momenti indimenticabili."
+    },
+    {
+      "titolo": "VIAGGIO LOFOTEN CON DENNIS MILELLO",
+      "nome": "Maria",
+      "stelle": 5,
+      "data": "Febbraio 2026",
+      "testo": "Paesaggi artici, silenzi irreali, villaggi di pescatori sospesi tra mare e montagne innevate, fiordi e aquile… ma ciò che ha reso questo viaggio davvero speciale sono state le persone.\nFin dal primo giorno si è creata un’energia rara: risate nelle rorbu, trekking tra neve e vento artico, attese col naso all’insù sotto cieli che sembravano dipinti ad acquerello.\nE poi lei...\nL’Aurora Boreale ci ha sorpreso 5 sere su 5. Ogni volta diversa, ogni volta capace di lasciarci in silenzio. Verde intenso,  rosso, viola, onde danzanti, esplosioni improvvise nel cielo nero artico. Condividerla insieme ha amplificato tutto.\nE come se non bastasse, il cielo color pastello ci ha regalato spettacolo più volte: albe e tramonti dalle sfumature rosa, pesca, lilla. Una luce morbida che rendeva irreali le montagne e il mare. Momenti in cui nessuno parlava… si respirava solo bellezza.\nDennis è stato uno dei veri punti di forza del viaggio. Competente e preparato, conosce bene il territorio e le sue dinamiche invernali: meteo, tempistiche, spostamenti, punti strategici per osservare l’aurora. Nulla lasciato al caso, ma senza mai far pesare l’organizzazione. Trasmette sicurezza senza creare ansia, anche quando le condizioni cambiano o serve adattare il programma. Sempre lucido nelle decisioni, ma capace di mantenere un clima sereno e positivo.\nAttento alle persone prima ancora che alla tabella di marcia: ascolta, osserva, capisce quando è il momento di aspettare, quando di muoversi, quando di semplicemente lasciare spazio al silenzio e allo spettacolo davanti a noi. E il tutto con una simpatia naturale che rende facile fidarsi e lasciarsi guidare. E, cosa non scontata, oltre alla stima è nata anche un’amicizia sincera.\nUn viaggio che  ti riempie la mente e il cuore💚"
+    }
+  ],
+  "manifesto": "Non progetto itinerari. Progetto il modo in cui vivrai una destinazione.",
+  "instagram": "@dennis____93",
+  "coperturaLegale": "Ho già un'agenzia / struttura — non mi serve supporto",
+  "gruppoHaGia": "No, non ancora",
+  "gruppoTempi": "Nel 2027",
+  "topDestinazioni": [
+    "Hawaii",
+    "Perù",
+    "Uzbekistan"
+  ],
+  "paesi": [
+    {
+      "paese": "Norvegia",
+      "livello": "Base",
+      "aree": "Lofoten",
+      "temi": [
+        "Natura e wildlife"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Islanda",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "California",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Deserto"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Hawaii",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Mare e isole",
+        "Deserto",
+        "Foresta e giungla"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Australia",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Foresta e giungla",
+        "Deserto",
+        "Mare e isole",
+        "Campagna e aree rurali"
+      ],
+      "durata": "Lungo (15–30 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Nuova Zelanda",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Lungo (15–30 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Tanzania",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Etiopia",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Tunisia",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Cultura, arte e storia",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Mare e isole",
+        "Deserto"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Cile",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia",
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Brasile",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Colombia",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor",
+        "Cultura, arte e storia"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Perù ",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia",
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Canada",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Florida",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Texas",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Cultura, arte e storia",
+        "Avventura e outdoor",
+        "Fotografia e creatività"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "New York",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Giappone",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia",
+        "Spiritualità e benessere",
+        "Fotografia e creatività"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Corea del Sud",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia",
+        "Spiritualità e benessere"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Campagna e aree rurali"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Uzbekistan",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia",
+        "Natura e wildlife"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Kazakistan",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor",
+        "Cultura, arte e storia"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Marocco",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Cultura, arte e storia",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Egitto",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Deserto",
+        "Città"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Scozia",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Cultura, arte e storia",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Balcani",
+      "livello": "Base",
+      "aree": "Croazia, Slovenia, Serbia, Albania, Bosnia, Kosovo",
+      "temi": [
+        "Cultura, arte e storia",
+        "Food",
+        "Natura e wildlife"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Contenuto (<€1.500)"
+    },
+    {
+      "paese": "Bulgaria",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia",
+        "Natura e wildlife"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Contenuto (<€1.500)"
+    },
+    {
+      "paese": "Giordania",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia",
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "",
+      "livello": "Base",
+      "aree": "",
+      "temi": [],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "",
+      "budget": ""
+    },
+    {
+      "paese": "Vietnam ",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Cultura, arte e storia",
+        "Spiritualità e benessere"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Caraibi",
+      "livello": "Base",
+      "aree": "Rep Dominicana, Saint Vincent, Saint Lucia, Antigua, Barbados, Saint Marteen",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Irlanda",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Cultura, arte e storia"
+      ],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "",
+      "livello": "Base",
+      "aree": "",
+      "temi": [],
+      "temiCustom": [],
+      "contesti": [],
+      "durata": "",
+      "budget": ""
+    }
+  ],
+  "assi": {
+    "conChi": [
+      "Coppia",
+      "Gruppo di amici/piccolo gruppo",
+      "Gruppo organizzato"
+    ],
+    "controllo": 2,
+    "ritmo": 3,
+    "scomodita": 2,
+    "luogo": 2,
+    "sociale": 3
+  },
+  "servizi": [
+    "Consulenza singola (30 min)",
+    "Itinerario su misura ALL INCLUSIVE",
+    "Itinerario su misura",
+    "Viaggio di gruppo a tua firma",
+    "Accompagnamento privato / presenza sul posto"
+  ]
+}
