@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  /* Verde brand XPETIS */
+  --color-brand: #1b5e24;
+  --color-brand-scuro: #12401a;
+  --color-brand-chiaro: #e8f0e9;
+}
+
+body {
+  background: #ffffff;
+  color: #1c1c1a;
+}

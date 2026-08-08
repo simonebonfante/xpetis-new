@@ -298,8 +298,13 @@ subito, anche se serviranno dopo.
 
 *Blocco B — quando il blocco A è avviato*
 
-- [ ] **[S]** Repo Git e progetto Vercel Pro → **S-02**
-- [ ] **[S]** Login Google (Google Cloud + credenziali in Supabase) → **S-07**
+- [x] **[S]** Repo Git e progetto Vercel → **S-02 fatto l'8 agosto.** Repo
+      collegato, deploy su `https://xpetis-new.vercel.app`. Resta su **Hobby**
+      finché il sito è un'anteprima privata: **il passaggio a Pro va fatto prima
+      di mostrarlo fuori dal team o di incassare**
+- [x] **[S]** Login Google → **S-07 fatto l'8 agosto** e verificato end-to-end:
+      sessione attiva, riga in `travelers` creata dal trigger, nome preso da
+      Google. Progetto Google Cloud `xpetis-504916`
 
 *Blocco C — chiude la milestone*
 
@@ -307,8 +312,10 @@ subito, anche se serviranno dopo.
 - [ ] **[S]** Account Cal.com di regia e event type modello → **S-09**
 - [ ] **[S]** Numero WhatsApp XPETIS → **S-08**
 - [x] **[S]** ~~Le tre verifiche su Cal.com~~ → **S-05 chiuso**, vedi sotto
-- [ ] **[C]** Bootstrap Next.js: TypeScript, Tailwind con la palette brand,
-      shadcn/ui, client Supabase (publishable lato browser, secret lato server)
+- [x] **[C]** Bootstrap Next.js 16: TypeScript, Tailwind 4 con il verde brand,
+      i tre client Supabase (publishable nel browser, publishable+cookie lato
+      server, secret per le scritture), `proxy.ts` che rinfresca la sessione,
+      route di callback OAuth e pagina di prova dell'impianto
 - [ ] **[C]** Applicare le migration al progetto Supabase e verificare le viste
 - [ ] **[C]** Struttura delle route server-side per le pagine token, con la
       validazione già agganciata a `resolve_access_token`
@@ -590,6 +597,18 @@ nuova. Regola aggiunta a `CLAUDE.md`.
 
 **S-01 chiuso.** Progetto `rsgyxbqzsxahsbdfgtbm`, 31 migration e i tre seed
 applicati, le query di verifica rispondono.
+
+**S-02 e S-07 chiusi, e il giro Google-Supabase-Vercel è provato.** Repo su
+GitHub, deploy su `xpetis-new.vercel.app`, login Google funzionante. Costruita
+l'app Next.js 16 con i tre client Supabase e una pagina di verifica
+dell'impianto che prova tre cose insieme: la lettura pubblica con la sola chiave
+publishable (129 paesi e i due designer di prova rispondono), il login, e la
+riga in `travelers` creata dal trigger su `auth.users`. **Tutte e tre verdi al
+primo tentativo.**
+
+*Punto aperto chiuso:* Google consegna davvero il nome in
+`raw_user_meta_data->>'full_name'`, quindi il trigger popola `full_name` da
+solo. Non serve raccoglierlo altrove.
 
 *Decisione che cambia una convenzione: le chiavi Supabase.* Installata nel repo
 la skill `supabase/server`, che documenta il passaggio alle nuove chiavi API:
