@@ -9,6 +9,8 @@ caselle, e si aggiunge una riga al registro in fondo a ogni sessione.
 - Documentazione dello schema: `supabase/README.md`
 - Mappatura form vetrina → schema, con le 11 migration da scrivere:
   `supabase/MAPPATURA_VETRINA.md`
+- Mappatura messaggi Cal.com → schema, ricavata da un messaggio vero:
+  `supabase/MAPPATURA_CALCOM.md`
 - Confronto con il piano di Alessandro: `XPETIS_CONFRONTO_PIANI.md`
 
 **Regola di ingaggio:** si lavora solo su via esplicito di Simone. Gli
@@ -23,11 +25,46 @@ business (Alessandro e Andrea)
 
 ---
 
+## Da dove ripartire
+
+**Stato a fine 8 agosto 2026.**
+
+Milestone 0 **chiusa**: 31 migration, 177 asserzioni verdi, schema applicato al
+progetto Supabase vero. Milestone 1 **a metà**: geografia importata, import delle
+25 vetrine rimandato alla fine per scelta. Milestone 2 **quasi chiusa**:
+Supabase, Vercel, login Google, n8n e Cal.com sono in piedi e provati.
+
+Il ponte Cal.com ha già consegnato il suo primo messaggio vero, ed è mappato in
+`supabase/MAPPATURA_CALCOM.md`.
+
+### Cosa resta a te
+
+- **S-08**, numero WhatsApp. Non dipende da nulla, mezz'ora.
+- **Stripe**: fermo sulla questione societaria, non sulla tecnica.
+- **Il link Figma.** È la cosa che sblocca più lavoro di tutte: la milestone 3
+  sono 6-8 sessioni ed è ferma solo su quello.
+- **Portare ad Alessandro e Andrea la domanda "chi è il venditore"** — è
+  diventata il percorso critico del progetto.
+
+### Cosa posso fare io, in ordine di utilità
+
+1. **Le route server per le pagine token** (`resolve_access_token` è già pronta
+   nel database). Non dipende dal design né da nulla di tuo, ed è l'impalcatura
+   su cui poggiano milestone 5, 6 e 7.
+2. **Il ponte Cal.com → `bookings` in n8n**, ora che abbiamo il messaggio vero e
+   la mappatura dei campi. Si può scrivere e provare subito con l'account di
+   prova.
+3. **Il suggeritore destinazioni** sulla tassonomia: è logica, non grafica, e
+   funziona indipendentemente da come sarà disegnata la barra di ricerca.
+4. La milestone 3 vera e propria, appena arriva il Figma.
+
+---
+
 ## Materiali in arrivo
 
 | Materiale | Serve per | Stato |
 |---|---|---|
-| Link Figma delle pagine | Milestone 3, 4, 6, 7, 8 | ⏳ me lo linki |
+| Link Figma delle pagine | Milestone 3, 4, 6, 7, 8 | ✅ arrivati il 10 agosto — file `x1DYYagZ2moagmpEHZHYYE`, nodi in `CLAUDE.md` |
 | Dataset geografico (129 stati, 244 regioni, 1.220 città) | Import geo, suggeritore, bande del match | ⏳ me lo incolli — versione normalizzata da Alessandro |
 | `GUIDA_PONTE_CALCOM.md` + fixture dei 7 messaggi veri | Nomi veri dei campi Cal.com e prove del ponte | ⏳ me lo incolli |
 | JSON delle 25 vetrine compilate | Import profili TD | ⏳ da produrre dal form HTML |
@@ -53,6 +90,7 @@ tassonomia geografica.
 | 5 | Non ne parla | Le mail native di Cal.com restano accese e i testi XPETIS sono scritti per convivere con loro | Spegnerle potrebbe richiedere un piano a pagamento su 25 account. Costo zero e nessuna dipendenza dal piano | 4 ago |
 | 6 | "La barra di ricerca normalizza qualunque input a un paese" (§1) | Filtrano **paesi e macro-aree**. Città e continenti sono solo navigazione: la città porta al suo paese, il continente alle sue macro-aree | La tassonomia dichiara selezionabili anche le macro-aree, e cercare "Sud America" è una richiesta legittima | 8 ago |
 | 7 | *(deviazione dalla tassonomia)* Le 20 regioni italiane sono dichiarate selezionabili | **Non filtrano.** Nessun quinto livello di filtro: come trattarle si deciderà | Il dato della tassonomia non si perde: `is_selectable` conserva la sua intenzione, `is_filterable` dice cosa filtra oggi. Sono le uniche 20 righe su cui i due valori differiscono, e l'harness lo verifica | 8 ago |
+| 8 | "Colore brand: verde `#1b5e24`" (§0) | La palette è **crema `#F0EEDF`, nero `#1C1C1A`, primario `#E53619`**, con Merriweather Bold sui titoli e Ronzino Regular sul testo | Sono i token del Figma, e concordano con il form Vetrina TD, che usa le stesse due tinte. Il verde non compare in nessuno dei due: è un dato più vecchio del design | 9 ago |
 
 **Conseguenza della 5, da non perdere di vista.** Le mail native di Cal.com
 contengono i link *cancella* e *riprogramma*, e cancellare su Cal.com richiede
@@ -294,7 +332,11 @@ subito, anche se serviranno dopo.
       di Resend. *Conseguenza:* la reputazione di invio si scalderà solo alla
       fine, quindi fra dominio autenticato e Beta va lasciata **almeno una
       settimana** di margine
-- [ ] **[S]** Account Stripe XPETIS e verifica dell'attività → **S-06**
+- [~] **[S]** Account Stripe → **S-06 parziale l'8 agosto.** Sandbox creata, si
+      sviluppa in test mode. **L'attivazione è bloccata: non esiste un'entità
+      legale** e non esisterà nel primo periodo. Vedi i rischi
+- [ ] **[B]** Decidere **chi è il venditore** su consulenze e itinerari su
+      misura: entità XPETIS, agenzia partner, o i designer con Stripe Connect
 
 *Blocco B — quando il blocco A è avviato*
 
@@ -308,15 +350,30 @@ subito, anche se serviranno dopo.
 
 *Blocco C — chiude la milestone*
 
-- [ ] **[S]** Istanza n8n self-hosted su Railway → **S-03**
-- [ ] **[S]** Account Cal.com di regia e event type modello → **S-09**
+- [x] **[S]** Istanza n8n self-hosted su Railway → **S-03 fatto l'8 agosto.**
+      `https://n8n-production-d576.up.railway.app`, Postgres dedicato,
+      **nessun volume**: tutto lo stato vive nel Postgres, la chiave di
+      cifratura è una variabile e i dati binari sono in memoria, quindi il disco
+      non serve. Potatura dello storico a 14 giorni, fuso Europe/Rome
+- [x] **[S]** Account Cal.com ed event type modello → **S-09 fatto l'8 agosto**
+      su un account di prova con username `marco-rossi-xpetis`, così le
+      prenotazioni atterrano su un designer che esiste già nel seed. Webhook
+      verso n8n attivo, primo messaggio vero raccolto e mappato
+- [x] **[C]** Verificati `disableCancelling` e `disableRescheduling`. Non esiste
+      lo scope "solo host", quindi il divieto di cancellare al solo designer
+      resta a n8n. Ma **la riprogrammazione si può bloccare sotto una soglia di
+      tempo: impostata a 720 minuti, cioè la regola delle 12 ore del Flusso, che
+      da osservata diventa imposta.** Attivato anche *Require cancellation
+      reason → solo host*
 - [ ] **[S]** Numero WhatsApp XPETIS → **S-08**
 - [x] **[S]** ~~Le tre verifiche su Cal.com~~ → **S-05 chiuso**, vedi sotto
 - [x] **[C]** Bootstrap Next.js 16: TypeScript, Tailwind 4 con il verde brand,
       i tre client Supabase (publishable nel browser, publishable+cookie lato
       server, secret per le scritture), `proxy.ts` che rinfresca la sessione,
       route di callback OAuth e pagina di prova dell'impianto
-- [ ] **[C]** Applicare le migration al progetto Supabase e verificare le viste
+- [x] **[C]** Applicare le migration al progetto Supabase e verificare le viste
+      — 31 migration e 3 seed applicati, 129 paesi e 1.220 città in risposta,
+      `match_designers('country','vietnam')` funzionante sul database vero
 - [ ] **[C]** Struttura delle route server-side per le pagine token, con la
       validazione già agganciata a `resolve_access_token`
 
@@ -324,31 +381,64 @@ subito, anche se serviranno dopo.
 
 ## Milestone 3 — Sito pubblico: ricerca, quiz, match, vetrina
 
-- [ ] **[C]** Home dal Figma, con i due elementi e il Cerca che compare alla
-      selezione
-- [ ] **[C]** Suggeritore destinazioni sulla tassonomia
+- [x] **[C]** Fondamenta: token del Figma in Tailwind, Merriweather e Ronzino,
+      componenti condivisi (header, footer, bottone, badge a stella)
+- [x] **[C]** Home dal Figma, con il Cerca che compare alla selezione
+- [x] **[C]** Suggeritore destinazioni sulla tassonomia: cerca, distingue i
+      livelli, porta una città al suo paese e scende dai continenti alle
+      macro-aree ai paesi
+- [ ] **[S]** Scaricare gli asset del Figma con
+      `bash scripts/scarica-asset-figma.sh` — **le URL scadono in 7 giorni**
+- [x] **[S]** Ronzino in `public/fonts/` — fatto il 9 agosto
+- [ ] **[C]** Ricerca accento-insensibile: oggi "peru" non trova "Perù". Serve
+      una colonna normalizzata con `unaccent` e una migration
 - [ ] **[C]** Le 6 schermate del quiz (tutte obbligatorie, nessun quiz a metà),
       in `sessionStorage` da anonimo e **salvato sul profilo al primo login**
-- [ ] **[C]** `match_designers()`: bande geografiche, punteggio quiz, punteggio
+- [x] **[C]** `match_designers()`: bande geografiche, punteggio quiz, punteggio
       filtri, affinità, chiave di ordinamento, badge e salienza dei due assi più
       forti. Restituisce posizione, banda, sezione e badge; **mai punteggi,
-      livelli o valori degli assi**
-- [ ] **[C]** Composizione della frase dai mattoncini nella route server, con
+      livelli o valori degli assi** — migration `0018` e `0030`, ora chiamata
+      davvero da `lib/match.ts` e provata sul database vero
+- [x] **[C]** Composizione della frase dai mattoncini nella route server, con
       hash stabile sull'id del TD. In SQL i numeri, in TypeScript le concordanze
-- [ ] **[C]** Pagina risultati con ricalcolo a ogni cambio di filtro (una
-      chiamata indicizzata al server, non un ricalcolo nel browser)
+      → `lib/frase.ts`. **I testi sono segnaposto: li scrive Gaia**
+- [x] **[C]** Pagina risultati con ricalcolo a ogni cambio di filtro (una
+      chiamata indicizzata al server, non un ricalcolo nel browser) →
+      `app/ricerca/page.tsx`, vestita sul Figma 177:262
+- [ ] **[S]** Guardare `/ricerca` accanto al Figma e dirmi cosa non torna
+- [ ] **[S]** Il terzo gruppo di filtri del Figma, "QUALE TIPO DI SUPPORTO
+      CERCHI?" (consulenza, all inclusive, itinerario pronto, viaggio di
+      gruppo), e con lui "Filtri avanzati": **non sono implementati.**
+      `match_designers()` accetta solo tema e contesto, e i servizi attivi non
+      possono filtrare dal browser. Serve un parametro nuovo sulla funzione, cioè
+      una migration: è una decisione tua, non una dimenticanza
+- [ ] **[S]** I due bolli a stella del Figma dicono "+100 Designer" e "4.9
+      valutazione media". Il primo ora mostra il conteggio vero; il secondo non
+      c'è, perché non esistono recensioni e `td_review_stats` non è esposta al
+      browser. Decidere se sono promesse di marketing o dati
+- [ ] **[C]** Maschera contestuale dei filtri (sulla Bolivia non si mostra
+      "mare"): serve una funzione server nuova, perché `td_destination_tags` è
+      dato chiuso e nessuna vista pubblica dice quali tag esistono su una
+      destinazione
+- [ ] **[B]** I mattoncini della frase, i divisori di sezione e la frase
+      introduttiva onesta del fallback (Gaia). I vincoli che i testi devono
+      rispettare sono in testa a `lib/frase.ts`
 - [ ] **[C]** Vetrina del TD, con i due box acquistabili e la presentazione non
       acquistabile di su misura e All Inclusive
 - [ ] **[C]** Test del match sui 25 profili veri: ordinamenti attesi, casi limite
       (nessun quiz, nessuna destinazione, sezioni vuote)
-- [ ] **[S]** Decidere, guardando i risultati veri: badge "match forte" visibile
-      sì o no
+- [~] **[S]** Decidere, guardando i risultati veri: badge "match forte" visibile
+      sì o no → **il Figma 177:262 non lo disegna**, quindi oggi è spento
+      (`MOSTRA_BADGE_MATCH_FORTE` in `components/card-designer.tsx`). Una
+      schermata sola non è una decisione: da confermare con Chiara
 
 ---
 
 ## Milestone 4 — Prenotazione e pagamento della consulenza
 
-- [ ] **[S]** Account Cal.com di regia con l'event type modello → **S-09**
+- [x] **[S]** ~~Account Cal.com di regia con l'event type modello~~ → **S-09
+      chiuso nella milestone 2.** L'event type modello, con tutte le
+      impostazioni verificate, è in `ONBOARDING_CALCOM_TD.md`
 - [ ] **[C]** Login Google al momento del Prenota, con registrazione automatica
 - [ ] **[C]** Embed Cal.com con nome, email e ID utente XPETIS precompilati.
       Torna in `payload.responses.xpetis_user_id.value`
@@ -524,9 +614,14 @@ Supabase Auth. Google è l'unico provider previsto.
 Numero dedicato, WhatsApp Business, chi lo presidia e con quali orari.
 
 **S-09 · Account Cal.com di regia e event type modello** (1-2 h)
-"Consulenza XPETIS · 30 min": durata 30, buffer 10 dopo, preavviso 12 ore,
-orizzonte 30 giorni, redirect post-prenotazione. Decidi anche lo strumento video
-(Google Meet o Cal Video): non è bloccante.
+"Consulenza XPETIS · 30 min", URL `consulenza-xpetis-30` **scritto a mano**,
+durata 30, buffer 10 dopo, preavviso 12 ore, orizzonte 30 giorni, campo nascosto
+`xpetis_user_id`. Dettagli verificati in `GUIDA_PONTE_CALCOM.md`.
+
+*Strumento video: **Cal Video**, deciso l'8 agosto.* Google Meet richiederebbe a
+ognuno dei 25 designer di collegare il proprio Google Calendar: una dipendenza in
+più in onboarding, per venticinque persone, in cambio di niente. Si cambia con
+un'impostazione dell'event type se serve.
 
 ### P2 — quando serve
 
@@ -544,10 +639,11 @@ custodisca credenziali di terzi.
 **S-12 · Attivazione tecnica della prima agenzia** (2-3 h)
 Chiavi, webhook verso n8n, prova di un pagamento di test.
 
-**S-13 · Onboarding Cal.com dei 25 TD** (12-15 h con il team)
-Circa 30 minuti a TD: account, event type dal modello, disponibilità, webhook.
-Nessuna chiave API da raccogliere (vedi S-05). Si può fare in parallelo alla
-milestone 6.
+**S-13 · Onboarding Cal.com dei 25 TD** (6-7 h con il team)
+**La procedura completa e provata sul campo è in `ONBOARDING_CALCOM_TD.md`**, con
+i valori esatti, le tre trappole e la checklist per designer. Circa 15 minuti a
+testa, non 30: nessuna chiave API da raccogliere (vedi S-05) e nessuna
+configurazione da inventare. Si può fare in parallelo alla milestone 6.
 
 **S-14 · Condizioni generali, privacy e cookie policy** (esterno)
 Il flusso ci appoggia regole precise (15 minuti di attesa, rimborso pieno fino a
@@ -561,6 +657,7 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 | Rischio | Impatto | Cosa lo tiene sotto controllo |
 |---|---|---|
 | Il verso di un asse è girato: un designer *wild* risulta amante del comfort, prende la frase sbagliata e finisce nel posto sbagliato | Alto, e **nessuna prova tecnica lo intercetta** | Confronto a vista foglio-database su 3-4 designer all'import (milestone 1). È già successo nel lavoro di Alessandro: due assi su sei erano invertiti |
+| **Non esiste un'entità legale XPETIS, e non esisterà nel primo periodo** (8 ago) | **Alto: è il nuovo percorso critico.** Senza partita IVA non si incassa, quindi la Beta con soldi veri non dipende più dalla tecnica. Blocca anche S-14, perché non si scrivono condizioni generali senza sapere chi è la controparte | Lo sviluppo prosegue in test mode senza differenze. La decisione "chi è il venditore" va portata ad Alessandro e Andrea subito: costituire una ditta individuale, far incassare l'agenzia partner anche su consulenze e su misura, oppure far incassare i designer con XPETIS che fattura una commissione. **La terza cambia l'architettura**: il denaro andrebbe verso 25 destinatari e servirebbe Stripe Connect molto prima |
 | Detenere le chiavi Stripe delle agenzie | Alto | Valutare Stripe Connect prima della prima agenzia (S-11) |
 | Le mail finiscono in spam | Alto: il funnel vive di mail. **Aumentato l'8 agosto:** S-04 è stato rimandato alla fine, quindi la reputazione di invio resterà non provata fino a ridosso della Beta | Lasciare almeno una settimana fra l'autenticazione del dominio e il primo viaggiatore vero |
 | Supabase free non fa backup | Alto se si dimentica il passaggio a Pro | Pro il giorno del primo pagamento vero |
@@ -571,11 +668,87 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 | Insoluti oltre il 10-15% | Medio | Misurabile a schema; si sposta il pagamento prima dello slot |
 | Il `.docx` del Flusso è superato su cinque punti e nessuno lo aggiorna | Medio: qualcuno lavora su regole vecchie | La tabella "Deviazioni dal Flusso" qui sopra. Da riportare nel `.docx` prima di allargare il team |
 | Testi definitivi delle mail in ritardo | Basso | Si costruisce con segnaposto |
-| Cal.com non impone i limiti di riprogrammazione | Basso in Beta | n8n fa il controllore e avvisa il team |
+| Cal.com non impone i limiti di riprogrammazione | Basso, **ridotto l'8 agosto**: la soglia delle 12 ore ora la impone Cal.com direttamente. Restano da presidiare i conteggi (5 e 2), la finestra dei 20 giorni e le cancellazioni | n8n fa il controllore sul resto e avvisa il team |
 
 ---
 
 ## Registro avanzamenti
+
+**10 agosto 2026 — la pagina risultati chiama il match**
+
+`/ricerca` esiste e gira sul database vero: bande, sezioni, badge, filtri e frase
+composta. Tre file nuovi — `lib/match.ts` (l'unica porta verso
+`match_designers`, e sta solo lato server), `lib/frase.ts` (i mattoncini),
+`app/ricerca/page.tsx` — più la card, i chip dei filtri e due proprietà nuove sul
+suggeritore, che ora conserva i filtri quando si cambia meta.
+
+*Il ricalcolo live passa dall'URL.* I filtri riscrivono la query e il Server
+Component richiama la funzione: è "una chiamata indicizzata al server" e non un
+ricalcolo nel browser. Stessa scelta per le risposte del quiz
+(`quiz=pace:1,comfort_wild:4`): la pagina resta interamente server-side e un
+risultato è condivisibile per link. Il travaso da `sessionStorage` lo farà la
+pagina del quiz.
+
+*Tre cose imparate scrivendo le frasi*, tutte di lingua e nessuna prevista dal
+Flusso, che le chiama "concordanze e articoli" in mezza riga:
+
+1. **`travel_designers` non ha il genere**, quindi nessun frammento può contenere
+   un participio ("è appassionato"). Si scrive tutto con verbi alla terza
+   persona. Aggiungere la colonna non basterebbe: andrebbe raccolta per 25
+   persone e mantenuta.
+2. **La tassonomia non porta l'articolo.** "Conosce il Vietnam" non si può
+   comporre: il default è il locativo "in {nome}", con una ventina di eccezioni
+   per identificatore in `lib/frase.ts` (isole e città-stato vogliono "a", i nomi
+   plurali "negli/nelle/nei"). Lo stesso problema colpisce il titolo di sezione
+   del Flusso, "Esperti di [paese]", che su alcuni paesi zoppica.
+3. **Un frammento non può contenere virgole**, perché i pezzi si uniscono con la
+   virgola. Il primo giro produceva "sta dalla parte del tempo lungo, come te,
+   conosce il ritmo dei viaggi in coppia".
+
+*Rimasto fuori.* La **maschera contestuale** dei filtri: `td_destination_tags` è
+dato chiuso e nessuna vista dice quali tag esistono su una destinazione, quindi
+serve una funzione server nuova — non l'ho scritta perché è una migration non
+richiesta.
+
+**10 agosto 2026 — la pagina ricerca vestita sul Figma**
+
+Arrivati i link: file `x1DYYagZ2moagmpEHZHYYE`, un nodo per pagina, ora scritti
+in `CLAUDE.md` perché non si perdano più (l'assenza di quella riga è costata
+mezza sessione). Deciso anche: pagamento col **plugin Stripe**, prenotazione con
+l'**iframe Cal.com** del designer.
+
+Rifatte card, filtri e impaginazione sul nodo 177:262: colonna bianca dei filtri
+a sinistra, griglia a due colonne di card alte 520 con il velo che scurisce verso
+il basso, avatar 130, "Vai alla vetrina", "Carica ancora" col tondo della freccia
+— che è byte per byte lo stesso asset della home. Aggiunti cinque asset allo
+script; `icona-quiz` e `icona-chevron` restano scaricati ma non usati.
+
+*Quattro punti dove il Figma e il Flusso non dicono la stessa cosa*, tutti
+risolti in modo reversibile e tutti da chiudere con Chiara e Gaia:
+
+1. **Il badge "match forte" non è disegnato.** Era la domanda aperta del Flusso
+   ("decisione UX da chiudere con Chiara"): oggi è spento da una costante sola.
+2. **Nessun divisore di sezione.** Ma quel nodo è l'arrivo dal quiz, cioè il caso
+   senza destinazione, dove il Flusso stesso vuole una fascia unica. I divisori
+   compaiono solo con una destinazione, dove dicono qualcosa che il viaggiatore
+   non può dedurre.
+3. **La riga di tag sulla card porta i temi**, il Flusso i paesi coperti. Si
+   mostrano i temi agganciati quando ci sono, i paesi quando non ce ne sono.
+4. **Il terzo gruppo di filtri e "Filtri avanzati" non esistono nel Flusso** e
+   `match_designers()` non li sa filtrare: lasciati fuori, con la ragione scritta
+   nel componente. Un gruppo di caselle che non filtrano sarebbe peggio del
+   vuoto.
+
+*Una cosa che il Figma decide e il database aspettava:* la **foto di sfondo della
+card** (`travel_designers.background_photo_url`, decisione aperta dal 1 agosto)
+**non c'è**. La card non ha immagine di sfondo: solo l'avatar sopra un velo che
+scurisce verso il basso, e sotto il velo si vede il crema della pagina.
+
+*E una che ho tolto di mia iniziativa:* i due bolli dicono "+100 Designer" e "4.9
+valutazione media". Il conteggio ora è quello vero (oggi 2); il bollo della
+valutazione è fuori, perché non ci sono recensioni e `td_review_stats` non è
+esposta al browser. Scriverli fissi sarebbe pubblicare due numeri falsi su un
+sito che incassa.
 
 **8 agosto 2026 — primo `db push` su Supabase vero**
 Fallito alla migration 0004: `gen_random_bytes does not exist`. Causa: **su
@@ -609,6 +782,13 @@ primo tentativo.**
 *Punto aperto chiuso:* Google consegna davvero il nome in
 `raw_user_meta_data->>'full_name'`, quindi il trigger popola `full_name` da
 solo. Non serve raccoglierlo altrove.
+
+*Un intoppo che vale la pena ricordare:* il primo deploy rispondeva 404. Il
+progetto Vercel era stato creato **prima** che l'app Next.js esistesse, e il
+preset del framework si decide una volta sola all'import: da allora serviva file
+statici che non c'erano. Cambiato il preset a Next.js e ridistribuito senza
+cache. Login provato anche in produzione, dove il redirect passa dal proxy ed è
+un percorso di codice diverso da localhost.
 
 *Decisione che cambia una convenzione: le chiavi Supabase.* Installata nel repo
 la skill `supabase/server`, che documenta il passaggio alle nuove chiavi API:

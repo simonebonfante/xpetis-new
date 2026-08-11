@@ -1,0 +1,79 @@
+{
+  "_nota": "Messaggio vero di Cal.com raccolto l'8 agosto 2026 su una prenotazione di prova. La password del video (un JWT) è stata sostituita: era l'unico dato sensibile e scade da sola. Versione del formato: x-cal-webhook-version 2021-10-20.",
+  "_headers_rilevanti": {
+    "x-cal-signature-256": "0e84d18a09a559133a3a86672eb84824479415818a8552dfb145e4174182be28",
+    "x-cal-webhook-version": "2021-10-20"
+  },
+  "triggerEvent": "BOOKING_CREATED",
+  "createdAt": "2026-08-08T21:10:57.435Z",
+  "payload": {
+    "title": "Consulenza XPETIS · 30 min between simone bonfante and simone bonfante",
+    "startTime": "2026-08-13T09:00:00.000Z",
+    "endTime": "2026-08-13T09:30:00.000Z",
+    "type": "consulenza-xpetis-30",
+    "eventTypeTitle": "Consulenza XPETIS · 30 min",
+    "eventTypeId": 6600042,
+    "length": 30,
+    "uid": "mMZAwLvZ759AUffL61hj66",
+    "bookingId": 23556601,
+    "status": "ACCEPTED",
+    "additionalNotes": "",
+    "cancellationReason": null,
+    "rejectionReason": null,
+    "requiresConfirmation": false,
+    "disableRescheduling": false,
+    "disableReschedulingScope": "HOST_AND_ATTENDEE",
+    "disableCancelling": false,
+    "disableCancellingScope": "HOST_AND_ATTENDEE",
+    "price": 0,
+    "currency": "usd",
+    "organizer": {
+      "id": 3041949,
+      "name": "simone bonfante",
+      "email": "simone.bonfante93@gmail.com",
+      "username": "marco-rossi-xpetis",
+      "timeZone": "Europe/Rome",
+      "utcOffset": 120
+    },
+    "attendees": [
+      {
+        "name": "simone bonfante",
+        "email": "simone.bonfante93@gmail.com",
+        "firstName": "simone",
+        "lastName": "bonfante",
+        "timeZone": "Europe/Rome",
+        "phoneNumber": null,
+        "utcOffset": 120
+      }
+    ],
+    "responses": {
+      "name": { "label": "your_name", "value": "simone bonfante", "isHidden": false },
+      "email": { "label": "email_address", "value": "simone.bonfante93@gmail.com", "isHidden": false },
+      "xpetis_user_id": {
+        "label": "Codice XPETIS (non modificare)",
+        "value": "69a37b12-b899-47c4-9bdb-31a17d9cb986",
+        "isHidden": false
+      }
+    },
+    "userFieldsResponses": {
+      "xpetis_user_id": {
+        "label": "Codice XPETIS (non modificare)",
+        "value": "69a37b12-b899-47c4-9bdb-31a17d9cb986",
+        "isHidden": false
+      }
+    },
+    "location": "integrations:daily",
+    "videoCallData": {
+      "type": "daily_video",
+      "id": "Ko1nhKtyc4iPsYV84Fw8",
+      "password": "RIMOSSO_ERA_UN_JWT",
+      "url": "https://app.cal.com/video/mMZAwLvZ759AUffL61hj66"
+    },
+    "metadata": { "videoCallUrl": "https://app.cal.com/video/mMZAwLvZ759AUffL61hj66" },
+    "iCalUID": "mMZAwLvZ759AUffL61hj66@Cal.com",
+    "appsStatus": [
+      { "appName": "Cal Video", "type": "daily_video", "success": 1, "failures": 0 },
+      { "appName": "Google Calendar", "type": "google_calendar", "success": 1, "failures": 0 }
+    ]
+  }
+}

@@ -52,13 +52,54 @@ Colore brand: verde `#1b5e24`. Mobile first su tutte le pagine dei TD.
 ## Struttura del repo
 
 ```
+app/            # Next.js 16, App Router
+components/     # header, footer, bottone, badge a stella, suggeritore
+lib/supabase/   # client browser, server (cookie) e admin (chiave secret)
+public/img,logo # asset esportati dal Figma
+public/fonts/   # Ronzino (Merriweather arriva da next/font)
+scripts/        # scarica-asset-figma.sh (le URL Figma scadono in 7 giorni)
 supabase/
   migrations/   # numerate, si applicano in ordine
-  seed/         # parametri di configurazione + dati finti per i test
-  tests/run.mjs # harness: applica tutto su PGlite e verifica ~60 asserzioni
+  seed/         # config, tassonomia geografica generata, dati finti
+  scripts/      # genera_geo.mjs: rigenera il seed geografico dal JSON
+  tests/run.mjs # harness: applica tutto su PGlite, ~177 asserzioni
   README.md     # documentazione dello schema e delle decisioni
-PIANO.md        # milestone, task, avanzamenti, stime
+  MAPPATURA_VETRINA.md  # form Vetrina TD → schema
+  MAPPATURA_CALCOM.md   # messaggi Cal.com → schema, da payload veri
+PIANO.md              # milestone, task, avanzamenti, deviazioni, stime
+ONBOARDING_CALCOM_TD.md  # procedura per i 25 designer
 ```
+
+## Comandi
+
+```bash
+npm run dev            # sito su localhost:3000; /prova verifica login e trigger
+npm run build
+npm run test:schema    # harness dello schema, deve restare verde
+bash scripts/scarica-asset-figma.sh   # riscarica gli asset del design
+```
+
+## Design
+
+Il Figma è la fonte per tutte le pagine pubbliche: usa il connettore Figma e
+leggi la skill design-to-code **prima** di scrivere codice da un design. I token
+del design system stanno in `app/globals.css` sotto `@theme`.
+
+File unico: **`x1DYYagZ2moagmpEHZHYYE`**, `https://www.figma.com/design/x1DYYagZ2moagmpEHZHYYE/XPETIS?node-id=<nodo>`
+
+| Pagina | Nodo |
+|---|---|
+| Homepage | `160-77` |
+| Ricerca / risultati | `177-262` |
+| Vetrina del designer | `171-17` |
+| Itinerario pronto da vivere | `261-1068` |
+| Quiz | `346-932` e `346-896` |
+
+Pagamento: **plugin Stripe**, niente pagina disegnata. Prenotazione: **iframe
+Cal.com** della pagina del designer. (Deciso da Simone il 10 agosto 2026.)
+
+Gli asset si riscaricano con `bash scripts/scarica-asset-figma.sh`: le URL degli
+asset scadono in 7 giorni, la chiave del file no.
 
 ## Decisioni architetturali già prese
 
@@ -134,6 +175,11 @@ di chi ha agito.
   authenticated` esplicito: su Supabase i privilegi di default concedono le
   tabelle create dopo, e la revoca della 0016 non si eredita.
 - Importi sempre in centesimi, colonne `*_cents`.
+- **I file non passano mai dentro n8n.** I documenti li carica il nostro server
+  su Supabase Storage; n8n manda un link firmato a scadenza, mai un allegato.
+  Così l'istanza n8n non ha bisogno di disco (tutto il suo stato vive nel suo
+  Postgres) e un documento di viaggio non resta per sempre in una casella email
+  inoltrabile a chiunque.
 - Timestamp `timestamptz`, mai `timestamp`.
 - Migration numerate a quattro cifre, mai modificate dopo essere state
   applicate: si aggiunge una migration nuova.
@@ -179,3 +225,13 @@ Elenco completo con i riferimenti nei commenti del codice in
    Connect.
 3. Il provider di invio email transazionali, che il documento di flusso non
    nomina: senza di lui n8n non manda niente.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

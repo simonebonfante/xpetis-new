@@ -1,13 +1,58 @@
 @import "tailwindcss";
 
+/* Token del design system XPETIS, presi dalle variabili del Figma.
+ *
+ * ATTENZIONE: il documento di flusso dice "colore brand: verde #1b5e24".
+ * È un dato superato: il Figma e il form Vetrina TD concordano su questa
+ * palette crema/nero/rosso, e il verde non compare da nessuna parte.
+ * Vince il design. Vedi "Deviazioni" in PIANO.md. */
 @theme {
-  /* Verde brand XPETIS */
-  --color-brand: #1b5e24;
-  --color-brand-scuro: #12401a;
-  --color-brand-chiaro: #e8f0e9;
+  --color-primario: #e53619;
+  --color-scuro: #1c1c1a;
+  --color-crema: #f0eedf;
+  --color-neutro: #ffffff;
+
+  /* Merriweather Bold per i titoli, Ronzino Regular per il testo.
+   * Le scale sono quelle dichiarate nel Figma: interlinea 100%. */
+  --font-titoli: var(--font-merriweather), Georgia, serif;
+  --font-testo: 'Ronzino', ui-sans-serif, system-ui, sans-serif;
+
+  --text-h1: 80px;
+  --text-h1--line-height: 1;
+  --text-h2: 60px;
+  --text-h2--line-height: 1;
+  --text-h3: 40px;
+  --text-h3--line-height: 1;
+  --text-h4: 30px;
+  --text-h4--line-height: 1;
+  --text-corpo: 16px;
+  --text-corpo--line-height: 1.45;
+  --text-corpo-big: 20px;
+  --text-corpo-big--line-height: 1.4;
+  --text-piccolo: 10px;
+  --text-piccolo--line-height: 1.4;
 }
 
 body {
-  background: #ffffff;
-  color: #1c1c1a;
+  background: var(--color-crema);
+  color: var(--color-scuro);
+  font-family: var(--font-testo);
+}
+
+/* Ronzino, di Collletttivo, licenza SIL OFL 1.1.
+ * I file non sono nel repo: vedi public/fonts/LEGGIMI.md. Finché mancano, il
+ * browser ricade sul font di sistema invece di rompere la build. */
+@font-face {
+  font-family: 'Ronzino';
+  src: url('/fonts/Ronzino-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ronzino';
+  src: url('/fonts/Ronzino-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
