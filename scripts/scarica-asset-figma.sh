@@ -52,3 +52,20 @@ scarica img/icona-chevron.svg  "https://www.figma.com/api/mcp/asset/ffa6ae26-fa3
 # icona-quiz e icona-chevron non sono ancora usati: il primo è il gallone bianco
 # che nel Figma si sovrappone all'icona tonda del tasto quiz, il secondo apre
 # "Filtri avanzati", che non esiste finché match_designers non filtra i servizi.
+
+echo "Vetrina del designer (nodo 171:17) — URL generate l'11 agosto 2026"
+scarica img/icona-orologio.svg    "https://www.figma.com/api/mcp/asset/4d9e55fb-5a4f-4c4f-b24d-6bed96d517af.svg"
+scarica img/icona-video.svg       "https://www.figma.com/api/mcp/asset/f2d624e9-b994-47c1-a32d-4ee79d15e8b5.svg"
+scarica img/icona-check.svg       "https://www.figma.com/api/mcp/asset/a40e49e8-697e-4294-91ae-5ad84ff5c335.svg"
+scarica img/icona-cuore.svg       "https://www.figma.com/api/mcp/asset/21a43c5d-bb21-4b93-8d0c-2572cebf3057.svg"
+scarica img/icona-instagram.svg   "https://www.figma.com/api/mcp/asset/e2bdff7e-e1a8-4830-a033-fb5102aa25e8.svg"
+scarica img/freccia-diagonale.svg "https://www.figma.com/api/mcp/asset/40776503-d6b5-4094-be2b-81815b812c75.svg"
+# **galleria-prec.svg e galleria-succ.svg non si scaricano: sono due ritagli.**
+# Nel Figma i comandi della galleria dei viaggi firma sono un unico gruppo largo
+# 396 (nodo 171:179, "Group 31") con i due tondi agli estremi: la stessa cosa che
+# serve al layout, non due asset separati da esportare. I due file nel repo
+# portano le geometrie esatte di quel gruppo, ognuna nel suo viewBox 40×40.
+# Se il disegno cambia si riesporta 171:179 e si rifà il ritaglio.
+#
+# La stella rossa del voto medio e il calendario delle recensioni restano fuori:
+# non esistono recensioni, quindi non esistono le sezioni che li usano.

@@ -29,8 +29,9 @@ npm run test:schema
 Va lanciato a ogni modifica delle migration: è il modo più rapido per scoprire
 di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 
-> Nota: nella cartella c'è un symlink `node_modules` avanzato dalla sessione di
-> sviluppo. Cancellalo prima del primo `npm install`.
+> Il symlink `node_modules` verso `/tmp` che era finito nel repo per sbaglio è
+> stato cancellato l'11 agosto 2026, insieme a questa nota che diceva di
+> cancellarlo. `npm install` ora funziona senza preamboli.
 
 ## I file
 
@@ -155,6 +156,19 @@ ordine vero dietro. Se e come mostrarle si decide alla milestone 8.
 `public_td_showcase` serve tutto il resto in un colpo solo: campi di profilo,
 paesi coperti per nome, servizi attivi con i punti dei box, viaggi firma con le
 foto in ordine, itinerari pronti.
+
+**Quello che la vista non dice, il sito non lo mostra.** Due esempi veri, dalla
+vetrina: la riga "Membro XPETIS" del Figma vorrebbe `joined_at`, che qui non c'è,
+e la scheda hero elenca le macro-aree mentre la vista dà i paesi. In entrambi i
+casi la pagina mostra meno invece di procurarsi il dato altrove — leggere una
+tabella con la chiave secret sarebbe lecito ma scavalcherebbe la regola. Se un
+campo serve davvero si aggiunge alla vista, con una migration.
+
+Il seed `0003_demo.sql` popola queste tabelle per i due designer finti: senza
+contenuto la vetrina renderizza vuota e non si vede se funziona. **Le prove
+dell'harness sulle stesse tabelle usano posizioni alte (91, 92) e cercano per
+titolo, non per conteggio:** un test che conta le righe si romperebbe ogni volta
+che qualcuno aggiunge contenuto al seed.
 
 ## La ricerca
 

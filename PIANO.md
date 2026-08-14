@@ -423,8 +423,30 @@ subito, anche se serviranno dopo.
 - [ ] **[B]** I mattoncini della frase, i divisori di sezione e la frase
       introduttiva onesta del fallback (Gaia). I vincoli che i testi devono
       rispettare sono in testa a `lib/frase.ts`
-- [ ] **[C]** Vetrina del TD, con i due box acquistabili e la presentazione non
-      acquistabile di su misura e All Inclusive
+- [x] **[C]** Vetrina del TD, con i due box acquistabili e la presentazione non
+      acquistabile di su misura e All Inclusive → `/designer/[slug]`, vestita sul
+      Figma 171:17. Tutto da `public_td_showcase`, nessuna vista nuova
+- [x] **[C]** Contenuto di vetrina nel seed: viaggi firma con foto, itinerari
+      pronti, punti dei box, recensioni esterne per Marco e Giulia. Le cinque
+      tabelle della vetrina esistevano da migration e nessuna riga le aveva mai
+      popolate → `seed/0003_demo.sql`
+- [ ] **[S]** **Riapplicare `seed/0003_demo.sql` al progetto Supabase.** Il seed
+      arricchito non è ancora sul database di sviluppo: finché non lo è,
+      `/designer/marco-rossi` mostra solo hero, storia e box consulenza, e le
+      tre sezioni nuove restano invisibili. *(Era segnata come fatta: la spunta
+      indicava il codice scritto, non il seed applicato.)*
+- [ ] **[S]** **Come si mostrano i viaggi di gruppo.** La sezione del Figma non
+      è costruita perché **non ha una sorgente**: nel form `gruppo[]` non ha
+      campi modificabili e resta il contenuto d'esempio, quindi non si importa
+      mai (deciso il 6 agosto). Le due strade sono aggiungerla al form o farli
+      caricare al team. Finché non si decide, niente sezione e niente tasto
+      "Vai ai viaggi di gruppo"
+- [ ] **[S]** **"Membro XPETIS" nella scheda hero.** La quarta riga del Figma
+      vuole `travel_designers.joined_at`, che `public_td_showcase` non espone.
+      Non l'ho aggiunta di mia iniziativa: è una riga in più sulla superficie
+      pubblica, e la decisione è tua. Oggi le righe sono tre
+- [ ] **[S]** Guardare `/designer/marco-rossi` accanto al Figma e dirmi cosa non
+      torna, come per `/ricerca`
 - [ ] **[C]** Test del match sui 25 profili veri: ordinamenti attesi, casi limite
       (nessun quiz, nessuna destinazione, sezioni vuote)
 - [~] **[S]** Decidere, guardando i risultati veri: badge "match forte" visibile
@@ -673,6 +695,77 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 ---
 
 ## Registro avanzamenti
+
+**11 agosto 2026 — la vetrina del designer**
+
+`/designer/[slug]` esiste: era il 404 in fondo a ogni card di `/ricerca`. Cinque
+componenti nuovi più `lib/vetrina.ts`, che è l'unica porta verso
+`public_td_showcase` e sta solo lato server, esattamente come `lib/match.ts` lo è
+verso `match_designers`. Nessuna vista nuova.
+
+*Prima la pagina, il seed.* Le cinque tabelle del contenuto di vetrina —
+`td_signature_trips`, `td_signature_trip_images`, `td_ready_itineraries`,
+`td_service_bullets`, `td_showcase_reviews` — esistevano dalla migration 0024 e
+**nessuna riga le aveva mai popolate**: la pagina sarebbe stata verde e vuota
+insieme, e non si sarebbe visto niente. Ora Marco e Giulia hanno tre viaggi
+firma a testa con le foto, tre itinerari pronti, i punti dentro ogni box e le
+recensioni portate da fuori. Harness a 178 asserzioni, verde.
+
+Una cosa imparata sull'harness: **le sue asserzioni contavano le righe** del
+contenuto di vetrina (`signature_trips.length === 1`), quindi qualunque
+arricchimento del seed le avrebbe rotte. Ora cercano per titolo, e le prove che
+scrivono usano posizioni alte (91, 92) per non collidere col seed. Il test è
+diventato più difficile da rompere per il motivo sbagliato.
+
+*Quattro cose del Figma che questa pagina non mostra*, tutte con la ragione
+scritta nel codice e tutte reversibili:
+
+1. **Il voto "4.6" sulla foto e la sezione "Cosa dice chi ha viaggiato con me".**
+   Non esistono recensioni: `public_reviews` è vuota perché non ci sono ordini, e
+   `td_showcase_reviews` non è esposta da nessuna vista per la decisione del 6
+   agosto rimandata alla milestone 8. Le ho seminate lo stesso — quella decisione
+   si prende meglio guardando dei dati veri che una tabella vuota — ma la vetrina
+   non le mostra. Esporle da qui avrebbe voluto dire prendere quella decisione di
+   nascosto, aggiungendo una vista pubblica di mia iniziativa.
+2. **La riga "Membro XPETIS".** Vuole `joined_at`, che la vista non espone.
+   Leggerlo con la chiave secret sarebbe stato lecito ma avrebbe scavalcato la
+   regola "la superficie pubblica è la vista".
+3. **La sezione "Viaggi di gruppo".** Non ha una sorgente, e non è un buco
+   nostro: il form non raccoglie quei viaggi. Il servizio `group_trip` invece
+   esiste, quindi il selettore dei box lo mostra a chi lo attiva.
+4. **"Prenota la call" e "Ottieni maggiori informazioni" non navigano.** Il primo
+   aspetta l'iframe Cal.com (milestone 4), il secondo la pagina "Itinerario
+   pronto da vivere" (nodo 261:1068, non costruita). Inerti e detto, invece di un
+   link verso un 404.
+
+*E una dove il Figma e il Flusso non dicono la stessa cosa.* Il Figma disegna in
+cima al box bianco due pillole — "Consulenza" rossa e attiva, "Itinerario su
+misura" marrone e spenta — cioè un selettore fra i servizi, e sotto un solo tasto
+"Prenota la call". Il Flusso dice che **i box acquistabili sono due soltanto**.
+Le due cose si tengono insieme così: il selettore resta e mostra tutti i servizi
+attivi come nel disegno, ma **il tasto d'acquisto compare solo su consulenza e
+consulenza approfondita**; sugli altri, al suo posto, c'è la frase che dice
+quando si comprano. Il selettore passa dalla query (`?servizio=`) e non da uno
+stato nel browser, quindi la pagina resta interamente server-side e una scheda è
+condivisibile per link.
+
+*Un errore che ho fatto e che vale la pena ricordare*, perché il codice della
+sessione precedente già lo preveniva e io l'avevo perso per strada: `next/image`
+su un host non dichiarato in `next.config.ts` **non degrada, solleva e porta giù
+tutta la pagina**. Il `photo_url` del seed punta a `example.com` e la vetrina
+rispondeva 500. La difesa è la stessa dell'avatar di `card-designer.tsx`: fuori
+da Supabase Storage si mostra un `<img>` normale.
+
+*Sugli asset:* i due tondi con le frecce della galleria sono un ritaglio, non un
+download. Nel Figma sono un gruppo unico largo 396 con i tondi agli estremi, e
+lo script lo spiega. Gli SVG esportati hanno `preserveAspectRatio="none"`: le
+icone non quadrate vanno misurate su entrambi i lati, altrimenti si stirano senza
+che nessuno se ne accorga leggendo il codice.
+
+*Fuori dal repo:* `supabase/node_modules` era un symlink verso `/tmp/node_modules`
+committato per sbaglio nella 084c939, ed era rotto. Cancellato — il `.gitignore`
+lo copre già — e rifatto `npm install`, che ora produce un `package-lock.json` da
+committare.
 
 **10 agosto 2026 — la pagina risultati chiama il match**
 

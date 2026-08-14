@@ -354,13 +354,15 @@ await expectFail('ma nessun ordine può nascere su di loro', `
   insert into orders (traveler_id, td_id, service_type)
   values ('44444444-4444-4444-4444-444444444444','11111111-1111-1111-1111-111111111111','group_trip')`,
   'service_type')
+// Le posizioni 1-4 le occupa il seed di vetrina: le prove usano posizioni alte,
+// così restano indipendenti da quanto contenuto ha il seed.
 await expectOk('punti del box consulenza, ordinati', `
   insert into td_service_bullets (service_id, position, text_it)
-  select id, 1, 'Analisi del tuo stile di viaggio' from td_services
+  select id, 91, 'Analisi del tuo stile di viaggio' from td_services
    where td_id='11111111-1111-1111-1111-111111111111' and service_type='consultation'`)
 await expectFail('due punti nella stessa posizione', `
   insert into td_service_bullets (service_id, position, text_it)
-  select id, 1, 'Doppione' from td_services
+  select id, 91, 'Doppione' from td_services
    where td_id='11111111-1111-1111-1111-111111111111' and service_type='consultation'`, 'unique')
 
 console.log('\n== Liste chiuse del form ==')
@@ -390,7 +392,7 @@ console.log('\n== Contenuto di vetrina ==')
 const MARCO = '11111111-1111-1111-1111-111111111111'
 await expectOk('viaggio firma con tre foto', `
   insert into td_signature_trips (id, td_id, position, title, description)
-  values ('aaaaaaa1-0000-0000-0000-000000000001','${MARCO}',1,
+  values ('aaaaaaa1-0000-0000-0000-000000000001','${MARCO}',91,
           'Australia, il richiamo dell''infinito','È l''alba sull''oceano.');
   insert into td_signature_trip_images (trip_id, position, storage_path) values
     ('aaaaaaa1-0000-0000-0000-000000000001',1,'td-media/marco/viaggio-1-foto-1.jpg'),
@@ -398,25 +400,33 @@ await expectOk('viaggio firma con tre foto', `
     ('aaaaaaa1-0000-0000-0000-000000000001',3,'td-media/marco/viaggio-1-foto-3.jpg')`)
 await expectFail('viaggio con titolo vuoto (le righe vuote del form)', `
   insert into td_signature_trips (td_id, position, title)
-  values ('${MARCO}', 2, '   ')`, 'title')
+  values ('${MARCO}', 92, '   ')`, 'title')
 await expectFail('due viaggi nella stessa posizione', `
   insert into td_signature_trips (td_id, position, title)
-  values ('${MARCO}', 1, 'Doppione')`, 'unique')
+  values ('${MARCO}', 91, 'Doppione')`, 'unique')
 await expectOk('itinerari pronti con etichette di durata e prezzo', `
   insert into td_ready_itineraries (td_id, position, title, duration_label, price_label, image_path)
-  values ('${MARCO}',1,'Bosnia 360 On the Road','5-7 giorni','850€','td-media/marco/itinerario-1.jpg'),
-         ('${MARCO}',2,'Vietnam del nord','12 giorni','1.380€',null)`)
+  values ('${MARCO}',91,'Bosnia 360 On the Road','5-7 giorni','850€','td-media/marco/itinerario-1.jpg'),
+         ('${MARCO}',92,'Vietnam del nord','12 giorni','1.380€',null)`)
 {
+  // Le asserzioni cercano per titolo e non per conteggio: il seed di vetrina
+  // popola le stesse tabelle, e un test che conta le righe si romperebbe ogni
+  // volta che qualcuno aggiunge contenuto ai due designer finti.
   const v = (await q(`select signature_trips, ready_itineraries, services, hero_bio
                         from public_td_showcase where slug='marco-rossi'`)).rows[0]
-  v.signature_trips.length === 1 && v.signature_trips[0].images.length === 3
+  const viaggio = v.signature_trips.find(t => t.title.startsWith('Australia'))
+  viaggio?.images.length === 3 && viaggio.images[0].endsWith('foto-1.jpg')
     ? ok('la vetrina pubblica serve il viaggio firma con le sue foto in ordine')
     : fail('signature_trips: ' + JSON.stringify(v.signature_trips))
-  v.ready_itineraries.length === 2 && v.ready_itineraries[0].price_label === '850€'
+  v.ready_itineraries.find(i => i.title === 'Bosnia 360 On the Road')?.price_label === '850€'
     ? ok('itinerari pronti con il prezzo come lo scrive il designer')
     : fail('ready_itineraries: ' + JSON.stringify(v.ready_itineraries))
+  // I viaggi firma escono in ordine di `position`, non di inserimento.
+  v.signature_trips[0].title.startsWith('Ha Giang')
+    ? ok('i viaggi firma escono ordinati per posizione')
+    : fail('ordine dei viaggi firma: ' + v.signature_trips.map(t => t.title).join(' | '))
   const cons = v.services.find(x => x.service_type === 'consultation')
-  Array.isArray(cons.bullets) && cons.bullets.length === 1
+  cons.bullets.includes('Analisi del tuo stile di viaggio')
     ? ok('i punti del box consulenza arrivano nella vetrina')
     : fail('bullets: ' + JSON.stringify(cons))
   v.hero_bio === 'Paragrafo di apertura della vetrina.'
@@ -426,13 +436,14 @@ await expectOk('itinerari pronti con etichette di durata e prezzo', `
 console.log('\n== Recensioni portate da fuori ==')
 await expectOk('recensione esterna caricata', `
   insert into td_showcase_reviews (td_id, position, title, author_name, stars, date_label, body)
-  values ('${MARCO}',1,'Isole Lofoten','Nico',5,'Febbraio 2026',
+  values ('${MARCO}',91,'Isole Lofoten','Nico',5,'Febbraio 2026',
           'Il viaggio più entusiasmante che abbia mai fatto.')`)
 await expectFail('recensione esterna senza autore', `
   insert into td_showcase_reviews (td_id, position, author_name, stars, body)
-  values ('${MARCO}', 2, '  ', 5, 'testo')`, 'author_name')
+  values ('${MARCO}', 92, '  ', 5, 'testo')`, 'author_name')
 {
-  const r = (await q(`select is_published from td_showcase_reviews where td_id='${MARCO}'`)).rows[0]
+  const r = (await q(`select is_published from td_showcase_reviews
+                       where td_id='${MARCO}' and author_name='Nico'`)).rows[0]
   r.is_published === false
     ? ok('nasce non pubblicata: la decisione è rimandata alla milestone 8')
     : fail('is_published di default a vero')

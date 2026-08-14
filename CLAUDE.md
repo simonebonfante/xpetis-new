@@ -67,6 +67,7 @@ supabase/
   MAPPATURA_VETRINA.md  # form Vetrina TD → schema
   MAPPATURA_CALCOM.md   # messaggi Cal.com → schema, da payload veri
 PIANO.md              # milestone, task, avanzamenti, deviazioni, stime
+ACCESSI.md            # inventario dei servizi esterni e dove vivono i segreti
 ONBOARDING_CALCOM_TD.md  # procedura per i 25 designer
 ```
 
