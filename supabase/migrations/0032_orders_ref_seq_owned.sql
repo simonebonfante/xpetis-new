@@ -1,0 +1,14 @@
+-- XPETIS · 0032 · orders_ref_seq legata alla sua colonna
+--
+-- La 0009 crea orders_ref_seq come sequenza autonoma. Lo script di reset del
+-- CLI Supabase (`supabase db reset --linked`) non la cancella: il suo ciclo
+-- sulle sequenze filtra `relkind = 's'` minuscolo, mentre in Postgres una
+-- sequenza è `'S'` maiuscola, quindi quel ciclo non trova mai niente. Le
+-- sequenze delle colonne identity sopravvivono comunque perché il
+-- `drop table ... cascade` se le porta via; una sequenza autonoma no. Risultato:
+-- al reset successivo la 0009 muore con
+-- `relation "orders_ref_seq" already exists`.
+--
+-- Legandola a orders.human_ref diventa una dipendenza interna della tabella:
+-- il drop della tabella la cancella, e il reset torna ripetibile.
+alter sequence orders_ref_seq owned by orders.human_ref;

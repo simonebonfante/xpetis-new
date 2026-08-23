@@ -7,6 +7,7 @@
  * browser non vede questo modulo e non deve.
  */
 import { createClient } from '@/lib/supabase/server'
+import type { Quiz } from '@/lib/quiz-risposte'
 
 /** I due soli livelli che filtrano. Città e continenti vivono nel suggeritore. */
 export const LIVELLI_FILTRABILI = ['country', 'macro_area'] as const
@@ -50,8 +51,12 @@ export type RisultatoMatch = {
   total_count: number
 }
 
-/** Le risposte del quiz: `{ codice_asse: valore }`. Il quiz è sempre completo. */
-export type Quiz = Record<string, number>
+/**
+ * Le risposte del quiz. Il tipo vive in `lib/quiz-risposte.ts`, insieme alla
+ * lettura e alla scrittura della stringa di query: quel modulo è puro e lo
+ * possono importare anche i componenti client, questo no.
+ */
+export type { Quiz }
 
 type Parametri = {
   destinazione?: Destinazione | null

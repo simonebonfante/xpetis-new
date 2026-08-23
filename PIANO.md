@@ -199,7 +199,12 @@ Si applicano come migration nuove, mai modificando quelle esistenti.
 - [x] **[C]** `0028` — la vetrina completa su `public_td_showcase`, e limite del
       bucket immagini alzato
 - [ ] **[B]** Scrivere le due etichette intermedie di ogni asse continuo. Gli
-      estremi ora vengono dal form: restano da scrivere i valori 2 e 3
+      estremi ora vengono dal form: restano da scrivere i valori 2 e 3. **Con il
+      quiz in piedi (14 agosto) quegli otto "DA SCRIVERE" si vedono in pagina**,
+      e con loro un nono buco: `quiz_axes.question_it` è vuoto su tutti e sei gli
+      assi, quindi ogni schermata mostra l'etichetta dell'asse invece della
+      domanda. Il Figma 346:932 e 346:896 porta già domanda e risposte scritte
+      per le prime due — sono testi da mettere nel seed, non nel codice
 
 ---
 
@@ -392,8 +397,22 @@ subito, anche se serviranno dopo.
 - [x] **[S]** Ronzino in `public/fonts/` — fatto il 9 agosto
 - [ ] **[C]** Ricerca accento-insensibile: oggi "peru" non trova "Perù". Serve
       una colonna normalizzata con `unaccent` e una migration
-- [ ] **[C]** Le 6 schermate del quiz (tutte obbligatorie, nessun quiz a metà),
-      in `sessionStorage` da anonimo e **salvato sul profilo al primo login**
+- [x] **[C]** Le 6 schermate del quiz (tutte obbligatorie, nessun quiz a metà),
+      in `sessionStorage` da anonimo e **salvato sul profilo al primo login** →
+      `/quiz` vestita sui Figma 346:932 e 346:896. Le domande arrivano da
+      `public_quiz_axes` (`lib/quiz.ts`), il contratto `quiz=codice:valore` sta in
+      un posto solo (`lib/quiz-risposte.ts`), il travaso al login è la route
+      `/quiz/salva`. Nessuna vista e nessuna migration nuova
+- [ ] **[S]** Guardare `/quiz` accanto al Figma e dirmi cosa non torna, come per
+      `/ricerca` e `/designer`. **Il giro col mouse non l'ho potuto provare io**:
+      in questa sessione non avevo un browser, quindi sono verificati il render
+      col dato vero, l'URL d'uscita e le due query della route, non i sei clic
+- [ ] **[S]** **L'ordine delle risposte della prima domanda.** Il Figma le elenca
+      dal massimo controllo al minimo; nel database `planning_involvement` cresce
+      al contrario (`label_min` = "Poco controllo"). Il quiz mostra le risposte in
+      ordine di valore, cioè come le dichiara il database: copiare l'ordine del
+      disegno significherebbe girare l'asse. Da chiudere con Chiara — o si
+      riordina il disegno, o si gira il verso nel database, mai solo la vista
 - [x] **[C]** `match_designers()`: bande geografiche, punteggio quiz, punteggio
       filtri, affinità, chiave di ordinamento, badge e salienza dei due assi più
       forti. Restituisce posizione, banda, sezione e badge; **mai punteggi,
@@ -449,10 +468,19 @@ subito, anche se serviranno dopo.
       torna, come per `/ricerca`
 - [ ] **[C]** Test del match sui 25 profili veri: ordinamenti attesi, casi limite
       (nessun quiz, nessuna destinazione, sezioni vuote)
-- [~] **[S]** Decidere, guardando i risultati veri: badge "match forte" visibile
-      sì o no → **il Figma 177:262 non lo disegna**, quindi oggi è spento
-      (`MOSTRA_BADGE_MATCH_FORTE` in `components/card-designer.tsx`). Una
-      schermata sola non è una decisione: da confermare con Chiara
+- [ ] **[S]** **Badge "match forte": domanda aperta, non decisione.** Oggi è
+      spento (`MOSTRA_BADGE_MATCH_FORTE` in `components/card-designer.tsx`)
+      perché il Figma 177:262 non lo disegna — ma dal 14 agosto l'assenza nel
+      Figma non chiude niente, e il Flusso lo dichiara "decisione UX da chiudere
+      con Chiara: l'algoritmo lo produce comunque"
+- [ ] **[S]** **Foto di sfondo della card: domanda aperta, non decisione.** Il
+      Flusso la dà come "da definire con Chiara"; il Figma non la disegna e
+      `background_photo_url` resta inutilizzata
+- [ ] **[C]** **La riga di tag della card va riportata al Flusso.** Oggi mostra i
+      temi agganciati quando ci sono, i paesi quando non ce ne sono. Il Flusso
+      parla solo di paesi, con una condizione precisa: *"compare nella ricerca
+      senza destinazione e nelle sezioni di fallback, mai quando la copertura è
+      implicita nella sezione"*. I temi in quella riga vengono dal disegno
 
 ---
 
@@ -695,6 +723,116 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 ---
 
 ## Registro avanzamenti
+
+**14 agosto 2026 — chi vince fra Figma e Flusso**
+
+Regola fissata da Simone e scritta in `CLAUDE.md`: **il Figma è autorevole sulla
+forma, il Flusso sul comportamento e sui contenuti.** Il disegno non è aggiornato
+al pari del documento, e resta indietro. Nel dubbio si chiede; finché non arriva
+risposta vince il Flusso.
+
+Con questo metro ho ricontrollato tutte le divergenze registrate finora. Sette
+reggono senza modifiche — palette e tipografia sono forma, e il Flusso aveva già
+vinto su "Cerca" che compare alla selezione, sul solo "Accedi", sui due box
+acquistabili, sul terzo gruppo di filtri non costruito, sull'ordine delle
+risposte del quiz e sui due bolli che non scrivono numeri falsi.
+
+**Una va riaperta.** La riga di tag della card in `/ricerca` mostra i temi
+agganciati quando ci sono e i paesi coperti quando non ce ne sono. Ma il Flusso
+è preciso su quella riga, e parla solo di paesi: *"Il tag paesi compare nella
+ricerca senza destinazione e nelle sezioni di fallback (dove serve capire cosa
+copre il TD), mai quando la copertura è implicita nella sezione."* I temi in
+quella riga vengono dal disegno, non dal documento.
+
+**Due erano etichettate come decisioni e sono invece domande aperte**, perché
+chiuse dall'assenza nel Figma — che sotto la regola nuova non chiude niente:
+
+- il **badge "match forte"**, che il Flusso dichiara esplicitamente "decisione UX
+  da chiudere con Chiara: l'algoritmo lo produce comunque";
+- la **foto di sfondo della card**, che il Flusso dà come "da definire con
+  Chiara".
+
+Restano spente entrambe come default reversibile, ma sono domande, non risposte.
+
+**14 agosto 2026 — il quiz**
+
+`/quiz` esiste: era il 404 in fondo al "Lasciati ispirare" della home, al "Non hai
+ancora le idee chiare?" e al tasto quiz della colonna filtri. Sei schermate, una
+domanda per volta, tutte obbligatorie. Tre file nuovi in `lib` e `components` più
+la pagina e una route: `lib/quiz.ts` (l'unica porta verso `public_quiz_axes`, solo
+lato server), `lib/quiz-risposte.ts` (il contratto delle risposte: query,
+`sessionStorage`, tipi), `components/quiz-domande.tsx`, `app/quiz/page.tsx`,
+`app/quiz/salva/route.ts`, `components/salva-quiz.tsx`. Nessuna vista nuova,
+nessuna migration.
+
+*Le sei domande non sono nel codice.* Codice, tipo, etichetta, domanda, scala e
+opzioni vengono da `public_quiz_axes`, quindi il numero delle schermate e il passo
+della barra si contano dagli assi: aggiungere un asse o correggere un'etichetta è
+un UPDATE da Studio, non un deploy. Le opzioni si costruiscono percorrendo la
+scala dichiarata (`scale_min`..`scale_max`) e non le chiavi del JSON: se un giorno
+mancasse la riga di un valore, quella risposta appare senza etichetta invece di
+sparire. Un buco si vede, una scelta che manca no.
+
+*Il quiz è incompleto e si vede, come deve.* Gli otto "DA SCRIVERE" dei valori 2 e
+3 sono in pagina così come sono. E ne è emerso un nono: **`question_it` è nullo su
+tutti e sei gli assi** — non è mai stato seminato — quindi l'intestazione ricade
+sull'etichetta dell'asse ("Coinvolgimento nella pianificazione"), che è una
+targhetta e non una domanda, con sotto un `domanda da scrivere` in rosso. Il Figma
+invece ha i testi buoni per le prime due domande, e anche le risposte del ritmo
+scritte meglio del seed ("Lento: poche cose, vissute a fondo" contro "Lento"). Non
+li ho copiati nel seed: sono contenuti, e vanno scritti tutti e sei insieme,
+altrimenti restano due domande buone e quattro targhette.
+
+*La trappola che stava in agguato.* Nel Figma la prima domanda elenca le risposte
+**dal massimo controllo al minimo**, mentre nel database `planning_involvement`
+cresce al contrario. Copiare l'ordine del disegno appiccicando i valori 1-4 alle
+righe avrebbe girato l'asse: è il rischio numero uno del piano, quello che nessuna
+prova tecnica intercetta, e si presenta esattamente così — come una questione di
+impaginazione. Le risposte si mostrano in ordine di valore. Da chiudere con
+Chiara, riordinando il disegno o girando il verso nel database: mai solo la vista.
+
+*Il travaso al login (deviazione 3).* Le risposte dell'anonimo vivono in
+`sessionStorage`; `components/salva-quiz.tsx` sta nel **layout radice**, non nella
+pagina del quiz, perché il momento da intercettare è il login e dopo Google si
+atterra su una pagina qualunque. Costa una lettura di `sessionStorage` quando non
+c'è niente da fare, che è quasi sempre. Scrive la route `/quiz/salva` con la
+chiave secret, dopo aver verificato la sessione dai cookie: `quiz_responses` ha la
+RLS accesa e nessuna policy, il client non parla mai con le tabelle. Tre cose che
+la route fa e vale la pena ricordare: **valida i codici degli assi e le scale
+leggendoli dal database**, quindi non si salva un `{pippo: 3}` arrivato da fuori;
+**rifiuta un quiz incompleto**, perché un profilo parziale nel briefing sembra una
+risposta e non lo è; e **confronta con l'ultima riga del viaggiatore** invece di
+inserire sempre, perché `quiz_responses` è un registro senza indice unico e il
+componente rimonta a ogni pagina — l'indice sarebbe stata una migration non
+richiesta. Non salva niente per gli anonimi: la tabella lo permetterebbe con
+`session_id`, ma sarebbe un endpoint di scrittura aperto a chiunque.
+
+*Il contratto verso i risultati era già scritto e non l'ho toccato.* `quiz=`,
+`livello`, `ref`, `temi`, `contesti` entrano ed escono identici, così chi arriva
+dal Vietnam torna al Vietnam. La lettura di quella stringa era duplicata nella
+pagina risultati: ora sta in `lib/quiz-risposte.ts` e la usano entrambe, insieme
+al tipo `Quiz` che `lib/match.ts` si limita a riesportare. Il passo del quiz
+invece **non** sta nell'URL, a differenza di tutto il resto del sito: le risposte
+vivono in `sessionStorage`, quindi un `/quiz?passo=4` condiviso mostrerebbe una
+domanda in mezzo al nulla. È l'unico pezzo di stato del sito che non è
+indirizzabile, e per questa ragione.
+
+*Sugli asset:* due frecce tonde nuove (`freccia-avanti`, `freccia-indietro`) e la
+foto, che è il **rendering del nodo** 346:946 a scala 1 — 568×709 e 592 KB, contro
+i 9 MB e 2731×4096 della sorgente Unsplash. Tre cose non si scaricano: la stella
+della barra, che è `img/stella.svg` (nel Figma è 34,238×36, cioè lo stesso path
+"Star 3" dei bolli scalato 5,0833 — misurata su entrambi i lati, che è la lezione
+dell'11 agosto sugli SVG con `preserveAspectRatio="none"`); la cucitura
+tratteggiata fra card e foto, che è una riga bianca da 3px con 10 pieni e 10 vuoti
+e sta in un gradiente ripetuto; e le stesse due frecce, che `galleria-prec.svg` e
+`galleria-succ.svg` già portavano come ritaglio del gruppo della galleria — qui
+sono l'esportazione pulita, con un nome che non parla di gallerie.
+
+*Rimasto fuori, detto:* il quiz su cellulare **non è disegnato**. Sotto `lg` la
+pagina impila la card e la foto sparisce: una foto alta 709 fra la domanda e le
+risposte allontanerebbe le due cose che devono stare insieme. E l'ultima schermata
+non è disegnata: il tasto resta "Continua" fino in fondo invece di inventarsi un
+"Vedi i risultati".
 
 **11 agosto 2026 — la vetrina del designer**
 

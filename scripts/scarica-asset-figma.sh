@@ -69,3 +69,24 @@ scarica img/freccia-diagonale.svg "https://www.figma.com/api/mcp/asset/40776503-
 #
 # La stella rossa del voto medio e il calendario delle recensioni restano fuori:
 # non esistono recensioni, quindi non esistono le sezioni che li usano.
+
+echo "Quiz (nodi 346:932 e 346:896) — URL generate il 14 agosto 2026"
+scarica img/freccia-avanti.svg   "https://www.figma.com/api/mcp/asset/0f7cc49a-45d7-41b4-b83f-d256d4aeca5a.svg"
+scarica img/freccia-indietro.svg "https://www.figma.com/api/mcp/asset/6a6f605b-b50f-4260-8cb9-0a9d7f034eb2.svg"
+# La foto è il **rendering del nodo** 346:946 a scala 1 (568×709, jpeg), non la
+# sorgente Unsplash: quella è 2731×4096 e pesa 9 MB. Il ritaglio del disegno è
+# centrato, quindi `object-cover` lo riproduce da sé a qualunque misura.
+scarica img/quiz.jpg             "https://www.figma.com/api/mcp/asset/bcc9ddf3-2e5d-4c23-ad14-4dca72bb480a.jpeg"
+#
+# **Tre asset del quiz non si scaricano.**
+#  · La stella sulla barra di avanzamento è img/stella.svg: nel Figma è alta 36 e
+#    larga 34,238, cioè lo stesso path "Star 3" dei bolli (183 × 174,043) scalato
+#    5,0833. Un file in meno, e la stessa forma non può divergere.
+#  · La cucitura tratteggiata fra card e foto ("Line 28") è una riga bianca da
+#    3px con 10 pieni e 10 vuoti: in `components/quiz-domande.tsx` è un gradiente
+#    ripetuto. Un SVG di una riga stirata su 659px non aggiunge fedeltà.
+#  · Le frecce tonde qui sopra sono le stesse due forme che galleria-prec.svg e
+#    galleria-succ.svg portano come ritaglio del gruppo della galleria (171:179).
+#    Qui sono l'esportazione pulita dei nodi 346:905 e 346:908, e hanno un nome
+#    che non parla di gallerie. Se il disegno cambia, vanno rifatte entrambe le
+#    coppie.

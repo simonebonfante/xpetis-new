@@ -86,6 +86,28 @@ Il Figma è la fonte per tutte le pagine pubbliche: usa il connettore Figma e
 leggi la skill design-to-code **prima** di scrivere codice da un design. I token
 del design system stanno in `app/globals.css` sotto `@theme`.
 
+### Chi vince, quando Figma e Flusso non dicono la stessa cosa
+
+Il Figma **non è aggiornato al pari del Flusso**: è un disegno, e i disegni
+restano indietro. Quindi:
+
+| Materia | Fonte autorevole |
+|---|---|
+| Forma: colori, tipografia, spazi, gerarchia visiva, componenti | **Figma** |
+| Comportamento: quando compare un elemento, cosa succede a un clic, quali stati esistono | **Flusso** |
+| Contenuto: quali dati stanno in un elemento, quali servizi si comprano, quali testi | **Flusso** |
+
+Nel dubbio si **chiede**, e finché non arriva risposta **vince il Flusso**.
+
+Due corollari che è facile sbagliare:
+
+- **L'assenza di qualcosa nel Figma non è una decisione.** Se il Flusso prevede
+  un elemento e il disegno non lo mostra, è una domanda aperta da segnare in
+  `PIANO.md`, non un punto chiuso. Vale in particolare per gli elementi che il
+  Flusso stesso dichiara "da definire con Chiara".
+- **Il Figma che aggiunge contenuto non previsto dal Flusso** (un filtro nuovo,
+  una riga di dati) non si costruisce di iniziativa: si segnala.
+
 File unico: **`x1DYYagZ2moagmpEHZHYYE`**, `https://www.figma.com/design/x1DYYagZ2moagmpEHZHYYE/XPETIS?node-id=<nodo>`
 
 | Pagina | Nodo |

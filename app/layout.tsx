@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Merriweather } from 'next/font/google'
+import { SalvaQuiz } from '@/components/salva-quiz'
 import './globals.css'
 
 const merriweather = Merriweather({
@@ -18,7 +19,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="it" className={merriweather.variable}>
-      <body className="bg-crema text-scuro antialiased">{children}</body>
+      <body className="bg-crema text-scuro antialiased">
+        {children}
+        {/* Non disegna niente: aspetta che esista una sessione per portare il
+            quiz dell'anonimo sul profilo. Sta qui perché il momento da
+            intercettare è il login, che può avvenire su qualunque pagina. */}
+        <SalvaQuiz />
+      </body>
     </html>
   )
 }

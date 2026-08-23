@@ -6,13 +6,13 @@ import { RicercaDestinazione } from '@/components/ricerca-destinazione'
 import { FiltriRicerca } from '@/components/filtri-ricerca'
 import { CardDesigner } from '@/components/card-designer'
 import { componiFrase } from '@/lib/frase'
+import { leggiQuiz } from '@/lib/quiz-risposte'
 import {
   cercaDesigner,
   contaDesignerPubblicati,
   leggiDestinazione,
   leggiTag,
   type Destinazione,
-  type Quiz,
   type RisultatoMatch,
   type Sezione,
 } from '@/lib/match'
@@ -63,20 +63,11 @@ const INTRO_FALLBACK =
  *
  * Così la pagina resta interamente renderizzata dal server — il match non deve
  * mai passare dal browser — e un risultato è condivisibile per link. Da anonimo
- * il quiz vive in `sessionStorage` (Flusso §1) e sarà la pagina del quiz a
- * travasarlo qui: quel pezzo arriva con la milestone del quiz.
+ * il quiz vive in `sessionStorage` (Flusso §1) e la pagina `/quiz` lo travasa
+ * qui alla fine delle sei domande. La lettura e la scrittura di questa stringa
+ * stanno in un posto solo, `lib/quiz-risposte.ts`: sono lo stesso contratto visto
+ * dai due lati.
  */
-function leggiQuiz(grezzo: string | undefined): Quiz | null {
-  if (!grezzo) return null
-  const quiz: Quiz = {}
-  for (const coppia of grezzo.split(',')) {
-    const [codice, valore] = coppia.split(':')
-    const n = Number(valore)
-    // Le scale sono 1-4 sui cinque assi continui, 1-5 su "con chi viaggi".
-    if (codice && Number.isInteger(n) && n >= 1 && n <= 5) quiz[codice] = n
-  }
-  return Object.keys(quiz).length > 0 ? quiz : null
-}
 
 function leggiLista(grezzo: string | undefined): string[] {
   return (grezzo ?? '').split(',').filter(Boolean)
