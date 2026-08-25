@@ -68,7 +68,20 @@ schema_paths = []
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+#
+# I nostri seed stanno in ./seed/ e vanno caricati IN QUESTO ORDINE: la
+# geografia prima dei designer, che la referenziano. Il valore di fabbrica era
+# "./seed.sql", un file che non esiste: `supabase db reset` non ha mai caricato
+# niente, e i seed sono sempre stati applicati a mano dal SQL Editor.
+#
+# ATTENZIONE per il progetto di produzione: togliere 0003 e 0004, che creano
+# Marco Rossi e Giulia Neri. Sono dati finti e non devono finire in vetrina.
+sql_paths = [
+  "./seed/0001_config.sql",
+  "./seed/0002_geo.sql",
+  "./seed/0003_demo.sql",
+  "./seed/0004_foto_finte.sql",
+]
 
 [db.network_restrictions]
 # Enable management of network restrictions.

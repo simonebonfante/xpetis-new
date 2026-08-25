@@ -433,6 +433,255 @@ await expectOk('itinerari pronti con etichette di durata e prezzo', `
     ? ok('i campi di profilo del form sono esposti') : fail('hero_bio: ' + v.hero_bio)
 }
 
+console.log('\n== Lo slug degli itinerari pronti (0033) ==')
+const GIULIA = '22222222-2222-2222-2222-222222222222'
+await expectOk('itinerario con titolo accentato e punteggiatura', `
+  insert into td_ready_itineraries (td_id, position, title)
+  values ('${MARCO}', 93, 'Perù & Bolivia: l''altopiano più alto')`)
+{
+  const r = (await q(`select slug from td_ready_itineraries
+                       where td_id='${MARCO}' and position=93`)).rows[0]
+  r.slug === 'peru-bolivia-l-altopiano-piu-alto'
+    ? ok('lo slug nasce dal titolo, senza accenti né maiuscole: ' + r.slug)
+    : fail('slug generato: ' + r.slug)
+}
+await expectOk('due itinerari con lo stesso titolo, stesso designer', `
+  insert into td_ready_itineraries (td_id, position, title)
+  values ('${MARCO}', 94, 'Perù & Bolivia: l''altopiano più alto')`)
+{
+  const r = (await q(`select slug from td_ready_itineraries
+                       where td_id='${MARCO}' and position=94`)).rows[0]
+  r.slug === 'peru-bolivia-l-altopiano-piu-alto-2'
+    ? ok('la collisione dentro lo stesso designer prende il suffisso: ' + r.slug)
+    : fail('slug della collisione: ' + r.slug)
+}
+await expectOk('lo stesso slug su un altro designer non collide', `
+  insert into td_ready_itineraries (td_id, position, title)
+  values ('${GIULIA}', 93, 'Perù & Bolivia: l''altopiano più alto')`)
+{
+  const r = (await q(`select slug from td_ready_itineraries
+                       where td_id='${GIULIA}' and position=93`)).rows[0]
+  r.slug === 'peru-bolivia-l-altopiano-piu-alto'
+    ? ok("l'unicità è per designer, non globale")
+    : fail('slug del secondo designer: ' + r.slug)
+}
+// **La proprietà che conta**: l'indirizzo non si muove quando il titolo cambia.
+await expectOk('correggere il titolo non muove lo slug', `
+  update td_ready_itineraries set title = 'Perù e Bolivia, l''altopiano'
+   where td_id='${MARCO}' and position=93`)
+{
+  const r = (await q(`select slug, title from td_ready_itineraries
+                       where td_id='${MARCO}' and position=93`)).rows[0]
+  r.slug === 'peru-bolivia-l-altopiano-piu-alto' && r.title.startsWith('Perù e Bolivia')
+    ? ok('titolo corretto, slug immobile: il link già dato resta valido')
+    : fail(`slug=${r.slug} titolo=${r.title}`)
+}
+// E nemmeno un riordino lo muove: è il punto per cui `position` non bastava.
+await expectOk('riordinare gli itinerari non muove gli slug', `
+  update td_ready_itineraries set position = 96 where td_id='${MARCO}' and position=93`)
+{
+  const r = (await q(`select slug from td_ready_itineraries
+                       where td_id='${MARCO}' and position=96`)).rows[0]
+  r.slug === 'peru-bolivia-l-altopiano-piu-alto'
+    ? ok('riordinato: lo slug è lo stesso')
+    : fail('slug dopo il riordino: ' + r.slug)
+}
+await expectOk('uno slug scritto a mano si rispetta', `
+  insert into td_ready_itineraries (td_id, position, title, slug)
+  values ('${MARCO}', 95, 'Un titolo qualunque', 'giappone-in-primavera')`)
+{
+  const r = (await q(`select slug from td_ready_itineraries
+                       where td_id='${MARCO}' and position=95`)).rows[0]
+  r.slug === 'giappone-in-primavera'
+    ? ok('lo slug esplicito non viene riscritto dal trigger')
+    : fail('slug esplicito: ' + r.slug)
+}
+await expectFail('due slug identici sullo stesso designer', `
+  insert into td_ready_itineraries (td_id, position, title, slug)
+  values ('${MARCO}', 97, 'Doppione', 'giappone-in-primavera')`, 'unique')
+{
+  const it = (await q(`select ready_itineraries from public_td_showcase
+                        where slug='marco-rossi'`)).rows[0].ready_itineraries
+  it.every(x => typeof x.slug === 'string' && x.slug.length > 0)
+    ? ok('la vetrina pubblica serve lo slug di ogni itinerario')
+    : fail('itinerari senza slug: ' + JSON.stringify(it))
+}
+{
+  // Il seed vero: gli slug dei tre itinerari di Marco sono leggibili. È la
+  // ragione per cui non abbiamo scelto l'uuid.
+  const r = (await q(`select slug from td_ready_itineraries
+                       where td_id='${MARCO}' and position=1`)).rows[0]
+  r.slug === 'vietnam-del-nord-hanoi-ninh-binh-ha-giang'
+    ? ok('gli slug del seed si leggono: ' + r.slug)
+    : fail('slug del seed: ' + r.slug)
+}
+
+console.log('\n== Maschera contestuale dei filtri (0036) ==')
+{
+  // Nel seed Giulia dichiara 'deserto' sulla Bolivia e 'montagna' sul Perù,
+  // nessuno dichiara 'mare_isole' là: è l'esempio del Flusso, alla lettera.
+  const bolivia = (await q(`select code from tags_for_destination('country','bolivia')`))
+    .rows.map(r => r.code)
+  bolivia.includes('deserto') && !bolivia.includes('mare_isole')
+    ? ok('sulla Bolivia si mostra "deserto" e non "mare": ' + bolivia.join(', '))
+    : fail('tag sulla Bolivia: ' + JSON.stringify(bolivia))
+  const thailandia = (await q(`select code from tags_for_destination('country','thailandia')`))
+    .rows.map(r => r.code)
+  thailandia.includes('mare_isole')
+    ? ok('sulla Thailandia il mare c\'è')
+    : fail('tag sulla Thailandia: ' + JSON.stringify(thailandia))
+}
+{
+  // Con una macro-area si guardano tutti i suoi paesi: Perù e Bolivia stanno
+  // entrambi in Sud America, quindi l'unione porta montagna e deserto.
+  const area = (await q(`select code from tags_for_destination('macro_area','sud_america')`))
+    .rows.map(r => r.code)
+  area.includes('montagna') && area.includes('deserto')
+    ? ok('la macro-area unisce i tag dei suoi paesi: ' + area.join(', '))
+    : fail('tag su sud_america: ' + JSON.stringify(area))
+}
+{
+  const tutti = (await q(`select code from tags_for_destination()`)).rows.map(r => r.code)
+  const quanti = (await q(`select count(*)::int as n from tags`)).rows[0].n
+  tutti.length === quanti
+    ? ok(`senza destinazione nessuna maschera: tutti i ${quanti} tag`)
+    : fail(`senza destinazione: ${tutti.length} tag su ${quanti}`)
+}
+await expectFail('una città non può mascherare i filtri',
+  `select * from tags_for_destination('city','lima')`, 'non filtrabile')
+await expectFail('nemmeno un continente',
+  `select * from tags_for_destination('continent','sud_america')`, 'non filtrabile')
+await expectFail('una destinazione inesistente non torna vuota: solleva',
+  `select * from tags_for_destination('country','atlantide')`, 'inesistente')
+{
+  // Un tag che esiste solo su una bozza non deve comparire: cliccarlo darebbe
+  // zero risultati, che è il difetto da togliere.
+  await expectOk('un designer in bozza che dichiara "mare" sulla Bolivia', `
+    insert into travel_designers (id, slug, display_name, email, status, cal_username)
+    values ('99999999-9999-9999-9999-999999999999','td-bozza','TD Bozza',
+            'bozza@example.com','draft','td-bozza');
+    insert into td_countries (td_id, country_code, level)
+    values ('99999999-9999-9999-9999-999999999999','bolivia',1);
+    insert into td_destination_tags (td_id, country_code, tag_code)
+    values ('99999999-9999-9999-9999-999999999999','bolivia','mare_isole')`)
+  const bolivia = (await q(`select code from tags_for_destination('country','bolivia')`))
+    .rows.map(r => r.code)
+  !bolivia.includes('mare_isole')
+    ? ok('un tag dichiarato solo da una bozza non entra nella maschera')
+    : fail('la bozza ha inquinato la maschera: ' + JSON.stringify(bolivia))
+}
+{
+  const priv = (await q(`select has_function_privilege('anon',
+      'tags_for_destination(text,text)', 'EXECUTE') as si`)).rows[0]
+  const tabella = (await q(`select has_table_privilege('anon','td_destination_tags','SELECT') as si`)).rows[0]
+  priv.si && !tabella.si
+    ? ok('anon chiama la funzione ma non legge td_destination_tags')
+    : fail(`execute=${priv.si} select_tabella=${tabella.si}`)
+}
+
+console.log('\n== Ricerca accento-insensibile (0035) ==')
+{
+  const r = (await q(`select name_it, level from geo_search
+                       where name_norm like '%peru%' and level='country'`)).rows
+  r.some(x => x.name_it === 'Perù')
+    ? ok('"peru" trova "Perù" (era il difetto)')
+    : fail('cercando "peru" fra i paesi: ' + JSON.stringify(r))
+}
+{
+  // Solo le tabelle: `geo_search` ha la stessa colonna ma è una vista, e una
+  // vista non ha colonne generate.
+  const gen = (await q(`select c.table_name, c.is_generated
+                          from information_schema.columns c
+                          join information_schema.tables t
+                            on t.table_schema = c.table_schema and t.table_name = c.table_name
+                         where c.column_name='name_norm' and c.table_schema='public'
+                           and t.table_type='BASE TABLE'
+                         order by c.table_name`)).rows
+  gen.length === 5 && gen.every(c => c.is_generated === 'ALWAYS')
+    ? ok('name_norm è una colonna generata su tutte e cinque le tabelle geo')
+    : fail('colonne name_norm: ' + JSON.stringify(gen))
+}
+await expectOk('correggere un nome aggiorna il normalizzato nello stesso statement', `
+  update geo_countries set name_it = 'Perù Prova' where code='peru'`)
+{
+  const r = (await q(`select name_norm from geo_countries where code='peru'`)).rows[0]
+  r.name_norm === 'peru prova'
+    ? ok('la colonna generata segue il nome: nessun trigger da ricordarsi')
+    : fail('name_norm dopo la modifica: ' + r.name_norm)
+  await db.exec(`update geo_countries set name_it = 'Perù' where code='peru'`)
+}
+{
+  const idx = (await q(`select indexname from pg_indexes where schemaname='public'
+                         and indexname in ('geo_countries_norm_trgm','geo_regions_norm_trgm',
+                                           'geo_cities_norm_trgm')`)).rows
+  idx.length === 3
+    ? ok('i tre indici trigramma sulle tabelle grosse esistono')
+    : fail('indici trovati: ' + JSON.stringify(idx.map(i => i.indexname)))
+}
+{
+  // **La proprietà che il codice da solo non garantisce.** Il pattern lo
+  // normalizza il browser (`normalizzaRicerca` in lib/geo.ts), la colonna la
+  // normalizza Postgres con `unaccent`: sono due implementazioni, e devono
+  // essere d'accordo. Qui si verifica su tutta la tassonomia vera che il nome
+  // di ogni riga, normalizzato dal lato browser, si trovi dentro il
+  // normalizzato dal lato database — cioè che scrivendo il nome per intero si
+  // trovi la riga.
+  //
+  // Questa è una **copia** di normalizzaRicerca: è il termine di confronto del
+  // test, non una seconda verità. Se cambia là, cambiala qui — è esattamente
+  // ciò che questo test serve a scoprire.
+  const senzaSegno = { 'ø':'o','ð':'d','ł':'l','ı':'i','đ':'d','æ':'ae','œ':'oe',
+                       'ß':'ss','þ':'th','ħ':'h','ŋ':'n','ŧ':'t','ĸ':'q','ſ':'s','ɛ':'e' }
+  const normalizza = (t) => t
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[øðłıđæœßþħŋŧĸſɛ]/g, (c) => senzaSegno[c] ?? c)
+    .replace(/[%_]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const righe = (await q(`
+    select name_it, name_norm from geo_continents
+    union all select name_it, name_norm from geo_macro_areas
+    union all select name_it, name_norm from geo_countries
+    union all select name_it, name_norm from geo_regions
+    union all select name_it, name_norm from geo_cities`)).rows
+  const perse = righe.filter(r => !r.name_norm.includes(normalizza(r.name_it)))
+  righe.length > 1500 && perse.length === 0
+    ? ok(`browser e database normalizzano allo stesso modo su ${righe.length} nomi veri`)
+    : fail(`nomi su cui le due normalizzazioni divergono (${perse.length} su ${righe.length}): `
+           + JSON.stringify(perse.slice(0, 5)))
+}
+
+console.log('\n== Parametri di testo in app_config (0034) ==')
+await expectOk('una riga di testo si inserisce', `
+  insert into app_config (key, value, value_text, config_group, label_it)
+  values ('prova_testo', null, 'un testo', 'showcase', 'Riga di prova')`)
+await expectFail('una riga con numero e testo insieme', `
+  insert into app_config (key, value, value_text, config_group, label_it)
+  values ('prova_doppia', 1, 'e anche testo', 'showcase', 'Riga di prova')`, 'app_config_value_xor')
+await expectFail('una riga senza né numero né testo', `
+  insert into app_config (key, value, value_text, config_group, label_it)
+  values ('prova_vuota', null, null, 'showcase', 'Riga di prova')`, 'app_config_value_xor')
+{
+  const r = (await q(`select value, value_text from public_config
+                       where key='ready_itinerary_price_note'`)).rows[0]
+  r && r.value === null && r.value_text.includes('IVA')
+    ? ok('la nota del prezzo arriva al sito: ' + r.value_text)
+    : fail('nota del prezzo: ' + JSON.stringify(r))
+}
+// **La regressione da escludere**: `match_designers` legge `app_config` con
+// `max(value)`, e ora in quella tabella ci sono righe con `value` nullo. Se le
+// aggregazioni si rompessero, il match tornerebbe senza punteggi e nessuno se ne
+// accorgerebbe leggendo il codice.
+{
+  const r = (await q(`select count(*)::int as n from match_designers(null, null, null, null, null, 10, 0)`)).rows[0]
+  r.n > 0
+    ? ok('il match regge le righe di configurazione senza numero')
+    : fail('match_designers non restituisce più niente')
+}
+await expectOk('pulizia delle righe di prova', `delete from app_config where key='prova_testo'`)
+
 console.log('\n== Recensioni portate da fuori ==')
 await expectOk('recensione esterna caricata', `
   insert into td_showcase_reviews (td_id, position, title, author_name, stars, date_label, body)
@@ -687,10 +936,17 @@ console.log('\n== Superficie pubblica ==')
     ? ok('nessuna vista pubblica tocca assi, livelli di copertura o parametri di matching')
     : fail('viste che perdono informazione: ' + leaks.map(v => v.relname).join(', '));
 
-  const cfgGroups = (await q(`select distinct config_group from public_config`)).rows.map(r => r.config_group);
-  JSON.stringify(cfgGroups) === JSON.stringify(['booking_rules'])
-    ? ok('public_config espone solo le regole di prenotazione, non i pesi del match')
+  // `distinct` non promette un ordine: si ordina qui, altrimenti il test passa
+  // o fallisce a seconda del piano di esecuzione.
+  const cfgGroups = (await q(`select distinct config_group from public_config`))
+    .rows.map(r => r.config_group).sort();
+  JSON.stringify(cfgGroups) === JSON.stringify(['booking_rules', 'showcase'])
+    ? ok('public_config espone regole di prenotazione e stringhe di vetrina, non i pesi del match')
     : fail('gruppi in public_config: ' + JSON.stringify(cfgGroups));
+  // La porta chiusa dalla 0018 resta chiusa: è l'asserzione che conta.
+  !cfgGroups.includes('matching')
+    ? ok('i pesi e le soglie del matching non sono sulla superficie pubblica')
+    : fail('public_config espone il gruppo matching');
 
   const axCols = (await q(`select column_name from information_schema.columns
                             where table_name='public_quiz_axes'`)).rows.map(r => r.column_name);

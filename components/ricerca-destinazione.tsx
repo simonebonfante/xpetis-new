@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+
+import { normalizzaRicerca } from '@/lib/geo'
 import { createClient } from '@/lib/supabase/client'
 
 type Voce = {
@@ -82,10 +84,13 @@ export function RicercaDestinazione({
     }
     const attesa = setTimeout(async () => {
       const supabase = createClient()
+      // Si cerca su `name_norm` — senza accenti, minuscolo — e si mostra
+      // `name_it`: "peru" trova "Perù" (migration 0035). Il testo digitato passa
+      // per la stessa normalizzazione, che sta in `lib/geo.ts`.
       const { data } = await supabase
         .from('geo_search')
         .select('level, ref, name_it, country_code, is_filterable, parent_ref')
-        .ilike('name_it', `%${testo.trim()}%`)
+        .like('name_norm', `%${normalizzaRicerca(testo)}%`)
         .order('is_filterable', { ascending: false })
         .order('name_it')
         .limit(12)

@@ -17,7 +17,7 @@ Oppure a mano, dal SQL Editor, incollando i file in ordine numerico.
 ## Come verificarlo
 
 C'è un harness che applica tutto su un Postgres 17 in-process (PGlite) e fa
-girare una sessantina di asserzioni sui vincoli, le macchine a stati, i token e
+girare oltre duecento asserzioni sui vincoli, le macchine a stati, i token e
 la superficie pubblica. Non serve un database vero, non serve Docker:
 
 ```bash
@@ -66,6 +66,13 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0027_showcase_reviews.sql` | Recensioni portate dal designer da fuori |
 | `0028_public_showcase.sql` | La vetrina completa sulla superficie pubblica |
 | `0029_geo_taxonomy.sql` | Le tabelle geografiche allineate alla tassonomia vera |
+| `0030_match_by_destination.sql` | Il match accetta anche una macro-area come destinazione |
+| `0031_filterable_levels.sql` | `is_filterable`: cosa filtra oggi, accanto a cosa la tassonomia dichiara |
+| `0032_orders_ref_seq_owned.sql` | `orders_ref_seq` legata alla sua colonna |
+| `0033_ready_itinerary_slug.sql` | Lo slug stabile degli itinerari pronti, e `unaccent_immutable`/`slugify` |
+| `0034_app_config_text.sql` | `app_config` accetta anche valori di testo |
+| `0035_geo_accent_insensitive.sql` | `name_norm` sulle tabelle geo: "peru" trova "Perù" |
+| `0036_tags_for_destination.sql` | La maschera contestuale dei filtri |
 
 ## La geografia
 
@@ -141,6 +148,15 @@ uniche per designer. Il vincolo sul titolo non vuoto non è pedanteria: il form
 nasce con tre righe di viaggio precompilate e vuote, e senza quel vincolo
 finirebbero in vetrina.
 
+`td_ready_itineraries.slug` (migration 0033) è l'identificatore stabile di un
+itinerario dentro il suo designer, ed è il pezzo di indirizzo che il sito usa.
+Nasce dal titolo al primo inserimento e **non si muove più**: il trigger è
+`before insert` e non tocca gli UPDATE, quindi correggere un titolo o riordinare
+la lista non cambia un link già dato. Prima c'era l'ordinale, e un riordino
+faceva rispondere 200 all'itinerario sbagliato. Slug e non uuid perché questi
+indirizzi finiscono nei messaggi WhatsApp del post-call, dove un identificatore
+si legge o non si clicca.
+
 Su `td_ready_itineraries.price_label` c'è una deroga consapevole alla convenzione
 degli importi in centesimi. Nel form durata e prezzo sono testo libero
 (`"5-7 giorni"`, `"850€"`) e sono indicazioni di vetrina: nessun pagamento nasce
@@ -186,6 +202,22 @@ Regola decisa l'8 agosto 2026, che il database impone:
 (`is_filterable`), a quale paese porta (`country_code`) e da chi discende
 (`parent_ref`, che permette di scendere continente → macro-aree → paesi).
 
+**La ricerca non guarda il nome, guarda `name_norm`** (migration 0035): il nome
+senza accenti e in minuscolo, in una colonna *generata* — quindi impossibile da
+far divergere. Nessuno scrive "Perù" con l'accento in un campo di ricerca, e
+prima di quella colonna "peru" non trovava niente. Due trappole, entrambe
+documentate nel file: `unaccent()` è STABLE e va avvolta in
+`unaccent_immutable()` prima di poterla usare in una colonna generata, e
+`gin_trgm_ops` si risolve alla creazione dell'indice, quindi serve il
+`search_path` in testa alla migration.
+
+Il testo digitato lo normalizza il browser (`lib/geo.ts`), la colonna la
+normalizza Postgres: sono **due implementazioni**, e l'harness verifica che siano
+d'accordo su tutti i 1.613 nomi della tassonomia. Non è teoria — il primo giro ha
+trovato nove nomi su cui divergevano (Tromsø, Køge, Helsingør, Hveragerði,
+Ísafjörður, Płock, Ostrołęka, Kuşadası): `unaccent` traduce anche le lettere che
+non sono "base + segno", e `normalize('NFD')` no.
+
 Due flag e non uno, di proposito. `is_selectable` è **cosa dichiara la
 tassonomia**; `is_filterable` è **cosa filtra oggi in XPETIS**, ed è quello che
 il sito obbedisce. Differiscono su venti righe soltanto — le regioni italiane,
@@ -228,6 +260,15 @@ i pesi degli assi e i parametri di matching: il browser non ne ha più bisogno.
 Una interpretazione da confermare con Chiara e Gaia: senza destinazione il Flusso
 prevede match forti, resto e un fallback in coda, ma non dice cosa definisce il
 fallback. Oggi è chi non aggancia niente, cioè affinità zero.
+
+`tags_for_destination(livello, identificatore)` è la seconda porta sui dati chiusi
+dei profili, e serve la **maschera contestuale** dei filtri: sulla Bolivia non si
+mostra "mare". Restituisce l'unione dei tag dichiarati dai designer **pubblicati**
+su quella destinazione — mai chi li ha dichiarati, quindi nessun profilo si
+ricostruisce da lì. Come `match_designers()` accetta solo `country` e
+`macro_area`, e su una città o un continente solleva. Senza destinazione
+restituisce tutti i tag: la regola "senza meta non si maschera" vive nella
+funzione, non in un `if` del sito.
 
 ## La pubblicazione di un profilo
 
@@ -305,8 +346,18 @@ numerico, modificabile a vista da Supabase Studio senza deploy:
 - `orders` — silenzio-conferma 48h, revisione 5 giorni, acconto 30%
 - `reviews` — buon viaggio 3 giorni prima, recensione viaggio 3 giorni dopo, alert sotto le 3 stelle
 
-Il sito legge i gruppi `matching` e `booking_rules` dalla vista
-`public_config`; i parametri operativi restano interni.
+Il sito legge dalla vista `public_config` i gruppi `booking_rules` e `showcase`;
+`matching` è chiuso dalla 0018 (il match è lato server) e i parametri operativi
+restano interni.
+
+**Dalla 0034 una riga può portare un numero o un testo**, in due colonne distinte
+con un vincolo XOR: `value` per ciò su cui SQL fa aritmetica, `value_text` per le
+stringhe che il sito stampa. Il tipo numerico non è diventato testo per tutti di
+proposito — una riga sbagliata deve fallire all'inserimento, non dentro un cast
+in un workflow. Il primo parametro di testo è `ready_itinerary_price_note`
+("volo non incluso • IVA inclusa"), gruppo `showcase`: dice cosa comprende un
+prezzo, quindi si cambia da Studio e non con un deploy. Svuotarlo lo fa sparire
+dalla pagina.
 
 ## Note sul modello dati
 

@@ -88,3 +88,17 @@ insert into app_config (key, value, config_group, label_it, notes) values
   ('trip_review_days_after',      3, 'reviews', 'Giorni dopo il rientro per la recensione viaggio', null),
   ('low_review_alert_max',        3, 'reviews', 'Alert al team sotto o pari a N stelle',   'Mai cancellare, solo intervenire')
 on conflict (key) do nothing;
+
+-- I parametri di testo (migration 0034). Insert a parte perché `value` resta
+-- nullo e `value_text` porta il valore: mettere le due forme nella stessa lista
+-- di `values` avrebbe reso illeggibili entrambe.
+--
+-- La nota sotto il prezzo degli itinerari pronti è **una sola per tutto il
+-- sito**: il form Vetrina TD non la raccoglie per itinerario, e la decisione del
+-- 23 agosto è di non toccare il form. Dice cosa comprende un prezzo, quindi si
+-- cambia da Studio e non con un deploy. Svuotarla la fa sparire dalla pagina.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('ready_itinerary_price_note', null, 'volo non incluso • IVA inclusa', 'showcase',
+   'Nota sotto il prezzo degli itinerari pronti',
+   'Vale per tutti gli itinerari di tutti i designer: il form non raccoglie questo dato riga per riga. Testo del Figma 261:1068.')
+on conflict (key) do nothing;

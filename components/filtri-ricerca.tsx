@@ -21,14 +21,26 @@ type Tag = { code: string; label_it: string }
  * e i servizi attivi di un designer non possono filtrare dal browser. Servono un
  * parametro nuovo sulla funzione e una migration — decisione di Simone, non
  * un'omissione. Un gruppo di caselle che non filtrano sarebbe peggio del vuoto.
+ *
+ * **La maschera contestuale** (Flusso §1, migration 0036) arriva in
+ * `disponibili`: con una destinazione scelta i chip si riducono a quelli che su
+ * quella destinazione esistono davvero, perché uno scatto che non può che dare
+ * zero risultati è un invito a un vicolo cieco. Senza destinazione la lista
+ * contiene tutti i tag e non maschera niente.
  */
 export function FiltriRicerca({
   temi,
   contesti,
+  disponibili,
   linkQuiz,
 }: {
   temi: Tag[]
   contesti: Tag[]
+  /**
+   * I codici che la destinazione ammette. Array e non `Set` per non dipendere da
+   * cosa il confine server/client sa serializzare: qui dentro diventa un `Set`.
+   */
+  disponibili: string[]
   linkQuiz: string
 }) {
   const router = useRouter()
@@ -38,6 +50,8 @@ export function FiltriRicerca({
 
   const attivi = (chiave: string) =>
     (searchParams.get(chiave) ?? '').split(',').filter(Boolean)
+
+  const ammessi = new Set(disponibili)
 
   function scatta(chiave: string, codice: string) {
     const correnti = attivi(chiave)
@@ -73,6 +87,7 @@ export function FiltriRicerca({
         titolo="Che esperienza cerchi?"
         tag={temi}
         attivi={attivi('temi')}
+        ammessi={ammessi}
         onScatto={(c) => scatta('temi', c)}
       />
 
@@ -82,6 +97,7 @@ export function FiltriRicerca({
         titolo="In che ambiente ti immagini?"
         tag={contesti}
         attivi={attivi('contesti')}
+        ammessi={ammessi}
         onScatto={(c) => scatta('contesti', c)}
       />
     </aside>
@@ -92,37 +108,61 @@ function Gruppo({
   titolo,
   tag,
   attivi,
+  ammessi,
   onScatto,
 }: {
   titolo: string
   tag: Tag[]
   attivi: string[]
+  ammessi: Set<string>
   onScatto: (codice: string) => void
 }) {
+  // **Un filtro acceso si mostra sempre**, anche se la destinazione non lo
+  // ammette. Succede cambiando meta con i filtri già scelti: nascondere il chip
+  // lascerebbe la query filtrata da qualcosa di invisibile, che è il modo più
+  // rapido di far sembrare rotto un elenco giusto. Resta visibile e si può
+  // spegnere, con il titolo che dice perché è lì.
+  const visibili = tag.filter((t) => ammessi.has(t.code) || attivi.includes(t.code))
+
   return (
     <fieldset className="mt-10">
       <legend className="mb-4 font-testo text-[14px] font-bold uppercase text-scuro">
         {titolo}
       </legend>
-      <ul className="flex flex-wrap gap-2">
-        {tag.map((t) => {
-          const acceso = attivi.includes(t.code)
-          return (
-            <li key={t.code}>
-              <button
-                type="button"
-                aria-pressed={acceso}
-                onClick={() => onScatto(t.code)}
-                className={`rounded-[20px] border border-primario px-5 py-2 text-corpo transition ${
-                  acceso ? 'bg-primario text-neutro' : 'bg-neutro text-scuro hover:bg-crema'
-                }`}
-              >
-                {t.label_it}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+
+      {visibili.length === 0 ? (
+        // Si dice, non si fa sparire il gruppo: un titolo senza chip è una
+        // domanda ("dove sono finiti?"), una riga di testo è una risposta.
+        <p className="text-corpo text-scuro/70">
+          Nessuno su questa destinazione, per ora.
+        </p>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {visibili.map((t) => {
+            const acceso = attivi.includes(t.code)
+            const fuoriMaschera = !ammessi.has(t.code)
+            return (
+              <li key={t.code}>
+                <button
+                  type="button"
+                  aria-pressed={acceso}
+                  onClick={() => onScatto(t.code)}
+                  title={
+                    fuoriMaschera
+                      ? 'Nessun designer lo dichiara su questa destinazione'
+                      : undefined
+                  }
+                  className={`rounded-[20px] border border-primario px-5 py-2 text-corpo transition ${
+                    acceso ? 'bg-primario text-neutro' : 'bg-neutro text-scuro hover:bg-crema'
+                  } ${fuoriMaschera ? 'opacity-70' : ''}`}
+                >
+                  {t.label_it}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </fieldset>
   )
 }

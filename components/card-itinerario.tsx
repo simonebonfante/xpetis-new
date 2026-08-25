@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import { FotoVetrina } from '@/components/foto-vetrina'
 import { urlMedia, type ItinerarioPronto } from '@/lib/vetrina'
 
@@ -10,9 +11,18 @@ import { urlMedia, type ItinerarioPronto } from '@/lib/vetrina'
  * Durata e prezzo sono **testo libero**, non numeri: arrivano dal form come
  * "12 giorni" e "1.380€" e sono indicazioni di vetrina (deroga consapevole della
  * migration 0026). Nessun pagamento nasce da questa riga, e infatti il tasto non
- * porta a una cassa.
+ * porta a una cassa: porta alla pagina dell'itinerario, dove l'unica azione è
+ * prenotare una call. La compravendita dell'itinerario pronto non esiste in
+ * nessun punto del sito, per il Flusso.
  */
-export function CardItinerario({ itinerario }: { itinerario: ItinerarioPronto }) {
+export function CardItinerario({
+  itinerario,
+  href,
+}: {
+  itinerario: ItinerarioPronto
+  /** `percorsoItinerario(slug, indice)`: il contratto sta in `lib/vetrina.ts`. */
+  href: string
+}) {
   return (
     <article className="flex flex-col">
       <div className="relative h-[335px] overflow-hidden rounded-[25px]">
@@ -39,7 +49,7 @@ export function CardItinerario({ itinerario }: { itinerario: ItinerarioPronto })
 
         <div className="mt-6 flex items-end justify-between gap-4 border-t border-dashed border-scuro/30 pt-4">
           <p className="text-[18px] leading-[1.5] tracking-[-0.198px]">
-            {itinerario.duration_label ?? ' '}
+            {itinerario.duration_label ?? ' '}
           </p>
           {itinerario.price_label && (
             <div className="border-l border-dashed border-scuro/30 pl-4 text-right">
@@ -51,11 +61,11 @@ export function CardItinerario({ itinerario }: { itinerario: ItinerarioPronto })
           )}
         </div>
 
-        {/* **Il tasto non naviga.** Il Figma lo manda alla pagina "Itinerario
-            pronto da vivere" (nodo 261:1068), che non è ancora costruita. Come
-            per il Prenota: meglio inerte e detto, che un link verso un 404. */}
-        <div className="mt-6 flex items-center gap-2">
-          <span className="flex-1 rounded-[30px] bg-primario px-5 py-2 text-center text-corpo text-neutro opacity-60">
+        {/* Il tasto naviga dal 23 agosto: la pagina dell'itinerario (Figma
+            261:1068) esiste. Fino a quel giorno era uno `span` spento, perché la
+            sua destinazione era un 404. */}
+        <Link href={href} className="group mt-6 flex items-center gap-2">
+          <span className="flex-1 rounded-[30px] bg-primario px-5 py-2 text-center text-corpo text-neutro transition group-hover:brightness-110">
             Ottieni maggiori informazioni
           </span>
           <Image
@@ -63,9 +73,9 @@ export function CardItinerario({ itinerario }: { itinerario: ItinerarioPronto })
             alt=""
             width={40}
             height={40}
-            className="size-10 shrink-0 opacity-60"
+            className="size-10 shrink-0"
           />
-        </div>
+        </Link>
       </div>
     </article>
   )

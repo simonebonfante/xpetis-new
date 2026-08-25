@@ -12,6 +12,7 @@ import { FotoVetrina } from '@/components/foto-vetrina'
 import {
   leggiVetrina,
   paragrafi,
+  percorsoItinerario,
   siCompraInVetrina,
   urlMedia,
   type Servizio,
@@ -34,8 +35,9 @@ import {
  *     `public_td_showcase` non espone. Vedi il commento in testa a
  *     `lib/vetrina.ts`.
  *  3. **La sezione "Viaggi di gruppo"**: non ha una sorgente. Vedi più sotto.
- *  4. **Il tasto "Prenota la call" e "Ottieni maggiori informazioni"**: non
- *     navigano, perché la loro destinazione è milestone 4 e oltre.
+ *  4. **Il tasto "Prenota la call"**: non naviga, perché la sua destinazione è
+ *     la milestone 4. *"Ottieni maggiori informazioni" invece naviga dal 23
+ *     agosto*, da quando esiste la pagina dell'itinerario pronto.
  *
  * E una che il Figma dice in un modo e il Flusso in un altro: il selettore dei
  * servizi. La riconciliazione è in `components/box-servizio.tsx`.
@@ -277,7 +279,11 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
 
             <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {itinerari.map((itinerario) => (
-                <CardItinerario key={itinerario.title} itinerario={itinerario} />
+                <CardItinerario
+                  key={itinerario.slug}
+                  itinerario={itinerario}
+                  href={percorsoItinerario(vetrina.slug, itinerario.slug)}
+                />
               ))}
             </div>
           </div>

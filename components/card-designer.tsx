@@ -19,11 +19,9 @@ type Props = {
   /**
    * Il tag dei paesi compare dove la copertura non è implicita nella sezione:
    * nelle ricerche senza destinazione e in tutte le sezioni che non sono
-   * "esperti della meta cercata".
+   * "esperti della meta cercata". Lo decide `app/ricerca/page.tsx`.
    */
   mostraPaesi: boolean
-  /** `code → label_it`, per scrivere i temi agganciati per esteso. */
-  etichetteTemi: Record<string, string>
 }
 
 /**
@@ -63,15 +61,23 @@ function Avatar({ url }: { url: string | null }) {
  * sopra il crema della pagina. Sopra il velo l'avatar, il nome e la frase in
  * bianco, e la CTA verso la vetrina.
  */
-export function CardDesigner({ risultato, frase, mostraPaesi, etichetteTemi }: Props) {
-  // Nel Figma la riga in cima porta i temi. Li abbiamo solo quando il viaggiatore
-  // ne ha chiesti: senza filtri restano i paesi coperti, che è quanto il Flusso
-  // chiede in quella stessa riga.
-  const temi = risultato.matched_themes.map((c) => etichetteTemi[c] ?? c)
-  const etichette = temi.length > 0 ? temi : mostraPaesi ? risultato.covered_countries : []
+export function CardDesigner({ risultato, frase, mostraPaesi }: Props) {
+  // **In questa riga ci vanno i paesi, e soltanto loro.** Il Flusso §2 la
+  // descrive per esteso — *"Il tag paesi compare nella ricerca senza destinazione
+  // e nelle sezioni di fallback (dove serve capire cosa copre il TD), mai quando
+  // la copertura è implicita nella sezione"* — e non nomina mai i temi. I temi
+  // che stavano qui fino al 23 agosto venivano dal disegno: sotto la regola del
+  // 14 agosto il Figma decide la forma della pillola, il Flusso cosa ci scrive
+  // dentro. Quindi dove la copertura è implicita la riga è vuota, anche se il
+  // disegno mostra tre pillole in ogni card: è una domanda aperta per Chiara, non
+  // una riga da riempire con l'unico dato che avevamo a portata di mano.
+  const etichette = mostraPaesi ? risultato.covered_countries : []
 
   return (
     <article className="flex h-[520px] flex-col items-center gap-12 overflow-hidden rounded-[24px] bg-[linear-gradient(to_bottom,transparent_46.154%,rgba(0,0,0,0.8)_100%)] p-3">
+      {/* La riga si rende anche vuota, e non si nasconde: così l'avatar, il nome
+          e la CTA restano alla stessa altezza in tutte le sezioni, comprese
+          quelle che il tag non lo portano. */}
       <ul className="flex w-full flex-wrap items-start gap-2">
         {etichette.slice(0, TAG_NELLA_CARD).map((etichetta) => (
           <li

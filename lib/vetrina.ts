@@ -68,12 +68,50 @@ export type ViaggioFirma = {
 }
 
 export type ItinerarioPronto = {
+  /**
+   * Identificatore stabile dentro il designer, e pezzo dell'indirizzo pubblico
+   * (migration 0033). Nasce dal titolo al primo inserimento e non si muove più:
+   * né una correzione del titolo né un riordino lo cambiano.
+   */
+  slug: string
   title: string
   /** Testo libero come lo scrive il designer ("12 giorni"): non è un numero. */
   duration_label: string | null
   /** Idem per il prezzo ("1.380€"). È vetrina, non una cassa: vedi 0026. */
   price_label: string | null
   image_path: string | null
+}
+
+/**
+ * L'indirizzo della pagina di un itinerario pronto, e il modo di risolverlo. Il
+ * contratto sta qui in un posto solo, come `lib/quiz-risposte.ts` fa per le
+ * risposte del quiz: chi costruisce il link e chi lo legge vedono la stessa
+ * regola.
+ *
+ * **Nell'URL c'è lo slug dell'itinerario** (migration 0033), non l'ordinale che
+ * c'era fino al 23 agosto. L'ordinale rendeva un riordino silenziosamente
+ * distruttivo: il link vecchio rispondeva 200 mostrando un altro viaggio. Lo slug
+ * nasce dal titolo, è unico per designer e non cambia più — nemmeno correggendo
+ * il titolo — quindi un indirizzo dato una volta resta quello. Il perché dello
+ * slug invece dell'uuid è scritto in testa alla migration: questi link finiscono
+ * nei messaggi WhatsApp, e là un identificatore si legge o non si clicca.
+ */
+export function percorsoItinerario(slugDesigner: string, slugItinerario: string): string {
+  return `/designer/${slugDesigner}/itinerario/${slugItinerario}`
+}
+
+/**
+ * Dallo slug dell'URL all'itinerario, o `null`.
+ *
+ * Cerca nell'array che la vista serve già: nessuna query in più, e un solo posto
+ * dove sta scritto che l'URL porta uno slug.
+ */
+export function trovaItinerario(
+  itinerari: ItinerarioPronto[],
+  slug: string | undefined,
+): ItinerarioPronto | null {
+  if (!slug) return null
+  return itinerari.find((i) => i.slug === slug) ?? null
 }
 
 export type Vetrina = {

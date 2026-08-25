@@ -131,6 +131,31 @@ export async function contaDesignerPubblicati(): Promise<number> {
   return count ?? 0
 }
 
+/**
+ * I tag che esistono davvero sulla destinazione: **la maschera contestuale** del
+ * Flusso (*"sulla Bolivia non si mostra 'mare'"*), migration 0036.
+ *
+ * Perché una funzione e non una vista: `td_destination_tags` dice su cosa un
+ * designer è forte, paese per paese, ed è uno degli ingredienti del punteggio.
+ * `tags_for_destination()` restituisce l'unione dei tag dei designer pubblicati
+ * su quella destinazione — mai chi li ha dichiarati.
+ *
+ * Senza destinazione torna tutti i tag, cioè nessuna maschera: la regola sta
+ * nella funzione, non in un `if` del sito.
+ */
+export async function leggiTagDisponibili(
+  destinazione: Destinazione | null,
+): Promise<string[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('tags_for_destination', {
+    p_destination_level: destinazione?.livello ?? null,
+    p_destination_ref: destinazione?.ref ?? null,
+  })
+
+  if (error) throw new Error(`tags_for_destination: ${error.message}`)
+  return ((data ?? []) as { code: string }[]).map((r) => r.code)
+}
+
 /** Le etichette dei filtri, dalla vista pubblica. Servono ai chip e alla frase. */
 export async function leggiTag(): Promise<{
   temi: { code: string; label_it: string }[]

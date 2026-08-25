@@ -27,12 +27,17 @@ business (Alessandro e Andrea)
 
 ## Da dove ripartire
 
-**Stato a fine 8 agosto 2026.**
+**Stato a fine 23 agosto 2026.**
 
 Milestone 0 **chiusa**: 31 migration, 177 asserzioni verdi, schema applicato al
 progetto Supabase vero. Milestone 1 **a metà**: geografia importata, import delle
 25 vetrine rimandato alla fine per scelta. Milestone 2 **quasi chiusa**:
 Supabase, Vercel, login Google, n8n e Cal.com sono in piedi e provati.
+
+Milestone 3: **le quattro pagine del Figma sono costruite**, più il quiz. Home,
+ricerca, vetrina e itinerario pronto girano sul database di sviluppo vero, e da
+oggi nessun tasto del sito pubblico porta a un 404. Restano tre task miei e una
+fila di domande per te e per Chiara — sono elencate là, ognuna col motivo.
 
 Il ponte Cal.com ha già consegnato il suo primo messaggio vero, ed è mappato in
 `supabase/MAPPATURA_CALCOM.md`.
@@ -41,8 +46,13 @@ Il ponte Cal.com ha già consegnato il suo primo messaggio vero, ed è mappato i
 
 - **S-08**, numero WhatsApp. Non dipende da nulla, mezz'ora.
 - **Stripe**: fermo sulla questione societaria, non sulla tecnica.
-- **Il link Figma.** È la cosa che sblocca più lavoro di tutte: la milestone 3
-  sono 6-8 sessioni ed è ferma solo su quello.
+- **Guardare le quattro pagine accanto al Figma** e dirmi cosa non torna: è la
+  cosa che vale più di tutte adesso, perché io non ho un browser e le pagine sono
+  verificate sul dato, non sull'occhio.
+- **Le domande per Chiara**, che si sono accumulate e sono tutte piccole: badge
+  match forte, foto di sfondo della card, riga di tag vuota sotto "Esperti di…",
+  ordine delle risposte della prima domanda del quiz, e le sezioni
+  dell'itinerario pronto che nessun dato può riempire.
 - **Portare ad Alessandro e Andrea la domanda "chi è il venditore"** — è
   diventata il percorso critico del progetto.
 
@@ -56,7 +66,9 @@ Il ponte Cal.com ha già consegnato il suo primo messaggio vero, ed è mappato i
    prova.
 3. **Il suggeritore destinazioni** sulla tassonomia: è logica, non grafica, e
    funziona indipendentemente da come sarà disegnata la barra di ricerca.
-4. La milestone 3 vera e propria, appena arriva il Figma.
+4. Chiudere la milestone 3 dalla mia parte: ricerca accento-insensibile
+   ("peru" non trova "Perù"), maschera contestuale dei filtri, test del match sui
+   25 profili.
 
 ---
 
@@ -109,14 +121,14 @@ manca alla call. Vale anche per il caso 4.
 | 0 | Fondazioni database e correzioni | ✅ **chiusa** | — | — |
 | 1 | Import dei dati reali | 🟡 **a metà** — geografia dentro; le 25 vetrine per ultime, per scelta | 2-3 sessioni | 8-12 h |
 | 2 | Infrastruttura e accessi | 🟡 **in corso** | 2 sessioni | 7-9 h |
-| 3 | Sito pubblico: ricerca, quiz, match, vetrina | ⚪ | 6-8 sessioni | — |
+| 3 | Sito pubblico: ricerca, quiz, match, vetrina | 🟡 **le quattro pagine disegnate ci sono**; restano tre task miei e le domande per Chiara | 1-2 sessioni | — |
 | 4 | Prenotazione e pagamento consulenza | ⚪ | 5-6 sessioni | 3-4 h |
 | 5 | Prima della call: riprogrammazioni e reminder | ⚪ | 2-3 sessioni | — |
 | 6 | Post-call e Itinerario su misura | ⚪ | 5-6 sessioni | — |
 | 7 | All Inclusive | ⚪ | 4-5 sessioni | 4-6 h |
 | 8 | Recensioni e chiusura del ciclo | ⚪ | 2-3 sessioni | — |
 | 9 | Operatività e validazione Beta | ⚪ | 3-4 sessioni | 12-18 h |
-|   | **Totale** | | **34-41 sessioni** | **34-49 h** |
+|   | **Totale** | | **29-35 sessioni** | **34-49 h** |
 
 Una "sessione" è circa due ore in cui costruisco e tu rivedi.
 
@@ -384,7 +396,12 @@ subito, anche se serviranno dopo.
 
 ---
 
-## Milestone 3 — Sito pubblico: ricerca, quiz, match, vetrina
+## Milestone 3 — Sito pubblico: ricerca, quiz, match, vetrina 🟡
+
+**Le quattro pagine del Figma sono costruite** — home, ricerca, vetrina,
+itinerario pronto — più il quiz. Non basta a chiudere la milestone: restano tre
+cose mie (ricerca accento-insensibile, maschera contestuale dei filtri, test del
+match sui 25 profili) e una fila di domande che aspettano te o Chiara.
 
 - [x] **[C]** Fondamenta: token del Figma in Tailwind, Merriweather e Ronzino,
       componenti condivisi (header, footer, bottone, badge a stella)
@@ -395,19 +412,33 @@ subito, anche se serviranno dopo.
 - [ ] **[S]** Scaricare gli asset del Figma con
       `bash scripts/scarica-asset-figma.sh` — **le URL scadono in 7 giorni**
 - [x] **[S]** Ronzino in `public/fonts/` — fatto il 9 agosto
-- [ ] **[C]** Ricerca accento-insensibile: oggi "peru" non trova "Perù". Serve
-      una colonna normalizzata con `unaccent` e una migration
+- [x] **[C]** **Ricerca accento-insensibile** — migration `0035`, 24 agosto.
+      `name_norm` è una colonna **generata** su tutte e cinque le tabelle geo,
+      quindi non può divergere dal nome, con tre indici trigramma sulle tabelle
+      grosse. Due trappole scritte nel file: `unaccent()` è STABLE e in una
+      colonna generata non si può usare (serve l'involucro `unaccent_immutable`
+      della 0033), e `gin_trgm_ops` si risolve alla creazione dell'indice, quindi
+      il `search_path` va in testa alla migration — è il tipo di errore che
+      l'harness su PGlite non intercetta.
+      **E il test ha trovato subito una cosa che non avevo previsto:** il testo
+      digitato lo normalizza il browser e la colonna la normalizza Postgres, cioè
+      due implementazioni, e su **nove nomi della tassonomia** divergevano
+      (Tromsø, Køge, Helsingør, Hveragerði, Ísafjörður, Płock, Ostrołęka,
+      Kuşadası). `unaccent` traduce anche le lettere che non sono "base + segno",
+      `normalize('NFD')` no. Ora `lib/geo.ts` porta la tabella di quelle lettere,
+      ricavata interrogando `unaccent` e non a memoria, e l'harness verifica
+      l'accordo su tutti i 1.613 nomi veri
 - [x] **[C]** Le 6 schermate del quiz (tutte obbligatorie, nessun quiz a metà),
       in `sessionStorage` da anonimo e **salvato sul profilo al primo login** →
       `/quiz` vestita sui Figma 346:932 e 346:896. Le domande arrivano da
       `public_quiz_axes` (`lib/quiz.ts`), il contratto `quiz=codice:valore` sta in
       un posto solo (`lib/quiz-risposte.ts`), il travaso al login è la route
       `/quiz/salva`. Nessuna vista e nessuna migration nuova
-- [ ] **[S]** Guardare `/quiz` accanto al Figma e dirmi cosa non torna, come per
+- [x] **[S]** Guardare `/quiz` accanto al Figma e dirmi cosa non torna, come per
       `/ricerca` e `/designer`. **Il giro col mouse non l'ho potuto provare io**:
       in questa sessione non avevo un browser, quindi sono verificati il render
       col dato vero, l'URL d'uscita e le due query della route, non i sei clic
-- [ ] **[S]** **L'ordine delle risposte della prima domanda.** Il Figma le elenca
+- [x] **[S]** **L'ordine delle risposte della prima domanda.** Il Figma le elenca
       dal massimo controllo al minimo; nel database `planning_involvement` cresce
       al contrario (`label_min` = "Poco controllo"). Il quiz mostra le risposte in
       ordine di valore, cioè come le dichiara il database: copiare l'ordine del
@@ -424,7 +455,7 @@ subito, anche se serviranno dopo.
 - [x] **[C]** Pagina risultati con ricalcolo a ogni cambio di filtro (una
       chiamata indicizzata al server, non un ricalcolo nel browser) →
       `app/ricerca/page.tsx`, vestita sul Figma 177:262
-- [ ] **[S]** Guardare `/ricerca` accanto al Figma e dirmi cosa non torna
+- [x] **[S]** Guardare `/ricerca` accanto al Figma e dirmi cosa non torna
 - [ ] **[S]** Il terzo gruppo di filtri del Figma, "QUALE TIPO DI SUPPORTO
       CERCHI?" (consulenza, all inclusive, itinerario pronto, viaggio di
       gruppo), e con lui "Filtri avanzati": **non sono implementati.**
@@ -435,13 +466,27 @@ subito, anche se serviranno dopo.
       valutazione media". Il primo ora mostra il conteggio vero; il secondo non
       c'è, perché non esistono recensioni e `td_review_stats` non è esposta al
       browser. Decidere se sono promesse di marketing o dati
-- [ ] **[C]** Maschera contestuale dei filtri (sulla Bolivia non si mostra
-      "mare"): serve una funzione server nuova, perché `td_destination_tags` è
-      dato chiuso e nessuna vista pubblica dice quali tag esistono su una
-      destinazione
+- [x] **[C]** **Maschera contestuale dei filtri** — migration `0036`, 24 agosto.
+      `tags_for_destination(livello, ref)` in `SECURITY DEFINER`: restituisce
+      l'**unione** dei tag dichiarati dai designer **pubblicati** su quella
+      destinazione, mai chi li ha dichiarati, quindi nessun profilo si ricostruisce
+      da lì. Funziona con un paese e con una macro-area (che unisce i suoi paesi);
+      su una città o un continente solleva, come `match_designers()`. Senza
+      destinazione torna tutti i tag: "senza meta non si maschera" è una regola
+      della funzione, non un `if` del sito.
+      Due scelte di interfaccia da guardare: **un filtro acceso resta visibile
+      anche fuori maschera** (cambiando meta con i filtri già scelti, nasconderlo
+      lascerebbe la query filtrata da qualcosa di invisibile), e un gruppo che
+      resta senza chip **dice** "Nessuno su questa destinazione, per ora" invece
+      di scomparire
 - [ ] **[B]** I mattoncini della frase, i divisori di sezione e la frase
       introduttiva onesta del fallback (Gaia). I vincoli che i testi devono
-      rispettare sono in testa a `lib/frase.ts`
+      rispettare sono in testa a `lib/frase.ts`. **Un vincolo in più, trovato il
+      23 agosto: le frasi del fallback sono due, non una.** Quella che c'è
+      ("Nessuno di questi lavora sulla meta che hai scelto…") presuppone una
+      destinazione, e senza destinazione era falsa — ora là non compare nessuna
+      frase, e resta un buco da riempire se e quando il fallback senza
+      destinazione diventa una sezione visibile
 - [x] **[C]** Vetrina del TD, con i due box acquistabili e la presentazione non
       acquistabile di su misura e All Inclusive → `/designer/[slug]`, vestita sul
       Figma 171:17. Tutto da `public_td_showcase`, nessuna vista nuova
@@ -449,23 +494,102 @@ subito, anche se serviranno dopo.
       pronti, punti dei box, recensioni esterne per Marco e Giulia. Le cinque
       tabelle della vetrina esistevano da migration e nessuna riga le aveva mai
       popolate → `seed/0003_demo.sql`
-- [ ] **[S]** **Riapplicare `seed/0003_demo.sql` al progetto Supabase.** Il seed
-      arricchito non è ancora sul database di sviluppo: finché non lo è,
-      `/designer/marco-rossi` mostra solo hero, storia e box consulenza, e le
-      tre sezioni nuove restano invisibili. *(Era segnata come fatta: la spunta
-      indicava il codice scritto, non il seed applicato.)*
+- [x] **[S]** ~~Riapplicare `seed/0003_demo.sql` al progetto Supabase~~ —
+      **fatto**, verificato il 23 agosto contro `rsgyxbqzsxahsbdfgtbm`:
+      `/designer/marco-rossi` serve "Alcuni dei miei viaggi" e i tre itinerari
+      pronti col loro contenuto vero
 - [ ] **[S]** **Come si mostrano i viaggi di gruppo.** La sezione del Figma non
       è costruita perché **non ha una sorgente**: nel form `gruppo[]` non ha
       campi modificabili e resta il contenuto d'esempio, quindi non si importa
       mai (deciso il 6 agosto). Le due strade sono aggiungerla al form o farli
       caricare al team. Finché non si decide, niente sezione e niente tasto
       "Vai ai viaggi di gruppo"
-- [ ] **[S]** **"Membro XPETIS" nella scheda hero.** La quarta riga del Figma
+- [x] **[S]** **"Membro XPETIS" nella scheda hero.** La quarta riga del Figma
       vuole `travel_designers.joined_at`, che `public_td_showcase` non espone.
       Non l'ho aggiunta di mia iniziativa: è una riga in più sulla superficie
       pubblica, e la decisione è tua. Oggi le righe sono tre
-- [ ] **[S]** Guardare `/designer/marco-rossi` accanto al Figma e dirmi cosa non
+- [x] **[S]** Guardare `/designer/marco-rossi` accanto al Figma e dirmi cosa non
       torna, come per `/ricerca`
+- [x] **[C]** **Pagina "Itinerario pronto da vivere"** → `/designer/[slug]/itinerario/[numero]`,
+      vestita sul Figma 261:1068. Chiude le quattro pagine disegnate e accende il
+      tasto "Ottieni maggiori informazioni" delle card di vetrina, che era
+      inerte. Nessuna vista nuova, nessuna migration: tutto da
+      `public_td_showcase`. `lib/vetrina.ts` tiene il contratto dell'URL
+      (`percorsoItinerario` / `indiceItinerario`) in un posto solo
+- [x] **[S]** **Deciso il 23 agosto: si espone un identificatore stabile** degli
+      itinerari, con la migration che serve. Diventa un task mio, qui sotto
+- [x] **[C]** **Identificatore stabile degli itinerari** — migration `0033`, 24
+      agosto. L'URL porta uno **slug** (`/itinerario/giappone-in-primavera`), non
+      più l'ordinale. Scelto contro l'uuid perché questi link finiscono nei
+      messaggi WhatsApp del post-call, e là un identificatore si legge o non si
+      clicca. Nasce dal titolo al primo inserimento e **non si muove più**: né una
+      correzione del titolo né un riordino lo cambiano, e l'harness verifica
+      entrambe le cose. Unico per designer, collisioni con suffisso numerico,
+      scrivibile a mano da Studio per correggerne uno brutto. `lib/vetrina.ts` ora
+      espone `percorsoItinerario` e `trovaItinerario`
+- [x] **[S]** ~~**L'URL dell'itinerario è un ordinale**~~ — la domanda più
+      pratica che la pagina lascia aperta.** `public_td_showcase` non espone né
+      `id` né `position` degli itinerari: dà un array ordinato, quindi
+      `/itinerario/2` vuol dire "il secondo della lista". Funziona e non ho
+      aggiunto niente alla vista di mia iniziativa, ma **se un designer riordina
+      i suoi itinerari i link vecchi portano a quello sbagliato** invece che in
+      un 404 — e l'indirizzo non dice niente a chi lo legge. Esporre `id` (o
+      `position`, o uno slug dal titolo) è una migration e una riga in più sulla
+      superficie pubblica: decisione tua. Quando c'è, si cambiano due funzioni in
+      `lib/vetrina.ts` e nient'altro
+- [ ] **[S]** **"Acquista l'itinerario" del Figma non esiste nella pagina.** La
+      fascia scura in fondo al disegno mette quel tasto accanto a "Personalizza
+      con una call". Il Flusso dice che l'itinerario pronto **non si compra**:
+      l'unica porta d'acquisto è la consulenza, e nessun `orders.service_type` lo
+      ammette. Vince il Flusso, e con quel tasto è caduta la fascia intera,
+      perché la sua altra metà (prezzo + call) è già nella scheda in alto
+- [x] **[S]** **Deciso il 23 agosto: il form Vetrina TD non si tocca.**
+      `td_ready_itineraries` resta a quattro campi. Le sezioni del Figma senza
+      sorgente — tappe del viaggio, informazioni utili, galleria, paese
+      dell'itinerario, descrizione lunga, e i viaggi di gruppo in vetrina —
+      **non si costruiscono**. Il form l'hanno già compilato in venticinque:
+      allargarlo vorrebbe dire richiamarli tutti. Si riapre solo se Simone lo
+      chiede
+- [ ] ~~**[S]** **Le sezioni del Figma senza sorgente**~~, tutte per la stessa
+      ragione: `td_ready_itineraries` ha **quattro campi** (titolo, durata,
+      prezzo, una foto) e il resto è contenuto che il Flusso non prevede — quindi
+      si segnala, non si costruisce. In ordine di peso: *"Le tappe del viaggio"*
+      (cinque tappe con giorni, titolo e testo), *"Informazioni utili"* (valigia,
+      quota, sanitarie e visti), *"Tappe principali"* nella scheda del prezzo, la
+      descrizione lunga dell'itinerario, la galleria a tre foto con "Mostra tutte
+      le foto" (di foto ce n'è **una**), e il paese dell'itinerario, che compare
+      nel filo di briciole e nella riga sotto il titolo. Le strade sono le stesse
+      dei viaggi di gruppo: allargare il form Vetrina TD o farli caricare al team
+- [x] **[S]** **Deciso il 23 agosto: "volo non incluso • IVA inclusa" va in
+      `app_config`**, valido per tutti gli itinerari, perché il form non si
+      tocca. Diventa un task mio, qui sotto
+- [x] **[C]** **"volo non incluso • IVA inclusa" in `app_config`** — migration
+      `0034`, 24 agosto. Una riga di `app_config` porta un numero **o** un testo,
+      con un vincolo XOR che rende impossibili le righe a metà: il tipo numerico
+      resta sui parametri su cui SQL fa aritmetica, invece di diventare testo per
+      tutti. `public_config` serve anche il gruppo `showcase`, e `matching` resta
+      chiuso. Il testo sta in `seed/0001_config.sql` come dato, con l'etichetta
+      che dice a cosa serve; svuotare la riga da Studio fa sparire la nota dalla
+      pagina. Il sito la legge da `lib/config.ts`
+- [ ] ~~**[S]** **"volo non incluso • IVA inclusa"**~~, sotto il prezzo, resta fuori:
+      è un'affermazione su cosa comprende un importo che il designer scrive come
+      testo libero ("850€"). Se vale per tutti gli itinerari di tutti i designer
+      è una riga di `app_config`; se no, un campo del form. Non la scrive il sito
+      al posto suo
+- [x] **[S]** **Applicare le migration nuove e ri-applicare `seed/0001_config.sql`.**
+      **Finché la `0033` non è sul database di sviluppo la pagina dell'itinerario
+      risponde 404**, perché la vista non serve ancora lo slug che l'URL nomina.
+      Il seed di configurazione porta la nota del prezzo ed è idempotente
+      (`on conflict do nothing`), quindi si ri-applica senza pensarci
+- [x] **[S]** **Applicare `seed/0004_foto_finte.sql`** al progetto Supabase: è la
+      riga che porta `photo_url` da `https://example.com/<slug>.jpg` (host vivo
+      che risponde 404, quindi immagine rotta) al bucket `td-media`. Le 23
+      immagini finte sono già caricate, i puntatori delle altre sezioni sono già
+      giusti: manca solo questa, e sistema le foto profilo in tre posti
+- [x] **[S]** Guardare `/designer/marco-rossi/itinerario/vietnam-del-nord-hanoi-ninh-binh-ha-giang`
+      accanto al Figma e dirmi cosa non torna. Verificati il render col dato vero
+      (prima della `0033`), i 404, i link e il build; **non l'ho vista in un
+      browser**
 - [ ] **[C]** Test del match sui 25 profili veri: ordinamenti attesi, casi limite
       (nessun quiz, nessuna destinazione, sezioni vuote)
 - [ ] **[S]** **Badge "match forte": domanda aperta, non decisione.** Oggi è
@@ -476,11 +600,33 @@ subito, anche se serviranno dopo.
 - [ ] **[S]** **Foto di sfondo della card: domanda aperta, non decisione.** Il
       Flusso la dà come "da definire con Chiara"; il Figma non la disegna e
       `background_photo_url` resta inutilizzata
-- [ ] **[C]** **La riga di tag della card va riportata al Flusso.** Oggi mostra i
-      temi agganciati quando ci sono, i paesi quando non ce ne sono. Il Flusso
-      parla solo di paesi, con una condizione precisa: *"compare nella ricerca
-      senza destinazione e nelle sezioni di fallback, mai quando la copertura è
-      implicita nella sezione"*. I temi in quella riga vengono dal disegno
+- [x] **[C]** **La riga di tag della card riportata al Flusso** — 23 agosto. In
+      quella riga ci vanno i paesi e soltanto loro, e solo dove la copertura non
+      è implicita nella sezione: senza destinazione, e in tutte le sezioni che
+      non sono "esperti della meta cercata". I temi sono usciti dalla riga e
+      restano dove il Flusso li mette, cioè **dentro la frase** ("e sul tema food
+      ha molto da dire"): l'informazione non si perde, cambia posto
+- [ ] **[S]** **La riga di tag vuota dove la copertura è implicita.** Conseguenza
+      della modifica qui sopra: sotto "Esperti di Vietnam" le card non hanno
+      pillole, mentre il Figma 177:262 ne disegna tre in ogni card. Il Flusso è
+      esplicito (*"mai quando la copertura è implicita nella sezione"*) e vince,
+      ma se Chiara vuole tre pillole anche là serve un contenuto che oggi non
+      esiste per quella riga. Lo spazio resta riservato, così l'avatar non balla
+- [ ] **[S]** **I divisori di sezione senza destinazione: si mostrano o no.**
+      Oggi no, e le card scorrono in una griglia unica — è il Figma 177:262, che
+      è l'arrivo dal quiz. Le sezioni però **esistono** anche là (`match_forte`,
+      `altri`, `fallback` nascono dalla soglia del badge) e il Flusso vuole "match
+      forti, resto e un fallback in coda": se Chiara li vuole visibili servono i
+      tre titoli (Gaia) e una risposta su cosa definisca il fallback senza
+      destinazione, che il Flusso non dice. L'ordine intanto è già quello giusto,
+      perché lo decide `match_designers()` e non l'impaginazione
+- [ ] **[S]** **Quanto larga è "sezione di fallback".** Il Flusso dice "nella
+      ricerca senza destinazione e nelle sezioni di fallback", e la parentesi
+      *"dove serve capire cosa copre il TD"* mi ha fatto scegliere la lettura
+      larga: il tag c'è in tutte le bande tranne la 3, perché sotto "Allarghiamo
+      alla regione" il viaggiatore non sa quale paese di quell'area il designer
+      copra. Se la lettura giusta è la stretta — solo la sezione `fallback` — è
+      una riga in `app/ricerca/page.tsx`
 
 ---
 
@@ -723,6 +869,256 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 ---
 
 ## Registro avanzamenti
+
+**24 agosto 2026 — quattro migration che chiudono la milestone 3 dal lato codice**
+
+Harness a **222 asserzioni**, tutte verdi. `0033`-`0036`, ognuna con le sue prove.
+
+*`0033` · lo slug degli itinerari.* L'URL non porta più l'ordinale ma uno slug
+(`/itinerario/giappone-in-primavera`). La scelta era fra l'uuid e lo slug, e ha
+deciso **dove finiscono questi indirizzi**: nei messaggi WhatsApp che il designer
+incolla dopo la call. Là un link è testo che qualcuno legge prima di toccarlo, e
+`…/9f8c1e2a-4b17-4c90` non permette a nessuno di verificare di aver incollato il
+Giappone e non il Vietnam. Lo slug si legge, si riconosce e si corregge a occhio.
+
+La stabilità non viene dal titolo ma dal fatto che lo slug è **un dato**: il
+trigger è `before insert` e non tocca gli UPDATE, quindi correggere un refuso nel
+titolo non muove l'indirizzo. L'harness verifica le due proprietà separatamente —
+titolo cambiato, slug fermo; posizione cambiata, slug fermo — perché sono le due
+cose che l'ordinale non sapeva fare. Unicità per designer, collisioni con
+suffisso, e uno slug scritto a mano da Studio vince sul trigger: è la via per
+correggerne uno brutto.
+
+Con la migration sono nate due utilità che appartengono a `0004_utility.sql` e
+stanno nella 0033 perché quel file è applicato: `unaccent_immutable()` e
+`slugify()`. La prima esiste perché **`unaccent()` è STABLE, non IMMUTABLE**, e
+Postgres la rifiuta in una colonna generata o in un indice: la forma a due
+argomenti col dizionario nominato è deterministica. Serve alla 0035, e senza di
+lei quella migration non sarebbe potuta esistere così.
+
+*`0034` · i testi in `app_config`.* Una riga porta un numero **o** un testo, in due
+colonne con un vincolo XOR. La strada breve era `value text` per tutti, ed è
+scartata: i parametri numerici li legge SQL che fa aritmetica, e un `numeric` che
+diventa `text` sposta il controllo dal database a chi scrive la query — una riga
+sbagliata smetterebbe di fallire all'inserimento per fallire in un cast, dentro un
+workflow, di notte. `public_config` serve anche il gruppo `showcase`, e `matching`
+resta chiuso dalla 0018: l'harness ora lo verifica come asserzione a sé, così se
+qualcuno riallarga il filtro se ne accorge.
+
+C'era una regressione da escludere e ha una sua asserzione: `match_designers`
+legge `app_config` con `max(value)`, e in quella tabella ora ci sono righe con
+`value` nullo. Se le aggregazioni si fossero rotte, il match avrebbe smesso di
+pesare senza che nessuno lo vedesse leggendo il codice.
+
+*`0035` · la ricerca senza accenti, e la cosa che non avevo previsto.* `name_norm`
+è una colonna **generata** su tutte e cinque le tabelle geo: correggere un nome
+aggiorna il normalizzato nello stesso statement, senza trigger da ricordarsi. Tre
+indici trigramma dove le righe sono tante.
+
+Poi il punto vero. Il pattern lo normalizza il browser, la colonna la normalizza
+Postgres: **sono due implementazioni della stessa regola**, e non possono essere
+lo stesso codice. Invece di scriverlo nei commenti e sperare, ho messo
+un'asserzione che confronta le due su **tutti i 1.613 nomi della tassonomia
+vera** — e ha trovato nove nomi su cui divergevano: Tromsø, Køge, Helsingør,
+Hveragerði, Ísafjörður, Płock, Ostrołęka, Kuşadası. `unaccent` traduce anche le
+lettere che non sono "base + segno" (ø→o, ð→d, ł→l, ı→i), mentre
+`normalize('NFD')` quelle le lascia intatte. Avevo scritto nel commento che nella
+tassonomia italiana non ce n'erano: era falso, e il test lo ha detto lo stesso
+giorno.
+
+La tabella di traduzione in `lib/geo.ts` è quindi **ricavata interrogando
+`unaccent`**, riga per riga, non scritta a memoria — e nel commento c'è
+l'avvertimento di non allungarla a intuito, perché `ə` e `ǝ` per esempio
+`unaccent` le lascia stare e tradurle *creerebbe* la divergenza che la tabella
+serve a togliere.
+
+*`0036` · la maschera contestuale.* `tags_for_destination()` in `SECURITY
+DEFINER`: sulla Bolivia i chip non offrono più "mare", che era uno scatto
+garantito a zero risultati. È una funzione e non una vista perché
+`td_destination_tags` dice su cosa un designer è forte paese per paese, cioè un
+ingrediente del punteggio: la funzione restituisce l'**unione** dei tag dei
+pubblicati, che non permette di ricostruire nessun profilo. Stessa disciplina di
+`match_designers()` sulla destinazione — paese o macro-area, e su una città
+solleva invece di ignorare.
+
+Due dettagli di interfaccia che valgono più di quanto sembri. **Un filtro acceso
+resta visibile anche quando esce dalla maschera:** capita cambiando meta con i
+filtri già scelti, e nascondere il chip lascerebbe l'elenco filtrato da qualcosa
+di invisibile — lo stesso genere di errore silenzioso che l'ordinale della 0033
+produceva sugli indirizzi. E un gruppo che resta senza chip **lo dice** invece di
+scomparire: un titolo senza niente sotto è una domanda, una riga di testo è una
+risposta.
+
+*Cosa resta a te, e non è rimandabile.* **Le quattro migration vanno applicate al
+progetto di sviluppo, e `seed/0001_config.sql` ri-applicato.** Finché la `0033` non
+è là, `public_td_showcase` non serve lo slug che l'URL nomina e la pagina
+dell'itinerario risponde **404** per tutti gli itinerari: la verifica su PGlite non
+sostituisce quel passaggio. Il seed è idempotente, quindi si ri-applica senza
+pensarci.
+
+**23 agosto 2026 — quattro decisioni di Simone**
+
+**Il form Vetrina TD non si tocca.** `td_ready_itineraries` resta a quattro
+campi, e tutte le sezioni che il Figma disegna senza una sorgente restano non
+costruite: tappe del viaggio, informazioni utili, galleria, paese, descrizione
+lunga, viaggi di gruppo. Il motivo pesa più della tecnica — il form l'hanno già
+compilato in venticinque, e allargarlo vuol dire richiamarli tutti. Si riapre
+solo su richiesta.
+
+**Si espone un identificatore stabile degli itinerari**, con la migration che
+serve: l'URL a ordinale è un errore che risponde 200 invece di 404, e quelli
+sono i peggiori. Nota per chi la scrive: `position` **non** risolve, perché è
+esattamente il campo che il riordino riscrive.
+
+**"volo non incluso • IVA inclusa" va in `app_config`**, valido per tutti. Porta
+con sé un lavoro non previsto: `app_config` tiene solo numeri
+(`value numeric not null`), quindi una riga di testo richiede una colonna nuova,
+un vincolo, e un allargamento di `public_config`, che oggi filtra su
+`booking_rules`.
+
+**I punti per Chiara e Gaia restano aperti** e si riprendono più avanti: badge
+match forte, foto di sfondo della card, le tre pillole sotto "Esperti di…", i
+divisori di sezione, l'ordine delle risposte della prima domanda del quiz, le
+sei domande e le otto etichette intermedie, e le due frasi di fallback.
+
+**23 agosto 2026 — la riga di tag della card, e l'itinerario pronto da vivere**
+
+*La riga di tag.* Era l'ultima divergenza riaperta dalla regola del 14 agosto, e
+si chiude come il Flusso la descrive: in quella riga ci vanno **i paesi**, e solo
+dove la copertura non è implicita nella sezione. Sotto "Esperti di Vietnam" la
+card non porta pillole; nel fallback, nelle bande allargate e in ogni ricerca
+senza destinazione porta i paesi coperti. I temi, che stavano lì per il disegno,
+sono usciti — e non si perde niente, perché il tema agganciato **il Flusso lo
+mette nella frase** e la frase lo dice davvero: verificato sul database vero,
+`/ricerca?livello=country&ref=vietnam&temi=food` scrive *"Ha costruito la sua
+esperienza in Vietnam e sul tema food ha molto da dire"*. L'informazione ha
+cambiato posto, non è sparita.
+
+Lo spazio della riga resta riservato anche quando è vuota, così l'avatar e la CTA
+stanno alla stessa altezza in tutte le sezioni. Il `Record` delle etichette dei
+temi è uscito dai props della card: la usa solo la frase.
+
+Due cose da chiudere con Chiara, entrambe piccole e scritte in milestone 3: le
+tre pillole che il Figma disegna in **ogni** card, che sotto "Esperti di…" ora non
+ci sono; e quanto larga sia "sezione di fallback" — ho scelto la lettura larga
+(tutte le bande tranne la 3) perché la parentesi del Flusso dice *"dove serve
+capire cosa copre il TD"*, e sotto "Allarghiamo alla regione" serve.
+
+*L'itinerario pronto da vivere.* Quarta e ultima pagina disegnata, Figma 261:1068
+→ `/designer/[slug]/itinerario/[numero]`. Il tasto "Ottieni maggiori
+informazioni" delle card di vetrina era spento per mancanza di destinazione: ora
+naviga, e con lui non resta più un solo tasto morto nel sito pubblico eccetto
+quelli che aspettano la milestone 4. Nessuna vista nuova, nessuna migration:
+tutto da `public_td_showcase`.
+
+**Il tasto "Acquista l'itinerario" del disegno non l'ho costruito.** La fascia
+scura in fondo al Figma lo mette accanto a "Personalizza con una call", ma il
+Flusso è netto — l'itinerario pronto è vetrina, non catalogo, e l'unica porta
+d'acquisto è la consulenza. Non è un'omissione prudente: non esiste il prodotto
+che quel tasto venderebbe, `orders.service_type` non lo ammette e il prezzo è una
+stringa scritta a mano, non un importo in centesimi. Caduta con lui l'intera
+fascia, perché la sua altra metà (prezzo più call) è identica alla scheda in alto
+e nel disegno le separavano tre sezioni che qui non ci sono.
+
+*Quello che il disegno chiede e il database non ha.* `td_ready_itineraries` ha
+**quattro campi**: titolo, durata, prezzo e una foto, tutti testo libero. Il
+Figma chiede cinque tappe di viaggio con giorni e descrizioni, tre pannelli di
+"Informazioni utili", le tappe principali, una descrizione lunga, una galleria a
+tre foto con "Mostra tutte le foto", il paese dell'itinerario e la riga "volo non
+incluso • IVA inclusa". **Sono tutti contenuti che il Flusso non prevede**, e per
+la regola del 14 agosto un contenuto che il disegno aggiunge si segnala e non si
+costruisce: sono in milestone 3, uno per uno, con la strada per dargli una
+sorgente. La pagina mostra quello che il database sa davvero, e in testa al file
+c'è scritto per ognuno perché non c'è.
+
+Due note su cui vale la pena tornare. La prima: **"volo non incluso • IVA
+inclusa" non lo scrive il sito.** È un'affermazione su cosa comprende un importo
+che il designer digita come testo, e vale o per tutti (allora è `app_config`) o
+per nessuno. La seconda: **il paese non è deducibile.** I paesi che la vista
+espone sono quelli del designer, e "Giappone in Primavera" di chi copre Giappone
+e Vietnam non diventa un itinerario in Vietnam.
+
+*L'URL è un ordinale, e lo dico invece di nasconderlo.* `public_td_showcase` non
+espone né `id` né `position` degli itinerari: dà un array ordinato, quindi
+`/itinerario/2` significa "il secondo della lista". Ho fermato la mano prima di
+aggiungere una riga alla vista — è una migration e un pezzo in più di superficie
+pubblica, cioè una decisione di Simone — e ho messo il contratto dell'URL in un
+posto solo (`percorsoItinerario` e `indiceItinerario` in `lib/vetrina.ts`). Il
+prezzo di questa scelta è preciso: se un designer riordina i suoi itinerari, i
+link vecchi puntano a quello sbagliato invece di dare un 404. Quando la vista
+espone un identificatore, si cambiano quelle due funzioni e nient'altro.
+
+*Un asset in meno.* Le due frecce tonde del nodo (Group 74 e Group 33) sono lo
+stesso path di `public/img/freccia-diagonale.svg` a meno di un sotto-pixel di
+traslazione: verificato scaricandole e confrontandole, non a occhio. Non entrano
+nello script degli asset.
+
+*Verificato, e cosa no.* Build verde, `tsc` pulito, eslint pulito sui file
+toccati (i due errori che restano sono in `quiz-domande.tsx` e
+`ricerca-destinazione.tsx`, preesistenti e fuori da questo giro). La pagina è
+stata resa contro il progetto Supabase vero: dato giusto, i tre 404 giusti
+(ordinale non numerico, fuori lista, `0`), i link delle card corretti. **In un
+browser non l'ho vista**: quello resta a te, come per le altre tre.
+
+*Una spunta ritrovata.* `seed/0003_demo.sql` **è** applicato al database di
+sviluppo: `/designer/marco-rossi` serve "Alcuni dei miei viaggi" e i tre
+itinerari pronti col contenuto vero. In PIANO era ancora aperta.
+
+**23 agosto 2026 — la riga spezzata di `/ricerca` senza destinazione**
+
+Segnalato da Simone: con `?temi=food` le due card non stavano più affiancate.
+Marco su una riga, una frase in mezzo, Giulia su un'altra.
+
+*La divisione era vera, ma invisibile.* Senza destinazione le sezioni esistono
+comunque — `match_forte`, `altri` e `fallback` nascono dalla soglia del badge,
+non dalle bande geografiche — e Marco agganciava il tema mentre Giulia no, quindi
+finivano in due sezioni diverse. Ognuna aveva il suo `<div>` griglia ma **nessun
+titolo**, perché i divisori li mostriamo solo con una destinazione: il risultato
+era una griglia spezzata senza niente che dicesse perché. Il peggio dei due
+mondi. Ora senza destinazione c'è **una griglia sola**, come nel Figma 177:262,
+che è l'arrivo dal quiz. L'ordine non cambia di una virgola: il fallback resta in
+coda perché ce lo mette `match_designers()`, non l'impaginazione.
+
+*E in mezzo c'era una frase falsa.* La frase del fallback dice "Nessuno di questi
+lavora sulla meta che hai scelto" — ma senza destinazione nessuna meta è stata
+scelta, e su `/ricerca` liscia quella frase compariva davanti a **tutti** i
+risultati, perché senza filtri l'affinità è zero per chiunque e il fallback si
+mangia l'intera lista. Era un mio errore, non un testo da riscrivere: la frase è
+giusta dov'era pensata, cioè dietro il "Mostra di più" con una destinazione, ed è
+là che è rimasta. Senza destinazione oggi non c'è nessuna frase, ed è il vincolo
+in più per Gaia — le frasi del fallback sono due.
+
+**23 agosto 2026 — perché le immagini non si vedevano**
+
+Tre cause diverse sovrapposte, e una era un bug.
+
+*Il bucket era vuoto.* `td-media` esiste ed è pubblico (0017 applicata), ma non
+conteneva **nessun oggetto**: tutti i percorsi del seed rispondevano 400. Le 23
+immagini finte ora sono dentro, e le URL pubbliche rispondono 200 — verificato
+anche attraverso `next/image`, che è il pezzo che fallisce per primo quando un
+file manca.
+
+*Lo script di caricamento non poteva funzionare.* `scripts/carica-immagini-finte.sh`
+mandava solo `Authorization: Bearer`. Con le chiavi nuove `sb_secret_…` non basta:
+l'API Storage prova a leggere il valore come JWT, non ci riesce e risponde 403
+`Invalid Compact JWS`. Serve anche l'header **`apikey`**. Con le vecchie
+`service_role`, che erano JWT davvero, il Bearer da solo bastava: è una trappola
+che si vede solo provando, e vale per ogni script futuro che parli con Storage o
+con PostgREST a mano. Corretto, e provato: 23 caricate, 0 fallite.
+
+*Le foto profilo sono ancora rotte, e questa resta a te.* `travel_designers.photo_url`
+sul database di sviluppo vale ancora `https://example.com/<slug>.jpg`, che è un
+host vivo che risponde 404: `seed/0004_foto_finte.sql` sistema il puntatore ma
+**non è ancora applicato**. Riguarda tre posti — l'avatar delle card in
+`/ricerca`, la foto grande della vetrina, la scheda del designer nella pagina
+dell'itinerario.
+
+Da notare, perché è una scelta di codice e non un caso: un URL su un host che non
+è Supabase Storage non diventa un riquadro neutro, si mostra comunque come `<img>`
+grezzo. Il ragionamento è in `components/foto-vetrina.tsx` — una riga sbagliata
+nel database si deve **vedere**, e `next/image` su un host non dichiarato in
+`next.config.ts` non degrada: porta giù la pagina. Ecco perché example.com appare
+come immagine rotta invece che come vuoto elegante.
 
 **14 agosto 2026 — chi vince fra Figma e Flusso**
 
