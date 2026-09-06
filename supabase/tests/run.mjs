@@ -5,11 +5,32 @@ import { PGlite } from '@electric-sql/pglite'
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { unaccent } from '@electric-sql/pglite/contrib/unaccent'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import crypto from 'node:crypto'
 import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
 const db = await PGlite.create({ extensions: { pg_trgm, pgcrypto, unaccent } })
+
+// La parola segreta con cui Cal.com firma i webhook. Nel repo non c'è e non ci
+// deve stare: si legge dall'ambiente, o da `.env.local` che non è versionato.
+// Se manca, il ponte si prova comunque con una parola inventata — cambia solo
+// che le firme VERE registrate nelle fixture non si possono verificare, e il
+// test lo dice invece di tacerlo.
+const leggiSegretoCalcom = () => {
+  if (process.env.CALCOM_WEBHOOK_SECRET) return { valore: process.env.CALCOM_WEBHOOK_SECRET, vero: true }
+  const env = path.join(root, '..', '.env.local')
+  if (existsSync(env)) {
+    const riga = readFileSync(env, 'utf8').split('\n')
+      .find(r => r.startsWith('CALCOM_WEBHOOK_SECRET='))
+    if (riga) {
+      const v = riga.slice('CALCOM_WEBHOOK_SECRET='.length).trim().replace(/^["']|["']$/g, '')
+      if (v) return { valore: v, vero: true }
+    }
+  }
+  return { valore: 'parola-segreta-finta-per-l-harness', vero: false }
+}
+const segretoCalcom = leggiSegretoCalcom()
 
 // Stub dell'ambiente Supabase che le migration danno per scontato.
 await db.exec(`
@@ -24,7 +45,20 @@ await db.exec(`
   );
   create or replace function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+
+  -- Supabase Vault: su un progetto vero lo schema c'è già, qui si simula come
+  -- auth.users. La 0037 legge la parola segreta di Cal.com da questa vista.
+  create schema vault;
+  create table vault.decrypted_secrets (
+    id uuid primary key default gen_random_uuid(),
+    name text unique,
+    description text,
+    decrypted_secret text
+  );
 `)
+await db.query(
+  `insert into vault.decrypted_secrets (name, decrypted_secret) values ('calcom_webhook_secret', $1)`,
+  [segretoCalcom.valore])
 
 let failures = 0
 const ok   = (m) => console.log('  ok   ' + m)
@@ -1025,6 +1059,430 @@ await expectOk('promosso un paese a livello 1: ora si pubblica', `
    where td_id='88888888-8888-8888-8888-888888888888' and country_code='tanzania';
   update travel_designers set status='published'
    where id='88888888-8888-8888-8888-888888888888'`)
+
+// ===========================================================================
+// Il ponte Cal.com → bookings (migration 0037)
+// ===========================================================================
+// Le sette fixture sono messaggi VERI, raccolti sull'account di prova. Si
+// rigiocano in sequenza perché il punto del ponte non è il singolo messaggio:
+// è che la catena regga — creazione, riprogrammazioni, cancellazione — quando
+// Cal.com cambia il codice della prenotazione sotto i piedi.
+console.log('\n== Il ponte Cal.com → bookings ==')
+{
+  const fxDir = path.join(root, 'tests', 'fixtures', 'calcom')
+  const fx = {}
+  for (const f of readdirSync(fxDir).filter(f => f.endsWith('.json'))) {
+    fx[f.replace(/^booking_|\.json$/g, '')] = JSON.parse(readFileSync(path.join(fxDir, f), 'utf8'))
+  }
+
+  // Il corpo vero, senza le due chiavi di commento (`_nota`,
+  // `_headers_rilevanti`) aggiunte a mano quando le fixture sono state salvate.
+  const senzaMeta = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => !k.startsWith('_')))
+  // SCOPERTA, e vale la pena scriverla: Cal.com firma il JSON COMPATTO, e
+  // `JSON.stringify` di un oggetto appena parsato riproduce quei byte esatti.
+  // È il motivo per cui le firme registrate nelle fixture sono verificabili
+  // davvero, invece che solo ricalcolabili.
+  const grezzo = (o) => JSON.stringify(senzaMeta(o))
+  const firmaDi = (raw) =>
+    crypto.createHmac('sha256', segretoCalcom.valore).update(raw, 'utf8').digest('hex')
+
+  let nVarianti = 0
+  const clone = (o) => JSON.parse(JSON.stringify(o))
+  // Una variante di un messaggio vero. `createdAt` cambia sempre: la chiave di
+  // diario è `trigger:uid:createdAt`, e senza questo una variante passerebbe
+  // per un doppio scatto del messaggio da cui deriva.
+  const variante = (base, patch = {}) => {
+    const b = clone(senzaMeta(base))
+    b.createdAt = `2026-09-06T20:${String(nVarianti++).padStart(2, '0')}:00.000Z`
+    for (const [via, val] of Object.entries(patch)) {
+      const parti = via.split('.')
+      let n = b
+      for (const p of parti.slice(0, -1)) n = n[p]
+      n[parti.at(-1)] = val
+    }
+    return b
+  }
+  // Il BOOKING_CREATED che apre una catena di riprogrammazioni non è stato
+  // catturato: la raccolta delle fixture comincia dalla prima riprogrammazione.
+  // Si ricostruisce dal messaggio di creazione vero sostituendo tre campi, e i
+  // valori NON sono inventati: `uid` e orario di partenza sono esattamente
+  // `rescheduleUid` e `rescheduleStartTime` che il messaggio di
+  // riprogrammazione vero dichiara.
+  const creataRicostruita = (uid, startISO, patch = {}) => variante(fx.created, {
+    'payload.uid': uid,
+    'payload.startTime': startISO,
+    'payload.endTime': new Date(Date.parse(startISO) + 30 * 60000).toISOString(),
+    'payload.metadata.videoCallUrl': `https://app.cal.com/video/${uid}`,
+    ...patch,
+  })
+
+  const chiama = async (corpoObj, firma) => {
+    const raw = typeof corpoObj === 'string' ? corpoObj : JSON.stringify(corpoObj)
+    const r = await db.query('select calcom_webhook($1, $2) as esito', [raw, firma ?? firmaDi(raw)])
+    return r.rows[0].esito
+  }
+  const prenotazione = async (where, params = []) =>
+    (await db.query(`select * from bookings where ${where}`, params)).rows[0]
+  const nAlert = async (kind) =>
+    Number((await db.query('select count(*) from team_alerts where kind = $1', [kind])).rows[0].count)
+  const nDiario = async () =>
+    Number((await db.query("select count(*) from webhook_events where provider='cal'")).rows[0].count)
+
+  // Il viaggiatore delle fixture: l'UUID che compare in
+  // `responses.xpetis_user_id.value` in tutti e sette i messaggi.
+  const VIAGGIATORE = '69a37b12-b899-47c4-9bdb-31a17d9cb986'
+  await db.query(
+    `insert into auth.users (id, email, raw_user_meta_data)
+     values ($1, 'pinco.pallino@example.com', '{"full_name":"Pinco Pallino"}'::jsonb)`, [VIAGGIATORE])
+  {
+    const n = Number((await db.query('select count(*) from travelers where id = $1', [VIAGGIATORE])).rows[0].count)
+    n === 1 ? ok('il viaggiatore delle fixture esiste (creato dal trigger sul login)')
+            : fail('viaggiatore delle fixture non creato')
+  }
+  // Un designer con la consulenza attiva ma senza prezzo non può esistere (lo
+  // vieta td_services_bookable_complete): per provare quel caso serve un
+  // servizio spento, che è esattamente lo scenario reale — il team lo
+  // disattiva mentre uno slot è ancora aperto su Cal.com.
+  await db.exec(`
+    insert into travel_designers (id, slug, status, display_name, email, cal_username)
+    values ('44444444-4444-4444-4444-444444444444','td-senza-prezzo','draft','TD Senza Prezzo',
+            'senzaprezzo@example.com','td-senza-prezzo-xpetis');
+    insert into td_services (td_id, service_type, is_active, cal_event_type_slug)
+    values ('44444444-4444-4444-4444-444444444444','consultation', false, 'consulenza-xpetis-30');`)
+
+  // ------------------------------------------------------------------- firma
+  console.log('  -- la firma --')
+  if (segretoCalcom.vero) {
+    let verificate = 0, saltate = []
+    for (const [nome, o] of Object.entries(fx)) {
+      const attesa = o._headers_rilevanti?.['x-cal-signature-256']
+      if (!attesa) continue
+      const r = (await db.query('select calcom_signature_ok($1, $2) as v', [grezzo(o), attesa])).rows[0].v
+      r ? verificate++ : saltate.push(nome)
+    }
+    // `created` è l'unica che non torna, e si sa perché: la password del video
+    // (un JWT) è stata sostituita prima di salvare la fixture, quindi quel
+    // corpo non è più quello firmato. Lo dice il suo `_nota`.
+    verificate === 6 && saltate.length === 1 && saltate[0] === 'created'
+      ? ok('6 firme VERE su 7 verificate contro i byte veri (la settima ha il JWT video sostituito)')
+      : fail(`firme vere verificate: ${verificate}, non verificate: ${JSON.stringify(saltate)}`)
+  } else {
+    ok('firme vere non verificate: CALCOM_WEBHOOK_SECRET non è nell\'ambiente (il resto del ponte si prova comunque)')
+  }
+  {
+    const raw = grezzo(fx.created)
+    const r = (await db.query('select calcom_signature_ok($1, $2) as v', [raw, firmaDi(raw)])).rows[0].v
+    r === true ? ok('la firma calcolata sul corpo grezzo combacia') : fail('firma ricalcolata non combacia')
+  }
+  for (const [etichetta, firma] of [
+    ['una firma sbagliata', 'a'.repeat(64)],
+    ['una firma vuota', ''],
+    ['nessuna firma', null],
+  ]) {
+    const r = (await db.query('select calcom_signature_ok($1, $2) as v', [grezzo(fx.created), firma])).rows[0].v
+    r === false ? ok(`${etichetta} non passa`) : fail(`${etichetta} è passata`)
+  }
+  {
+    // Anche un solo byte diverso nel corpo cambia la firma: è la ragione per
+    // cui il nodo Webhook di n8n deve consegnare il corpo GREZZO e non un JSON
+    // riserializzato.
+    const raw = grezzo(fx.created)
+    const r = (await db.query('select calcom_signature_ok($1, $2) as v',
+      [raw + ' ', firmaDi(raw)])).rows[0].v
+    r === false ? ok('un corpo alterato di un solo carattere non passa più') : fail('corpo alterato passato')
+  }
+  {
+    const prima = await nDiario()
+    const e = await chiama(senzaMeta(fx.created), 'b'.repeat(64))
+    const dopo = await nDiario()
+    e.esito === 'firma_non_valida' && e.ok === false && dopo === prima
+      ? ok('firma non valida: nessuna riga nel diario, come deve essere')
+      : fail(`firma non valida gestita male: ${JSON.stringify(e)}, diario ${prima}→${dopo}`)
+  }
+
+  // --------------------------------------------------------- BOOKING_CREATED
+  console.log('  -- BOOKING_CREATED --')
+  {
+    const e = await chiama(senzaMeta(fx.created))
+    if (e.esito !== 'creata') fail(`creazione: ${JSON.stringify(e)}`)
+    else {
+      ok('BOOKING_CREATED vero: riga creata')
+      const b = await prenotazione('cal_booking_uid = $1', ['mMZAwLvZ759AUffL61hj66'])
+      b.status === 'pending_payment' ? ok('nasce in pending_payment') : fail('stato: ' + b.status)
+      // Nel messaggio `price` è 0 e `currency` "usd": il prezzo lo dà il
+      // listino, e questa asserzione è la prova che non lo prendiamo da lì.
+      Number(b.price_cents) === 6000
+        ? ok('prezzo 6000 dal listino del designer, non lo 0 del messaggio')
+        : fail('price_cents: ' + b.price_cents)
+      b.td_id === '11111111-1111-1111-1111-111111111111'
+        ? ok('designer identificato con cal_username + payload.type') : fail('td_id: ' + b.td_id)
+      b.traveler_id === VIAGGIATORE
+        ? ok('viaggiatore identificato da responses.xpetis_user_id.value') : fail('traveler_id: ' + b.traveler_id)
+      b.cal_event_type_slug === 'consulenza-xpetis-30'
+        ? ok('slug preso da payload.type') : fail('slug: ' + b.cal_event_type_slug)
+      b.video_url === 'https://app.cal.com/video/mMZAwLvZ759AUffL61hj66'
+        ? ok('link video da metadata.videoCallUrl') : fail('video_url: ' + b.video_url)
+      +new Date(b.original_starts_at) === +new Date(b.starts_at)
+        ? ok('original_starts_at uguale a starts_at alla nascita') : fail('original_starts_at diverso')
+      const min = (+new Date(b.payment_deadline_at) - Date.now()) / 60000
+      min > 25 && min < 31
+        ? ok(`finestra di pagamento di ~30 minuti da app_config (${Math.round(min)})`)
+        : fail('finestra di pagamento: ' + min)
+      b.last_actor === 'traveler'
+        ? ok('last_actor = traveler: lo slot l\'ha scelto lui, n8n è solo il mezzo')
+        : fail('last_actor: ' + b.last_actor)
+      const h = (await db.query(
+        `select to_status, actor from booking_status_history where booking_id = $1`, [b.id])).rows
+      h.length === 1 && h[0].to_status === 'pending_payment' && h[0].actor === 'traveler'
+        ? ok('una riga di storia, attribuita al viaggiatore') : fail('storia: ' + JSON.stringify(h))
+      const w = (await db.query(
+        `select external_id, processed_at, error from webhook_events
+          where payload -> 'payload' ->> 'uid' = 'mMZAwLvZ759AUffL61hj66'`)).rows[0]
+      w.processed_at && !w.error && w.external_id.startsWith('BOOKING_CREATED:mMZAwLvZ')
+        ? ok('messaggio registrato nel diario e marcato lavorato') : fail('diario: ' + JSON.stringify(w))
+    }
+  }
+  {
+    // Cal.com ritenta: gli stessi byte, la stessa chiave di diario.
+    const e = await chiama(senzaMeta(fx.created))
+    const n = Number((await db.query(
+      `select count(*) from bookings where cal_booking_uid = 'mMZAwLvZ759AUffL61hj66'`)).rows[0].count)
+    e.esito === 'duplicato' && e.ok === true && n === 1
+      ? ok('doppio scatto: riconosciuto duplicato, una sola prenotazione')
+      : fail(`doppio scatto: ${JSON.stringify(e)}, prenotazioni ${n}`)
+  }
+
+  // ------------------------------------------------- la catena del designer
+  console.log('  -- la catena: creazione → 2 riprogrammazioni → cancellazione --')
+  {
+    const UID0 = 'ideSbZgh1rxn6JXSq4b4jd'   // = booking_rescheduled_1.rescheduleUid
+    const UID1 = 'ovsVi7iaqqYAfx62N7bnfy'   // = booking_rescheduled_1.uid
+    const UID2 = 'hXBtFar1ZUCZci4qszEbs2'   // = booking_rescheduled_2.uid = booking_cancelled.uid
+    const e0 = await chiama(creataRicostruita(UID0, '2026-09-11T08:30:00.000Z'))
+    e0.esito === 'creata' ? ok('anello 0: prenotazione dell\'11 settembre') : fail('anello 0: ' + JSON.stringify(e0))
+    const b0 = await prenotazione('cal_booking_uid = $1', [UID0])
+    // Il pagamento lo conferma il workflow Stripe: qui si simula, perché la
+    // regola sulle cancellazioni cambia a seconda che i soldi siano arrivati.
+    await db.query(
+      `update bookings set status='confirmed', confirmed_at=now(), last_actor='n8n' where id=$1`, [b0.id])
+
+    const e1 = await chiama(senzaMeta(fx.rescheduled_1))
+    e1.esito === 'riprogrammata' && e1.booking_id === b0.id
+      ? ok('1ª riprogrammazione: la riga si trova con rescheduleUid, non con uid')
+      : fail('1ª riprogrammazione: ' + JSON.stringify(e1))
+    let b = await prenotazione('id = $1', [b0.id])
+    b.cal_booking_uid === UID1
+      ? ok(`cal_booking_uid sostituito con quello nuovo (${UID1.slice(0, 8)}…)`)
+      : fail('uid non sostituito: ' + b.cal_booking_uid)
+    +new Date(b.starts_at) === +new Date('2026-09-14T08:00:00.000Z')
+      ? ok('starts_at spostato al 14 settembre') : fail('starts_at: ' + b.starts_at)
+    +new Date(b.original_starts_at) === +new Date('2026-09-11T08:30:00.000Z')
+      ? ok('original_starts_at fermo all\'11: è l\'ancora dei 20 giorni') : fail('ancora mossa: ' + b.original_starts_at)
+    b.reschedule_count_td === 1 && b.reschedule_count_traveler === 0
+      ? ok('contatore del designer a 1 (rescheduledBy = organizer.email)')
+      : fail(`contatori: td ${b.reschedule_count_td}, viaggiatore ${b.reschedule_count_traveler}`)
+
+    const e2 = await chiama(senzaMeta(fx.rescheduled_2))
+    e2.esito === 'riprogrammata' && e2.booking_id === b0.id
+      ? ok('2ª riprogrammazione: trovata col codice che la 1ª aveva scritto')
+      : fail('2ª riprogrammazione: ' + JSON.stringify(e2))
+    b = await prenotazione('id = $1', [b0.id])
+    b.cal_booking_uid === UID2 && +new Date(b.starts_at) === +new Date('2026-09-18T08:00:00.000Z')
+      ? ok('la catena degli uid regge: 18 settembre, codice nuovo') : fail('anello 2: ' + JSON.stringify(b))
+    +new Date(b.original_starts_at) === +new Date('2026-09-11T08:30:00.000Z')
+      ? ok('original_starts_at ancora fermo dopo due riprogrammazioni') : fail('ancora mossa')
+    b.reschedule_count_td === 2 ? ok('contatore del designer a 2') : fail('contatore td: ' + b.reschedule_count_td)
+
+    // La prova vera: la cancellazione arriva col codice NUOVO. Senza la
+    // sostituzione nella riprogrammazione, qui non si troverebbe niente.
+    const e3 = await chiama(senzaMeta(fx.cancelled))
+    e3.esito === 'cancellata' && e3.booking_id === b0.id
+      ? ok('cancellazione trovata col codice nuovo: la catena ha tenuto')
+      : fail('cancellazione: ' + JSON.stringify(e3))
+    b = await prenotazione('id = $1', [b0.id])
+    b.status === 'cancelled' && b.cancelled_by === 'td' && b.cancelled_at
+      ? ok('cancellata (era pagata), per mano del designer') : fail('cancellazione: ' + JSON.stringify(b))
+    b.cancel_reason === 'Dummy text canceling event'
+      ? ok('motivo conservato') : fail('motivo: ' + b.cancel_reason)
+    await nAlert('calcom_designer_ha_cancellato_call_pagata') === 1
+      ? ok('alert critico: il designer ha cancellato una call pagata, cosa che il Flusso non ammette')
+      : fail('manca l\'alert sul designer che cancella una call pagata')
+    const ev = (await db.query(
+      `select event from event_log where entity_type='booking' and entity_id=$1 order by id`, [b0.id])).rows
+      .map(r => r.event)
+    JSON.stringify(ev) === JSON.stringify(
+      ['calcom_riprogrammata', 'calcom_riprogrammata', 'calcom_cancellata'])
+      ? ok('il diario della prenotazione racconta i tre passaggi') : fail('event_log: ' + JSON.stringify(ev))
+  }
+
+  // ---------------------------------------------- la catena del viaggiatore
+  console.log('  -- attribuzione: la stessa catena, ma per mano del viaggiatore --')
+  {
+    const UID0 = 'dFcnoaXSPXR7kZP6d3A7gj'  // = booking_rescheduled_by_attendee.rescheduleUid
+    const UID1 = '9f1wLNY9hn3ZMxc9L8fA5f'  // = ..._by_attendee.uid = booking_cancelled_by_attendee.uid
+    const e0 = await chiama(creataRicostruita(UID0, '2026-09-30T11:00:00.000Z'))
+    const b0 = await prenotazione('cal_booking_uid = $1', [UID0])
+    e0.esito === 'creata' ? ok('anello 0 della seconda catena') : fail('anello 0: ' + JSON.stringify(e0))
+
+    const e1 = await chiama(senzaMeta(fx.rescheduled_by_attendee))
+    let b = await prenotazione('id = $1', [b0.id])
+    e1.esito === 'riprogrammata' && b.reschedule_count_traveler === 1 && b.reschedule_count_td === 0
+      ? ok('rescheduledBy diverso da organizer.email: conta il viaggiatore, non il designer')
+      : fail(`attribuzione riprogrammazione: ${JSON.stringify(e1)} / td ${b.reschedule_count_td} viagg ${b.reschedule_count_traveler}`)
+    b.cal_booking_uid === UID1 && b.last_actor === 'traveler'
+      ? ok('codice sostituito e last_actor = traveler') : fail('anello 1: ' + JSON.stringify(b))
+
+    const e2 = await chiama(senzaMeta(fx.cancelled_by_attendee))
+    b = await prenotazione('id = $1', [b0.id])
+    e2.esito === 'cancellata' && b.cancelled_by === 'traveler'
+      ? ok('cancelledBy diverso da organizer.email: ha cancellato il viaggiatore')
+      : fail('attribuzione cancellazione: ' + JSON.stringify(e2) + ' / ' + b.cancelled_by)
+    b.status === 'cancelled_unpaid'
+      ? ok('non era pagata: cancelled_unpaid, niente da rimborsare') : fail('stato: ' + b.status)
+    await nAlert('calcom_designer_ha_cancellato_call_pagata') === 1
+      ? ok('nessun alert in più: una cancellazione del viaggiatore è routine') : fail('alert di troppo')
+  }
+
+  // ------------------------------------------------- il tasto Request reschedule
+  console.log('  -- il tasto *Request reschedule* --')
+  {
+    const UID = 'fMQVWeV9Qvqm5NjTZm2w1E'
+    await chiama(creataRicostruita(UID, '2026-09-30T11:00:00.000Z'))
+    const b0 = await prenotazione('cal_booking_uid = $1', [UID])
+    await db.query(`update bookings set status='confirmed', confirmed_at=now() where id=$1`, [b0.id])
+
+    const e = await chiama(senzaMeta(fx.cancelled_request_reschedule))
+    const b = await prenotazione('id = $1', [b0.id])
+    e.esito === 'request_reschedule_bloccata' && b.status === 'disputed'
+      ? ok('*Request reschedule* del designer: stato bloccato in disputed')
+      : fail('request reschedule: ' + JSON.stringify(e) + ' / ' + b.status)
+    b.dispute_note && b.dispute_note.includes('cancellazione secca')
+      ? ok('scritto in tabella perché è bloccata') : fail('dispute_note: ' + b.dispute_note)
+    await nAlert('calcom_request_reschedule_del_designer') === 1
+      ? ok('alert critico al team: il rimborso si esegue a mano') : fail('manca l\'alert critico')
+    const msg = (await db.query(
+      `select message from team_alerts where kind='calcom_request_reschedule_del_designer'`)).rows[0].message
+    msg.includes('ERA PAGATA')
+      ? ok('l\'alert dice che c\'erano soldi dentro: è l\'informazione che serve al team')
+      : fail('messaggio dell\'alert: ' + msg)
+  }
+  {
+    // SERVONO ENTRAMBI I SEGNI. Un viaggiatore può scrivere a mano un motivo
+    // che comincia per "Please reschedule.", e trattarlo come il tasto del
+    // designer produrrebbe un rimborso non dovuto.
+    const UID = 'FintoViaggiatoreScrive'
+    await chiama(creataRicostruita(UID, '2026-10-05T09:00:00.000Z'))
+    const b0 = await prenotazione('cal_booking_uid = $1', [UID])
+    await db.query(`update bookings set status='confirmed', confirmed_at=now() where id=$1`, [b0.id])
+
+    const e = await chiama(variante(fx.cancelled_request_reschedule, {
+      'payload.uid': UID,
+      'payload.cancelledBy': 'viaggiatore.furbo@example.com',
+    }))
+    const b = await prenotazione('id = $1', [b0.id])
+    e.esito === 'cancellata' && b.status === 'cancelled' && b.cancelled_by === 'traveler'
+      ? ok('stesso motivo "Please reschedule." ma scritto dal viaggiatore: cancellazione normale')
+      : fail('il prefisso da solo ha bloccato la riga: ' + JSON.stringify(e) + ' / ' + b.status)
+    await nAlert('calcom_request_reschedule_del_designer') === 1
+      ? ok('nessun secondo alert: il prefisso da solo non basta') : fail('alert di troppo')
+  }
+
+  // ------------------------------------------------------------- gli scarti
+  console.log('  -- quello che si scarta --')
+  {
+    const prima = await nDiario()
+    const e = await chiama(variante(fx.created, { 'payload.type': 'caffe-con-marco' }))
+    e.esito === 'event_type_non_nostro' && e.ok === true
+      ? ok('event type non nostro: scartato senza alert (il webhook è per account, non per event type)')
+      : fail('event type non nostro: ' + JSON.stringify(e))
+    await nDiario() === prima + 1 ? ok('scartato ma annotato nel diario') : fail('non annotato')
+    const n = Number((await db.query(
+      `select count(*) from event_log where event='calcom_event_type_non_nostro'`)).rows[0].count)
+    n === 1 ? ok('e la ragione dello scarto è leggibile in event_log') : fail('event_log: ' + n)
+  }
+  {
+    const e = await chiama(variante(fx.created, { 'payload.organizer.username': 'chi-e-questo' }))
+    e.esito === 'designer_sconosciuto' && await nAlert('calcom_designer_sconosciuto') === 1
+      ? ok('designer sconosciuto su un nostro slug: scartato CON alert (o è onboarding, o un username cambiato)')
+      : fail('designer sconosciuto: ' + JSON.stringify(e))
+  }
+  {
+    // marco-rossi non ha la consulenza approfondita: giulia-neri sì, quindi lo
+    // slug è dei nostri ma non di questo designer.
+    const e = await chiama(variante(fx.created, { 'payload.type': 'consulenza-xpetis-approfondita' }))
+    e.esito === 'servizio_non_del_designer' && await nAlert('calcom_servizio_non_configurato') === 1
+      ? ok('slug nostro ma non di questo designer: alert critico, nessuna riga')
+      : fail('servizio non del designer: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(variante(fx.created, { 'payload.organizer.username': 'td-senza-prezzo-xpetis' }))
+    e.esito === 'servizio_senza_prezzo' && await nAlert('calcom_servizio_senza_prezzo') === 1
+      ? ok('servizio senza prezzo: nessuna riga, alert critico (la cassa non si può aprire)')
+      : fail('servizio senza prezzo: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(variante(fx.created, {
+      'payload.responses.xpetis_user_id.value': '00000000-0000-4000-8000-000000000000' }))
+    e.esito === 'viaggiatore_non_identificato' && await nAlert('calcom_viaggiatore_non_identificato') === 1
+      ? ok('viaggiatore inesistente: nessuna riga, alert critico') : fail('viaggiatore inesistente: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(variante(fx.created, {
+      'payload.responses.xpetis_user_id.value': 'non-un-uuid' }))
+    e.esito === 'viaggiatore_non_identificato'
+      ? ok('codice XPETIS che non è un UUID: scartato, non fa esplodere il ponte')
+      : fail('codice non-uuid: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(variante(fx.created, { triggerEvent: 'MEETING_ENDED' }))
+    e.esito === 'evento_non_gestito' && e.ok === true
+      ? ok('un evento che non gestiamo: annotato e lasciato stare') : fail('evento non gestito: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(variante(fx.rescheduled_1, { 'payload.rescheduleUid': 'unCodiceCheNonAbbiamo' }))
+    e.esito === 'prenotazione_sconosciuta' && await nAlert('calcom_riprogrammazione_orfana') === 1
+      ? ok('riprogrammazione di una prenotazione che non abbiamo: alert critico')
+      : fail('riprogrammazione orfana: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(variante(fx.cancelled, { 'payload.uid': 'unCodiceCheNonAbbiamo' }))
+    e.esito === 'prenotazione_sconosciuta' && await nAlert('calcom_cancellazione_orfana') === 1
+      ? ok('cancellazione di una prenotazione che non abbiamo: alert') : fail('cancellazione orfana: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(variante(fx.created, { payload: null }))
+    e.esito === 'corpo_non_riconosciuto' ? ok('corpo firmato ma senza payload: esito, non errore') : fail('corpo senza payload: ' + JSON.stringify(e))
+  }
+  {
+    const raw = 'questo non è json'
+    const e = (await db.query('select calcom_webhook($1,$2) as esito', [raw, firmaDi(raw)])).rows[0].esito
+    e.esito === 'corpo_non_json' ? ok('corpo firmato ma non JSON: esito, non errore') : fail('corpo non json: ' + JSON.stringify(e))
+  }
+
+  // ------------------------------------------------------------ la superficie
+  console.log('  -- chi può chiamare il ponte --')
+  for (const ruolo of ['anon', 'authenticated']) {
+    const v = (await db.query(
+      `select has_function_privilege($1, 'calcom_webhook(text,text)', 'EXECUTE') as v`, [ruolo])).rows[0].v
+    v === false ? ok(`${ruolo} non può chiamare calcom_webhook`) : fail(`${ruolo} può chiamare il ponte`)
+  }
+  {
+    const v = (await db.query(
+      `select has_function_privilege('service_role', 'calcom_webhook(text,text)', 'EXECUTE') as v`)).rows[0].v
+    v === true ? ok('service_role sì: è la chiave secret che usa n8n') : fail('service_role non può chiamare il ponte')
+  }
+  {
+    // Nessun messaggio si è fermato su un errore: gli esiti sopra sono tutti
+    // decisioni prese, non guasti. Un errore lascia `processed_at` nullo di
+    // proposito, così il ritentativo di Cal.com riprova.
+    const rotti = (await db.query(
+      `select external_id, error from webhook_events
+        where provider='cal' and error is not null`)).rows
+    rotti.length === 0
+      ? ok('nessun messaggio si è fermato su un errore')
+      : fail('messaggi in errore: ' + JSON.stringify(rotti))
+  }
+}
 
 console.log(failures === 0 ? '\nTutto verde.\n' : `\n${failures} asserzioni fallite.\n`)
 process.exit(failures === 0 ? 0 : 1)

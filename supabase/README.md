@@ -73,6 +73,7 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0034_app_config_text.sql` | `app_config` accetta anche valori di testo |
 | `0035_geo_accent_insensitive.sql` | `name_norm` sulle tabelle geo: "peru" trova "Perù" |
 | `0036_tags_for_destination.sql` | La maschera contestuale dei filtri |
+| `0037_calcom_webhook.sql` | Il ponte Cal.com → `bookings`: firma, diario, creazione, riprogrammazione, cancellazione |
 
 ## La geografia
 
@@ -269,6 +270,92 @@ ricostruisce da lì. Come `match_designers()` accetta solo `country` e
 `macro_area`, e su una città o un continente solleva. Senza destinazione
 restituisce tutti i tag: la regola "senza meta non si maschera" vive nella
 funzione, non in un `if` del sito.
+
+## Il ponte Cal.com
+
+`calcom_webhook(p_corpo text, p_firma text)` è tutto il ponte. n8n riceve il
+messaggio, gli passa il **corpo grezzo** e la firma, e non guarda dentro:
+quattro nodi, nessuna decisione. Il workflow e le istruzioni per reimportarlo
+stanno in `n8n/`.
+
+**Perché nel database.** La macchina a stati delle prenotazioni vive già qui,
+con i suoi trigger e la sua storia. Un ponte scritto in un grafo di nodi avrebbe
+dovuto reimplementarla fuori, senza vincoli e senza prove; qui è versionata come
+migration e **rigiocabile sui sette messaggi veri** dall'harness. n8n resta su
+questo percorso per le due cose che il database non ha: il log visuale di ogni
+messaggio e il retry quando Supabase non risponde.
+
+**La firma si calcola sui byte esatti.** HMAC-SHA256 del corpo grezzo, parola
+segreta in Supabase Vault sotto `calcom_webhook_secret` — non in un file
+versionato. Un JSON riserializzato dà una firma diversa a contenuto identico, ed
+è il punto in cui questi ponti falliscono: il nodo Webhook di n8n ha *Raw Body*
+acceso e un nodo Code decodifica i byte, perché nessuna espressione di n8n sa
+toccare un buffer. Firma non valida: il messaggio **non entra nemmeno nel
+diario**, perché l'indirizzo del webhook è pubblico e una riga per ogni corpo
+arbitrario farebbe di `webhook_events` una discarica scrivibile da chiunque.
+Il fatto resta comunque leggibile: n8n conserva l'esecuzione.
+
+Scoperta utile e non ovvia: **Cal.com firma il JSON compatto**, e
+`JSON.stringify` di un oggetto appena parsato riproduce quei byte. È per questo
+che le firme vere registrate nelle fixture sono *verificabili* e non solo
+ricalcolabili — sei su sette lo sono davvero nell'harness; la settima ha il JWT
+della password video sostituito prima del salvataggio, quindi quel corpo non è
+più quello che era stato firmato.
+
+**Il diario prima del lavoro.** Ogni messaggio finisce in `webhook_events` prima
+di essere lavorato, e la chiave di unicità è
+`triggerEvent : uid : createdAt` — composta e non un hash del corpo, perché su
+Studio si legge. `uid` da solo non basterebbe: nella catena vera la seconda
+riprogrammazione e la cancellazione portano lo stesso `uid`. Se il lavoro
+fallisce, la riga di diario **sopravvive** (l'inserimento sta fuori dal blocco
+con gestore) e `processed_at` resta nullo di proposito: il ritentativo di Cal.com
+riprova invece di scartare il messaggio come duplicato.
+
+**Riprogrammare crea una prenotazione NUOVA.** È la cosa che nessuna
+documentazione dice e che rende sbagliato il disegno ovvio. Cal.com non aggiorna
+niente: fabbrica un `uid` nuovo e mette il vecchio in `rescheduleUid`. Quindi la
+riga **non si trova con `uid`**, che per noi è sconosciuto: si trova con
+`rescheduleUid`, e poi `cal_booking_uid` va **sostituito** con quello nuovo —
+altrimenti la cancellazione successiva, che arriva col codice nuovo, non trova
+più niente. `original_starts_at` invece non si tocca mai: è l'ancora da cui si
+contano i 20 giorni. L'harness rigioca la catena intera (creazione, due
+riprogrammazioni, cancellazione) e verifica che l'ancora non si sia mossa.
+
+**Chi ha agito lo dice Cal.com**, e i campi seguono chi agisce: `rescheduledBy`
+e `cancelledBy` confrontati con `organizer.email`. Uguale = il designer,
+diverso = il viaggiatore. Se il campo manca, l'attore è `system` e **nessun
+contatore si muove**: incrementare quello sbagliato farebbe scattare uno dei due
+limiti del Flusso su una colpa non sua. Il team riceve un alert e attribuisce a
+mano.
+
+**Il tasto *Request reschedule* servono due segni per riconoscerlo:** il motivo
+che inizia per `Please reschedule.` **e** `cancelledBy` uguale a
+`organizer.email`. Il prefisso da solo non basta perché un viaggiatore potrebbe
+scriverlo a mano, e la conseguenza sarebbe un rimborso non dovuto — l'harness lo
+verifica con la coppia esatta e col caso finto. Riconosciuto: stato `disputed`,
+alert critico che dice se c'erano soldi dentro, rimborso a mano (decisione dell'8
+agosto 2026).
+
+**Non solleva mai.** Ogni caso torna un esito in JSON — `creata`,
+`riprogrammata`, `cancellata`, `duplicato`, `firma_non_valida`,
+`event_type_non_nostro`, `designer_sconosciuto`, `servizio_senza_prezzo`,
+`viaggiatore_non_identificato`, `prenotazione_sconosciuta`,
+`request_reschedule_bloccata`, `errore` — così n8n risponde sempre 2xx: un 500
+ripetuto porta un provider a spegnere l'endpoint, e la difesa dal doppio scatto
+sta già nel database.
+
+Gli scarti non sono tutti uguali, e la differenza è di prodotto. Un **event type
+non nostro** è routine — il webhook è per account, non per event type, quindi un
+designer che tiene appuntamenti propri sul suo Cal.com ce li manda tutti: si
+annota nel diario e basta. Un **designer sconosciuto su un nostro slug** invece
+è un alert: o il team non ha ancora scritto `cal_username`, o qualcuno l'ha
+cambiato e le sue prenotazioni stanno smettendo di arrivarci in silenzio.
+
+Sull'harness lo schema `vault` non esiste: il test lo simula come già fa con
+`auth.users`, e la parola segreta la legge da `CALCOM_WEBHOOK_SECRET`
+nell'ambiente (o da `.env.local`, che non è versionato). Se non la trova, il
+ponte si prova comunque con una parola inventata e il test **dice** che le firme
+vere non sono state verificate, invece di tacerlo.
 
 ## La pubblicazione di un profilo
 

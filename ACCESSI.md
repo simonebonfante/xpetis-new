@@ -32,7 +32,7 @@ Aggiornato al 10 agosto 2026. Se cambia qualcosa, si aggiorna qui.
 | **Figma** | Design | — | ✅ file condiviso |
 | **Dominio `xpetis.it`** | Sito e mail | — | 🟡 landing page attiva, DNS non toccato |
 | **Provider email** | Le 15 mail del funnel | — | ⚪ **da creare** (rimandato) |
-| **WhatsApp Business** | Canale umano | — | ⚪ da creare (S-08) |
+| **WhatsApp** | Canale umano | — | 🟡 numero provvisorio, da sostituire |
 | **Stripe agenzia** | Incassi All Inclusive | — | ⚪ quando ci sarà un'agenzia |
 
 ---
@@ -148,8 +148,12 @@ come egress ed espone il database su un indirizzo pubblico.
 | | |
 |---|---|
 | URL | `https://n8n-production-d576.up.railway.app` |
-| Webhook Cal.com | `…/webhook/calcom-consulenze` |
+| Webhook Cal.com | `…/webhook/calcom-consulenze` → workflow `rkhzLOHO64kDeGFc`, *Cal.com → bookings · consulenze* |
 | Licenza | Sustainable Use — self-hosting per uso interno d'impresa, va bene per noi |
+
+I workflow hanno una copia leggibile e versionata in **`n8n/`**, con le
+istruzioni per reimportarli. Le credenziali **non** si esportano: nel file resta
+solo il riferimento.
 
 **Segreti, nel password manager:**
 
@@ -160,8 +164,12 @@ come egress ed espone il database su un indirizzo pubblico.
 - **account proprietario di n8n** (email + password) — è l'unica porta
   dell'istanza: chi entra legge tutte le credenziali che ci sono dentro.
 
-**Credenziali da creare dentro n8n** quando serviranno: Supabase, Stripe,
-provider email.
+**Credenziali dentro n8n:**
+
+- ✅ *Supabase XPETIS · chiave secret (server)* — tipo **Header Auth**, header
+  `apikey`, valore la chiave `sb_secret_…`. Creata il 6 settembre 2026, la usa
+  il ponte Cal.com per chiamare `calcom_webhook()` via PostgREST.
+- ⚪ da creare quando serviranno: Stripe, provider email.
 
 Configurazione: fuso `Europe/Rome` (le pianificazioni si leggono in quel fuso),
 potatura dello storico esecuzioni a 14 giorni, dati binari in memoria — perché
@@ -181,6 +189,26 @@ potatura dello storico esecuzioni a 14 giorni, dati binari in memoria — perch�
 essere **identica su tutti i 25 account**. Se non combacia con quella salvata da
 noi, il ponte rifiuta tutte le prenotazioni di quel designer — e il sintomo è
 "le prenotazioni di Mario non arrivano".
+
+Dal 6 settembre 2026 quella parola vive in **due posti, entrambi fuori dal
+repository**, e devono restare d'accordo:
+
+| Dove | Chi la usa |
+|---|---|
+| **Supabase Vault**, secret `calcom_webhook_secret` | La funzione `calcom_webhook()` la legge per verificare la firma di ogni messaggio |
+| `CALCOM_WEBHOOK_SECRET` in `.env.local` (non versionato) | Serve solo a firmare i payload di prova e a far verificare all'harness le firme vere delle fixture |
+
+Si scrive nel Vault una volta sola, dal SQL Editor:
+
+```sql
+select vault.create_secret('<la parola segreta>', 'calcom_webhook_secret',
+                           'Firma dei webhook Cal.com (x-cal-signature-256)');
+```
+
+Per **ruotarla** serve cambiarla in tre punti nello stesso giro: sui webhook dei
+designer su Cal.com, nel Vault e in `.env.local`. Nel mezzo il ponte rifiuta i
+messaggi con `firma_non_valida`, che è il comportamento giusto ma va fatto in
+una finestra tranquilla.
 
 **Da sapere sui 25 account:** ognuno è di proprietà del designer, con le sue
 credenziali che noi non abbiamo e non ci servono. La procedura completa è in
@@ -242,8 +270,14 @@ dominio**: se ce n'è già uno, va fuso, non aggiunto.
 Fra dominio autenticato e primo viaggiatore vero va lasciata **almeno una
 settimana**: la reputazione di invio si scalda in giorni.
 
-**WhatsApp Business:** numero dedicato da attivare (S-08), con chi lo presidia e
-in quali orari. I gruppi si creano a mano: le API non permettono di crearli.
+**WhatsApp:** **+39 347 891 1018**, deciso il 6 settembre 2026. È un numero
+**provvisorio e personale**, prestato al progetto per non tenere fermo lo
+sviluppo: va sostituito con un numero dedicato prima del pubblico. Restano da
+decidere chi lo presidia e in quali orari.
+
+⚠️ **Il numero sta in `app_config`, non nel codice.** Cambiarlo è una riga da
+Studio, non un deploy — è l'unico modo perché la sostituzione sia indolore.
+I gruppi si creano a mano: le API non permettono di crearli.
 
 ---
 
@@ -257,6 +291,7 @@ in quali orari. I gruppi si creano a mano: le API non permettono di crearli.
 [ ] n8n · N8N_ENCRYPTION_KEY        ← irrecuperabile
 [ ] n8n · account proprietario (email + password)
 [ ] Cal.com · parola segreta del webhook (una per tutti i 25)
+                                    ← anche in Supabase Vault: calcom_webhook_secret
 [ ] Stripe · chiave sk_test_
 [ ] Stripe · webhook signing secret            (quando esisterà)
 [ ] Provider email · API key                   (quando esisterà)

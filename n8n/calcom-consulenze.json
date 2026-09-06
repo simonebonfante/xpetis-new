@@ -1,0 +1,139 @@
+{
+  "name": "Cal.com → bookings · consulenze",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calcom-consulenze",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7287e9b9-beb3-47eb-bb54-f9c0012570ee",
+      "name": "Webhook",
+      "webhookId": "47b67a5d-e1e8-4646-8ed3-e4bef7a9915b",
+      "notes": "Cal.com POSTa qui. Opzione Raw Body accesa: la firma si calcola sui byte esatti."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Il corpo GREZZO, byte per byte, e la firma che lo accompagna.\n//\n// Qui non si decide niente: tutta la logica del ponte vive nella funzione\n// Postgres `calcom_webhook()` (migration 0037). Questo nodo esiste per una\n// ragione sola, ed è la ragione per cui questi ponti falliscono: la firma di\n// Cal.com è un HMAC-SHA256 sui byte esatti che sono arrivati. Un JSON parsato e\n// riserializzato da n8n dà una firma diversa anche a contenuto identico —\n// l'ordine delle chiavi, gli spazi e il formato dei numeri non sopravvivono al\n// giro. Per questo il nodo Webhook ha \"Raw Body\" acceso e qui si decodifica.\n//\n// Se il corpo grezzo non arriva, questo nodo FALLISCE di proposito, invece di\n// ripiegare su una riserializzazione: un ponte configurato male deve essere\n// rumoroso. Il ripiego silenzioso produrrebbe \"firma_non_valida\" su ogni\n// messaggio, che è il modo peggiore di rompersi — sembra un problema di segreti\n// e non lo è.\nconst item = $input.first();\n\nconst b64 = item.binary && item.binary.data && item.binary.data.data;\nif (!b64) {\n  throw new Error(\n    'Il nodo Webhook non ha consegnato il corpo grezzo. Controlla che l\\'opzione ' +\n    '\"Raw Body\" sia accesa: senza i byte originali la firma non si può verificare.'\n  );\n}\n\nconst corpo = Buffer.from(b64, 'base64').toString('utf8');\nconst headers = item.json.headers || {};\nconst firma = headers['x-cal-signature-256'] || '';\n\nreturn [{ json: { corpo, firma } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Corpo grezzo e firma",
+      "notes": "Decodifica i byte e pesca l'header x-cal-signature-256. Nessuna logica: solo idraulica."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rsgyxbqzsxahsbdfgtbm.supabase.co/rest/v1/rpc/calcom_webhook",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_corpo",
+              "value": "={{ $json.corpo }}"
+            },
+            {
+              "name": "p_firma",
+              "value": "={{ $json.firma }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "calcom_webhook()",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YCF5Wo9nOxBRWrRf",
+          "name": "Supabase XPETIS · chiave secret (server)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
+      "notes": "Tutta la decisione vive dentro questa funzione Postgres (migration 0037)."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Sempre 2xx",
+      "notes": "Cal.com ritenta sui non-2xx e i provider spengono gli endpoint che sbagliano sempre. La difesa dal doppio scatto è nel database."
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Corpo grezzo e firma",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Corpo grezzo e firma": {
+      "main": [
+        [
+          {
+            "node": "calcom_webhook()",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calcom_webhook()": {
+      "main": [
+        [
+          {
+            "node": "Sempre 2xx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "_nota": "Riprogrammazione fatta DAL PARTECIPANTE dal link nella sua mail, con un indirizzo diverso da quello dell'organizzatore. È la fixture che dimostra che rescheduledBy segue chi agisce. Raccolto il 24 agosto 2026.",
+  "_headers_rilevanti": {
+    "x-cal-signature-256": "ab925a4ce1e92c3e35ca1dd61ea26e6df3c6bd07109f593b6508c8fa0b42d33d",
+    "x-cal-webhook-version": "2021-10-20"
+  },
+  "triggerEvent": "BOOKING_RESCHEDULED",
+  "createdAt": "2026-09-06T14:08:28.979Z",
+  "payload": {
+    "bookerUrl": "https://cal.com",
+    "title": "Consulenza XPETIS · 30 min between simone bonfante and Pinco Pallino",
+    "startTime": "2026-10-01T08:00:00.000Z",
+    "endTime": "2026-10-01T08:30:00.000Z",
+    "additionalNotes": "",
+    "type": "consulenza-xpetis-30",
+    "eventTypeTitle": "Consulenza XPETIS · 30 min",
+    "description": "",
+    "eventTypeId": 6600042,
+    "hideCalendarNotes": false,
+    "hideCalendarEventDetails": false,
+    "privateNoteEnabled": false,
+    "privateNoteMode": null,
+    "privateNoteTemplate": null,
+    "hideOrganizerEmail": false,
+    "schedulingType": null,
+    "seatsPerTimeSlot": null,
+    "seatsShowAttendees": true,
+    "seatsShowAvailabilityCount": true,
+    "customReplyToEmail": null,
+    "disableRescheduling": false,
+    "disableReschedulingScope": "HOST_AND_ATTENDEE",
+    "disableCancelling": false,
+    "disableCancellingScope": "HOST_AND_ATTENDEE",
+    "organizer": {
+      "id": 3041949,
+      "name": "simone bonfante",
+      "email": "simone.bonfante93@gmail.com",
+      "username": "marco-rossi-xpetis",
+      "timeZone": "Europe/Rome",
+      "language": {
+        "locale": "en"
+      },
+      "timeFormat": "h:mma",
+      "utcOffset": 120
+    },
+    "attendees": [
+      {
+        "name": "Pinco Pallino",
+        "email": "simone.bonfante@elty.it",
+        "timeZone": "Europe/Rome",
+        "language": {
+          "locale": "it"
+        },
+        "phoneNumber": null,
+        "bookingSeat": null,
+        "utcOffset": 120,
+        "firstName": "Pinco",
+        "lastName": "Pallino"
+      }
+    ],
+    "customInputs": {},
+    "responses": {
+      "name": {
+        "label": "your_name",
+        "value": "Pinco Pallino",
+        "isHidden": false
+      },
+      "email": {
+        "label": "email_address",
+        "value": "simone.bonfante@elty.it",
+        "isHidden": false
+      },
+      "attendeePhoneNumber": {
+        "label": "phone_number",
+        "isHidden": true
+      },
+      "location": {
+        "label": "location",
+        "value": {
+          "value": "integrations:daily",
+          "optionValue": ""
+        },
+        "isHidden": false
+      },
+      "title": {
+        "label": "what_is_this_meeting_about",
+        "isHidden": true
+      },
+      "notes": {
+        "label": "additional_notes",
+        "isHidden": true
+      },
+      "guests": {
+        "label": "additional_guests",
+        "value": [],
+        "isHidden": true
+      },
+      "rescheduleReason": {
+        "label": "reason_for_reschedule",
+        "isHidden": true
+      },
+      "xpetis_user_id": {
+        "label": "Codice XPETIS (non modificare)",
+        "value": "69a37b12-b899-47c4-9bdb-31a17d9cb986",
+        "isHidden": false
+      }
+    },
+    "userFieldsResponses": {
+      "xpetis_user_id": {
+        "label": "Codice XPETIS (non modificare)",
+        "value": "69a37b12-b899-47c4-9bdb-31a17d9cb986",
+        "isHidden": false
+      }
+    },
+    "location": "integrations:daily",
+    "iCalUID": "dFcnoaXSPXR7kZP6d3A7gj@Cal.com",
+    "iCalSequence": 1,
+    "requiresConfirmation": false,
+    "oneTimePassword": null,
+    "platformClientId": "",
+    "platformRescheduleUrl": "",
+    "platformCancelUrl": "",
+    "platformBookingUrl": "",
+    "uid": "9f1wLNY9hn3ZMxc9L8fA5f",
+    "organizationId": null,
+    "hashedLink": null,
+    "cancellationReason": null,
+    "rejectionReason": null,
+    "hideBranding": false,
+    "videoCallData": {
+      "type": "daily_video",
+      "id": "",
+      "password": "",
+      "url": "https://app.cal.com/video/9f1wLNY9hn3ZMxc9L8fA5f"
+    },
+    "appsStatus": [
+      {
+        "appName": "Google Calendar",
+        "type": "google_calendar",
+        "success": 1,
+        "failures": 0,
+        "errors": []
+      }
+    ],
+    "destinationCalendar": [
+      {
+        "id": 1473868,
+        "integration": "google_calendar",
+        "externalId": "simone.bonfante93@gmail.com",
+        "primaryEmail": "simone.bonfante93@gmail.com",
+        "userId": 3041949,
+        "credentialId": 2381683
+      }
+    ],
+    "bookingId": 24859797,
+    "status": "ACCEPTED",
+    "eventTitle": "Consulenza XPETIS · 30 min",
+    "eventDescription": "",
+    "price": 0,
+    "currency": "usd",
+    "length": 30,
+    "assignmentReason": [],
+    "rescheduleId": 24859767,
+    "rescheduleUid": "dFcnoaXSPXR7kZP6d3A7gj",
+    "rescheduleStartTime": "2026-09-30T11:00:00.000Z",
+    "rescheduleEndTime": "2026-09-30T11:30:00.000Z",
+    "rescheduledBy": "simone.bonfante@elty.it",
+    "metadata": {
+      "videoCallUrl": "https://app.cal.com/video/9f1wLNY9hn3ZMxc9L8fA5f"
+    }
+  }
+}

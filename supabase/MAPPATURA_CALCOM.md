@@ -1,8 +1,9 @@
 # Mappatura · messaggi Cal.com → schema Supabase
 
-**8 agosto 2026.** Ricavata da un messaggio **vero**, raccolto con una
-prenotazione di prova sulla nostra istanza n8n. La fixture sta in
-`tests/fixtures/calcom/booking_created.json`.
+**8 agosto 2026, aggiornata il 24.** Ricavata da messaggi **veri**, raccolti con
+prenotazioni di prova sulla nostra istanza n8n. Le fixture stanno in
+`tests/fixtures/calcom/`: creazione, due riprogrammazioni consecutive,
+cancellazione, e il tasto *Request reschedule*.
 
 Vale la regola che ha già fatto risparmiare tempo una volta: **prima si ascolta
 un messaggio vero, poi si scrive il codice.** La documentazione di un prodotto
@@ -32,6 +33,116 @@ Se un giorno cambia, la fixture è il modo per accorgersene.
 `payload.type`, mai con lo slug da solo: i 25 designer copiano lo stesso event
 type modello, quindi `consulenza-xpetis-30` è identico su tutti e da solo non
 distingue nessuno.
+
+**Verificato il 24 agosto: tutti i campi di identità sopravvivono a ogni tipo di
+evento.** `organizer.username`, `payload.type` e soprattutto
+`responses.xpetis_user_id.value` ci sono anche dopo due riprogrammazioni e in
+entrambe le cancellazioni. Il legame col viaggiatore non si perde per strada.
+
+---
+
+## Riprogrammare crea una prenotazione NUOVA
+
+È la scoperta che cambia il disegno del ponte, e nessuna documentazione la
+diceva.
+
+Cal.com **non aggiorna** la prenotazione esistente: ne crea un'altra, con un
+`uid` nuovo, e mette il vecchio in `rescheduleUid`. La catena, misurata su due
+riprogrammazioni consecutive:
+
+| Messaggio | `uid` (nuovo) | `rescheduleUid` (vecchio) | `startTime` | `rescheduleStartTime` |
+|---|---|---|---|---|
+| 1ª riprogrammazione | `ovsVi7ia…` | `ideSbZgh…` | 14 set | 11 set |
+| 2ª riprogrammazione | `hXBtFar1…` | `ovsVi7ia…` | 18 set | 14 set |
+| cancellazione | `hXBtFar1…` | — | 18 set | — |
+
+**Conseguenza per il ponte.** Su `BOOKING_RESCHEDULED` la riga da aggiornare
+**non si trova con `uid`**, che è nuovo e sconosciuto: si trova con
+`rescheduleUid`. E poi va **sostituito** `bookings.cal_booking_uid` con quello
+nuovo, altrimenti la cancellazione successiva — che arriva col nuovo uid — non
+trova più niente.
+
+`original_starts_at` invece non si tocca mai: è l'ancora da cui si contano i 20
+giorni della regola sulle riprogrammazioni, e nella tabella qui sopra si vede
+perché serve un campo separato.
+
+`rescheduleStartTime` porta l'orario vecchio, ed è utile per la storia.
+
+## Chi ha riprogrammato, e chi ha cancellato
+
+Cal.com **lo dice**, con due campi che portano un indirizzo email:
+
+- `rescheduledBy` sui messaggi di riprogrammazione
+- `cancelledBy` sui messaggi di cancellazione
+
+La regola è quindi: **confrontare con `organizer.email`**. Se coincide ha agito
+il designer, altrimenti il viaggiatore. È così che si tengono separati i due
+contatori del Flusso, cinque per il viaggiatore e due per il designer.
+
+✅ **Verificato il 24 agosto con due indirizzi diversi.** Una prenotazione presa
+da `simone.bonfante@elty.it` su un calendario il cui organizzatore è
+`simone.bonfante93@gmail.com`, poi riprogrammata e cancellata **dai link nelle
+mail del partecipante**:
+
+| Azione | `organizer.email` | Campo | Valore |
+|---|---|---|---|
+| Riprogrammazione | `…93@gmail.com` | `rescheduledBy` | **`…@elty.it`** |
+| Cancellazione | `…93@gmail.com` | `cancelledBy` | **`…@elty.it`** |
+
+Entrambi i campi **seguono chi agisce**, non l'organizzatore. L'attribuzione è
+quindi affidabile, e i due contatori si possono tenere separati.
+
+Le prime prove non lo dimostravano perché sull'account di prova organizzatore e
+partecipante erano la stessa persona con la stessa email: i valori coincidevano
+per caso, non per costruzione. È il motivo per cui è servita una seconda
+casella.
+
+## Il tasto *Request reschedule*, visto davvero
+
+Confermato: **è una cancellazione**, non una richiesta. Nessun
+`rescheduleUid`, nessuna prenotazione nuova, `status: CANCELLED`.
+
+Si riconosce dal motivo, che Cal.com precede col prefisso esatto:
+
+```
+"cancellationReason": "Please reschedule. text rescheduling\n"
+```
+
+Il prefisso `Please reschedule.` è verificato carattere per carattere, e da solo
+basta a distinguerlo da una cancellazione normale — che nel nostro campione
+portava un motivo scritto a mano senza prefissi.
+
+Il secondo segno regge: `cancelledBy` uguale a `organizer.email`. Ora sappiamo
+che quel campo segue davvero chi agisce, quindi la coppia *prefisso + cancellato
+dall'organizzatore* distingue il caso senza ambiguità. Serve tutta e due, perché
+un viaggiatore potrebbe scrivere a mano un motivo che comincia per "Please
+reschedule." — improbabile, ma non impossibile, e la conseguenza sarebbe un
+rimborso automatico non dovuto.
+
+## La firma, e perché le fixture la dimostrano
+
+**Cal.com firma il JSON compatto.** Nessuno spazio dopo le virgole e i due
+punti, i caratteri non-ASCII lasciati come sono. È stato verificato il 6
+settembre 2026 ricalcolando l'HMAC-SHA256 delle fixture con la parola segreta
+vera: **sei firme su sette combaciano**.
+
+Non è una curiosità. Vuol dire che `JSON.stringify` di un oggetto appena parsato
+riproduce **i byte esatti** che Cal.com ha firmato, e quindi che le firme
+registrate nelle fixture sono *verificabili* e non solo ricalcolabili: l'harness
+le passa alla funzione di verifica vera e controlla che dica sì. Una prova di
+firma costruita su una firma che ci siamo calcolati da soli non prova niente —
+verifica il codice contro se stesso.
+
+La settima è `booking_created.json`, e si sa perché: la password del video (un
+JWT) era stata sostituita prima di salvare la fixture, quindi quel corpo non è
+più quello che era stato firmato. Lo dice il suo `_nota`.
+
+**Conseguenza per il ponte.** La firma si calcola sui byte, non sul contenuto:
+il nodo Webhook di n8n deve consegnare il corpo **grezzo**. Un JSON parsato e
+riserializzato da n8n darebbe una firma diversa anche a contenuto identico —
+l'ordine delle chiavi, gli spazi e il formato dei numeri non sopravvivono al
+giro. È il punto in cui questi ponti falliscono, e falliscono male: sembra un
+problema di segreti sbagliati.
 
 ## Campi che ignoriamo, e perché
 

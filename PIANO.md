@@ -1,7 +1,11 @@
 # XPETIS — piano di sviluppo
-pwd db-> Xpet1s2026@
-File unico di lavoro: piano, task, avanzamenti. Si aggiorna qui, spuntando le
-caselle, e si aggiunge una riga al registro in fondo a ogni sessione.
+
+File di lavoro: stato, decisioni e task. Si aggiorna qui spuntando le caselle;
+il racconto di ogni sessione va in `REGISTRO.md`.
+
+> **Qui non si scrivono segreti.** Password, chiavi e token vivono nel password
+> manager: l'inventario di cosa esiste e dove sta è in `ACCESSI.md`. Questo file
+> è versionato, quindi finisce su GitHub e in ogni copia della cartella.
 
 - Contesto tecnico: `CLAUDE.md`
 - Fonte di verità sul prodotto: `XPETIS Flusso Completo.docx` — **attenzione:
@@ -39,8 +43,14 @@ ricerca, vetrina e itinerario pronto girano sul database di sviluppo vero, e da
 oggi nessun tasto del sito pubblico porta a un 404. Restano tre task miei e una
 fila di domande per te e per Chiara — sono elencate là, ognuna col motivo.
 
-Il ponte Cal.com ha già consegnato il suo primo messaggio vero, ed è mappato in
-`supabase/MAPPATURA_CALCOM.md`.
+**Aggiornamento del 6 settembre 2026.** Si è aperta la milestone 4 col primo
+pezzo: **il ponte Cal.com → `bookings` è costruito, provato e attivo**. Sta nel
+database (`0037_calcom_webhook.sql`) con n8n ridotto a quattro nodi che non
+decidono niente; le sette fixture vere si rigiocano in sequenza nell'harness, che
+è passato da 222 a **284 asserzioni**, tutte verdi. Nello stesso giro sono
+entrate nel progetto Supabase vero anche le migration `0033`-`0036`, che erano
+state applicate a mano dal SQL Editor senza essere registrate nella storia delle
+migration: ora la storia e il database dicono la stessa cosa.
 
 ### Cosa resta a te
 
@@ -61,9 +71,9 @@ Il ponte Cal.com ha già consegnato il suo primo messaggio vero, ed è mappato i
 1. **Le route server per le pagine token** (`resolve_access_token` è già pronta
    nel database). Non dipende dal design né da nulla di tuo, ed è l'impalcatura
    su cui poggiano milestone 5, 6 e 7.
-2. **Il ponte Cal.com → `bookings` in n8n**, ora che abbiamo il messaggio vero e
-   la mappatura dei campi. Si può scrivere e provare subito con l'account di
-   prova.
+2. ~~**Il ponte Cal.com → `bookings`**~~ → **fatto il 6 settembre**, e non in
+   n8n ma nel database: `0037_calcom_webhook.sql`, con n8n ridotto a quattro
+   nodi che non decidono niente. Provato sull'indirizzo di produzione.
 3. **Il suggeritore destinazioni** sulla tassonomia: è logica, non grafica, e
    funziona indipendentemente da come sarà disegnata la barra di ricerca.
 4. Chiudere la milestone 3 dalla mia parte: ricerca accento-insensibile
@@ -78,7 +88,7 @@ Il ponte Cal.com ha già consegnato il suo primo messaggio vero, ed è mappato i
 |---|---|---|
 | Link Figma delle pagine | Milestone 3, 4, 6, 7, 8 | ✅ arrivati il 10 agosto — file `x1DYYagZ2moagmpEHZHYYE`, nodi in `CLAUDE.md` |
 | Dataset geografico (129 stati, 244 regioni, 1.220 città) | Import geo, suggeritore, bande del match | ⏳ me lo incolli — versione normalizzata da Alessandro |
-| `GUIDA_PONTE_CALCOM.md` + fixture dei 7 messaggi veri | Nomi veri dei campi Cal.com e prove del ponte | ⏳ me lo incolli |
+| `GUIDA_PONTE_CALCOM.md` + fixture dei 7 messaggi veri | Nomi veri dei campi Cal.com e prove del ponte | ✅ arrivate — 7 fixture in `supabase/tests/fixtures/calcom/`, mappatura riscritta, ponte costruito |
 | JSON delle 25 vetrine compilate | Import profili TD | ⏳ da produrre dal form HTML |
 | `Vetrina TD (2).html` | È il form che produce quel JSON | ✅ in cartella |
 | `XPETIS_CONFRONTO_PIANI.md` | Merge dei due piani | ✅ in cartella, lavorato |
@@ -122,7 +132,7 @@ manca alla call. Vale anche per il caso 4.
 | 1 | Import dei dati reali | 🟡 **a metà** — geografia dentro; le 25 vetrine per ultime, per scelta | 2-3 sessioni | 8-12 h |
 | 2 | Infrastruttura e accessi | 🟡 **in corso** | 2 sessioni | 7-9 h |
 | 3 | Sito pubblico: ricerca, quiz, match, vetrina | 🟡 **le quattro pagine disegnate ci sono**; restano tre task miei e le domande per Chiara | 1-2 sessioni | — |
-| 4 | Prenotazione e pagamento consulenza | ⚪ | 5-6 sessioni | 3-4 h |
+| 4 | Prenotazione e pagamento consulenza | 🟡 **aperta** — il ponte Cal.com → `bookings` è dentro e provato | 4-5 sessioni | 3-4 h |
 | 5 | Prima della call: riprogrammazioni e reminder | ⚪ | 2-3 sessioni | — |
 | 6 | Post-call e Itinerario su misura | ⚪ | 5-6 sessioni | — |
 | 7 | All Inclusive | ⚪ | 4-5 sessioni | 4-6 h |
@@ -643,11 +653,21 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
 - [ ] **[C]** **Cassa aperta dal server**: Checkout Session creata da una route
       con l'importo letto dal database, più verifica dell'importo a valle in n8n
       prima di portare la riga a "pagata"
-- [ ] **[C]** Ponte Cal.com → `bookings` (created, rescheduled, cancelled). Due
-      cose imparate dai messaggi veri: il designer si identifica con
-      **`cal_username` + slug** (i 25 copiano lo stesso event type modello,
-      quindi lo slug da solo non identifica nessuno), e **lo slug sta in
-      `payload.type`**, non in `eventType.slug`
+- [x] **[C]** **Ponte Cal.com → `bookings`** (created, rescheduled, cancelled)
+      → migration `0037_calcom_webhook.sql` + workflow n8n
+      `n8n/calcom-consulenze.json`. **Chiuso il 6 settembre 2026**, provato
+      sull'indirizzo di produzione del webhook.
+      La logica sta nel database, n8n fa il fattorino: la macchina a stati vive
+      già qui, e in un grafo di nodi sarebbe stata reimplementata fuori senza
+      vincoli né prove. Le tre cose imparate dai messaggi veri e finite nel
+      codice: il designer si identifica con **`cal_username` + `payload.type`**
+      (i 25 copiano lo stesso event type modello, quindi lo slug da solo non
+      identifica nessuno, e **non** sta in `eventType.slug`); una
+      riprogrammazione è una prenotazione **nuova**, quindi la riga si trova con
+      `rescheduleUid` e `cal_booking_uid` va **sostituito**; l'attribuzione si
+      legge da `rescheduledBy`/`cancelledBy` confrontati con `organizer.email`.
+      Le sette fixture vere si rigiocano in sequenza nell'harness, catena
+      compresa
 - [ ] **[C]** Workflow Stripe → conferma e mail. **Risponde sempre 2xx** anche
       quando non ha niente da fare: un 500 ripetuto porta Stripe a disattivare
       l'endpoint
@@ -806,8 +826,11 @@ cassa aperta dal server.
 Progetto Google Cloud, credenziali OAuth, URI di redirect, client ID e secret in
 Supabase Auth. Google è l'unico provider previsto.
 
-**S-08 · Numero WhatsApp XPETIS** (1 h)
-Numero dedicato, WhatsApp Business, chi lo presidia e con quali orari.
+~~**S-08 · Numero WhatsApp XPETIS**~~ — **provvisoriamente chiuso il 6 settembre
+2026**: si usa **+39 347 891 1018**, numero personale prestato al progetto per
+non tenere fermo lo sviluppo. Va in `app_config`, così sostituirlo è una riga da
+Studio. **Resta aperto** il numero dedicato vero e chi lo presidia, prima del
+pubblico.
 
 **S-09 · Account Cal.com di regia e event type modello** (1-2 h)
 "Consulenza XPETIS · 30 min", URL `consulenza-xpetis-30` **scritto a mano**,
@@ -870,787 +893,8 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 
 ## Registro avanzamenti
 
-**24 agosto 2026 — quattro migration che chiudono la milestone 3 dal lato codice**
-
-Harness a **222 asserzioni**, tutte verdi. `0033`-`0036`, ognuna con le sue prove.
-
-*`0033` · lo slug degli itinerari.* L'URL non porta più l'ordinale ma uno slug
-(`/itinerario/giappone-in-primavera`). La scelta era fra l'uuid e lo slug, e ha
-deciso **dove finiscono questi indirizzi**: nei messaggi WhatsApp che il designer
-incolla dopo la call. Là un link è testo che qualcuno legge prima di toccarlo, e
-`…/9f8c1e2a-4b17-4c90` non permette a nessuno di verificare di aver incollato il
-Giappone e non il Vietnam. Lo slug si legge, si riconosce e si corregge a occhio.
-
-La stabilità non viene dal titolo ma dal fatto che lo slug è **un dato**: il
-trigger è `before insert` e non tocca gli UPDATE, quindi correggere un refuso nel
-titolo non muove l'indirizzo. L'harness verifica le due proprietà separatamente —
-titolo cambiato, slug fermo; posizione cambiata, slug fermo — perché sono le due
-cose che l'ordinale non sapeva fare. Unicità per designer, collisioni con
-suffisso, e uno slug scritto a mano da Studio vince sul trigger: è la via per
-correggerne uno brutto.
-
-Con la migration sono nate due utilità che appartengono a `0004_utility.sql` e
-stanno nella 0033 perché quel file è applicato: `unaccent_immutable()` e
-`slugify()`. La prima esiste perché **`unaccent()` è STABLE, non IMMUTABLE**, e
-Postgres la rifiuta in una colonna generata o in un indice: la forma a due
-argomenti col dizionario nominato è deterministica. Serve alla 0035, e senza di
-lei quella migration non sarebbe potuta esistere così.
-
-*`0034` · i testi in `app_config`.* Una riga porta un numero **o** un testo, in due
-colonne con un vincolo XOR. La strada breve era `value text` per tutti, ed è
-scartata: i parametri numerici li legge SQL che fa aritmetica, e un `numeric` che
-diventa `text` sposta il controllo dal database a chi scrive la query — una riga
-sbagliata smetterebbe di fallire all'inserimento per fallire in un cast, dentro un
-workflow, di notte. `public_config` serve anche il gruppo `showcase`, e `matching`
-resta chiuso dalla 0018: l'harness ora lo verifica come asserzione a sé, così se
-qualcuno riallarga il filtro se ne accorge.
-
-C'era una regressione da escludere e ha una sua asserzione: `match_designers`
-legge `app_config` con `max(value)`, e in quella tabella ora ci sono righe con
-`value` nullo. Se le aggregazioni si fossero rotte, il match avrebbe smesso di
-pesare senza che nessuno lo vedesse leggendo il codice.
-
-*`0035` · la ricerca senza accenti, e la cosa che non avevo previsto.* `name_norm`
-è una colonna **generata** su tutte e cinque le tabelle geo: correggere un nome
-aggiorna il normalizzato nello stesso statement, senza trigger da ricordarsi. Tre
-indici trigramma dove le righe sono tante.
-
-Poi il punto vero. Il pattern lo normalizza il browser, la colonna la normalizza
-Postgres: **sono due implementazioni della stessa regola**, e non possono essere
-lo stesso codice. Invece di scriverlo nei commenti e sperare, ho messo
-un'asserzione che confronta le due su **tutti i 1.613 nomi della tassonomia
-vera** — e ha trovato nove nomi su cui divergevano: Tromsø, Køge, Helsingør,
-Hveragerði, Ísafjörður, Płock, Ostrołęka, Kuşadası. `unaccent` traduce anche le
-lettere che non sono "base + segno" (ø→o, ð→d, ł→l, ı→i), mentre
-`normalize('NFD')` quelle le lascia intatte. Avevo scritto nel commento che nella
-tassonomia italiana non ce n'erano: era falso, e il test lo ha detto lo stesso
-giorno.
-
-La tabella di traduzione in `lib/geo.ts` è quindi **ricavata interrogando
-`unaccent`**, riga per riga, non scritta a memoria — e nel commento c'è
-l'avvertimento di non allungarla a intuito, perché `ə` e `ǝ` per esempio
-`unaccent` le lascia stare e tradurle *creerebbe* la divergenza che la tabella
-serve a togliere.
-
-*`0036` · la maschera contestuale.* `tags_for_destination()` in `SECURITY
-DEFINER`: sulla Bolivia i chip non offrono più "mare", che era uno scatto
-garantito a zero risultati. È una funzione e non una vista perché
-`td_destination_tags` dice su cosa un designer è forte paese per paese, cioè un
-ingrediente del punteggio: la funzione restituisce l'**unione** dei tag dei
-pubblicati, che non permette di ricostruire nessun profilo. Stessa disciplina di
-`match_designers()` sulla destinazione — paese o macro-area, e su una città
-solleva invece di ignorare.
-
-Due dettagli di interfaccia che valgono più di quanto sembri. **Un filtro acceso
-resta visibile anche quando esce dalla maschera:** capita cambiando meta con i
-filtri già scelti, e nascondere il chip lascerebbe l'elenco filtrato da qualcosa
-di invisibile — lo stesso genere di errore silenzioso che l'ordinale della 0033
-produceva sugli indirizzi. E un gruppo che resta senza chip **lo dice** invece di
-scomparire: un titolo senza niente sotto è una domanda, una riga di testo è una
-risposta.
-
-*Cosa resta a te, e non è rimandabile.* **Le quattro migration vanno applicate al
-progetto di sviluppo, e `seed/0001_config.sql` ri-applicato.** Finché la `0033` non
-è là, `public_td_showcase` non serve lo slug che l'URL nomina e la pagina
-dell'itinerario risponde **404** per tutti gli itinerari: la verifica su PGlite non
-sostituisce quel passaggio. Il seed è idempotente, quindi si ri-applica senza
-pensarci.
-
-**23 agosto 2026 — quattro decisioni di Simone**
-
-**Il form Vetrina TD non si tocca.** `td_ready_itineraries` resta a quattro
-campi, e tutte le sezioni che il Figma disegna senza una sorgente restano non
-costruite: tappe del viaggio, informazioni utili, galleria, paese, descrizione
-lunga, viaggi di gruppo. Il motivo pesa più della tecnica — il form l'hanno già
-compilato in venticinque, e allargarlo vuol dire richiamarli tutti. Si riapre
-solo su richiesta.
-
-**Si espone un identificatore stabile degli itinerari**, con la migration che
-serve: l'URL a ordinale è un errore che risponde 200 invece di 404, e quelli
-sono i peggiori. Nota per chi la scrive: `position` **non** risolve, perché è
-esattamente il campo che il riordino riscrive.
-
-**"volo non incluso • IVA inclusa" va in `app_config`**, valido per tutti. Porta
-con sé un lavoro non previsto: `app_config` tiene solo numeri
-(`value numeric not null`), quindi una riga di testo richiede una colonna nuova,
-un vincolo, e un allargamento di `public_config`, che oggi filtra su
-`booking_rules`.
-
-**I punti per Chiara e Gaia restano aperti** e si riprendono più avanti: badge
-match forte, foto di sfondo della card, le tre pillole sotto "Esperti di…", i
-divisori di sezione, l'ordine delle risposte della prima domanda del quiz, le
-sei domande e le otto etichette intermedie, e le due frasi di fallback.
-
-**23 agosto 2026 — la riga di tag della card, e l'itinerario pronto da vivere**
-
-*La riga di tag.* Era l'ultima divergenza riaperta dalla regola del 14 agosto, e
-si chiude come il Flusso la descrive: in quella riga ci vanno **i paesi**, e solo
-dove la copertura non è implicita nella sezione. Sotto "Esperti di Vietnam" la
-card non porta pillole; nel fallback, nelle bande allargate e in ogni ricerca
-senza destinazione porta i paesi coperti. I temi, che stavano lì per il disegno,
-sono usciti — e non si perde niente, perché il tema agganciato **il Flusso lo
-mette nella frase** e la frase lo dice davvero: verificato sul database vero,
-`/ricerca?livello=country&ref=vietnam&temi=food` scrive *"Ha costruito la sua
-esperienza in Vietnam e sul tema food ha molto da dire"*. L'informazione ha
-cambiato posto, non è sparita.
-
-Lo spazio della riga resta riservato anche quando è vuota, così l'avatar e la CTA
-stanno alla stessa altezza in tutte le sezioni. Il `Record` delle etichette dei
-temi è uscito dai props della card: la usa solo la frase.
-
-Due cose da chiudere con Chiara, entrambe piccole e scritte in milestone 3: le
-tre pillole che il Figma disegna in **ogni** card, che sotto "Esperti di…" ora non
-ci sono; e quanto larga sia "sezione di fallback" — ho scelto la lettura larga
-(tutte le bande tranne la 3) perché la parentesi del Flusso dice *"dove serve
-capire cosa copre il TD"*, e sotto "Allarghiamo alla regione" serve.
-
-*L'itinerario pronto da vivere.* Quarta e ultima pagina disegnata, Figma 261:1068
-→ `/designer/[slug]/itinerario/[numero]`. Il tasto "Ottieni maggiori
-informazioni" delle card di vetrina era spento per mancanza di destinazione: ora
-naviga, e con lui non resta più un solo tasto morto nel sito pubblico eccetto
-quelli che aspettano la milestone 4. Nessuna vista nuova, nessuna migration:
-tutto da `public_td_showcase`.
-
-**Il tasto "Acquista l'itinerario" del disegno non l'ho costruito.** La fascia
-scura in fondo al Figma lo mette accanto a "Personalizza con una call", ma il
-Flusso è netto — l'itinerario pronto è vetrina, non catalogo, e l'unica porta
-d'acquisto è la consulenza. Non è un'omissione prudente: non esiste il prodotto
-che quel tasto venderebbe, `orders.service_type` non lo ammette e il prezzo è una
-stringa scritta a mano, non un importo in centesimi. Caduta con lui l'intera
-fascia, perché la sua altra metà (prezzo più call) è identica alla scheda in alto
-e nel disegno le separavano tre sezioni che qui non ci sono.
-
-*Quello che il disegno chiede e il database non ha.* `td_ready_itineraries` ha
-**quattro campi**: titolo, durata, prezzo e una foto, tutti testo libero. Il
-Figma chiede cinque tappe di viaggio con giorni e descrizioni, tre pannelli di
-"Informazioni utili", le tappe principali, una descrizione lunga, una galleria a
-tre foto con "Mostra tutte le foto", il paese dell'itinerario e la riga "volo non
-incluso • IVA inclusa". **Sono tutti contenuti che il Flusso non prevede**, e per
-la regola del 14 agosto un contenuto che il disegno aggiunge si segnala e non si
-costruisce: sono in milestone 3, uno per uno, con la strada per dargli una
-sorgente. La pagina mostra quello che il database sa davvero, e in testa al file
-c'è scritto per ognuno perché non c'è.
-
-Due note su cui vale la pena tornare. La prima: **"volo non incluso • IVA
-inclusa" non lo scrive il sito.** È un'affermazione su cosa comprende un importo
-che il designer digita come testo, e vale o per tutti (allora è `app_config`) o
-per nessuno. La seconda: **il paese non è deducibile.** I paesi che la vista
-espone sono quelli del designer, e "Giappone in Primavera" di chi copre Giappone
-e Vietnam non diventa un itinerario in Vietnam.
-
-*L'URL è un ordinale, e lo dico invece di nasconderlo.* `public_td_showcase` non
-espone né `id` né `position` degli itinerari: dà un array ordinato, quindi
-`/itinerario/2` significa "il secondo della lista". Ho fermato la mano prima di
-aggiungere una riga alla vista — è una migration e un pezzo in più di superficie
-pubblica, cioè una decisione di Simone — e ho messo il contratto dell'URL in un
-posto solo (`percorsoItinerario` e `indiceItinerario` in `lib/vetrina.ts`). Il
-prezzo di questa scelta è preciso: se un designer riordina i suoi itinerari, i
-link vecchi puntano a quello sbagliato invece di dare un 404. Quando la vista
-espone un identificatore, si cambiano quelle due funzioni e nient'altro.
-
-*Un asset in meno.* Le due frecce tonde del nodo (Group 74 e Group 33) sono lo
-stesso path di `public/img/freccia-diagonale.svg` a meno di un sotto-pixel di
-traslazione: verificato scaricandole e confrontandole, non a occhio. Non entrano
-nello script degli asset.
-
-*Verificato, e cosa no.* Build verde, `tsc` pulito, eslint pulito sui file
-toccati (i due errori che restano sono in `quiz-domande.tsx` e
-`ricerca-destinazione.tsx`, preesistenti e fuori da questo giro). La pagina è
-stata resa contro il progetto Supabase vero: dato giusto, i tre 404 giusti
-(ordinale non numerico, fuori lista, `0`), i link delle card corretti. **In un
-browser non l'ho vista**: quello resta a te, come per le altre tre.
-
-*Una spunta ritrovata.* `seed/0003_demo.sql` **è** applicato al database di
-sviluppo: `/designer/marco-rossi` serve "Alcuni dei miei viaggi" e i tre
-itinerari pronti col contenuto vero. In PIANO era ancora aperta.
-
-**23 agosto 2026 — la riga spezzata di `/ricerca` senza destinazione**
-
-Segnalato da Simone: con `?temi=food` le due card non stavano più affiancate.
-Marco su una riga, una frase in mezzo, Giulia su un'altra.
-
-*La divisione era vera, ma invisibile.* Senza destinazione le sezioni esistono
-comunque — `match_forte`, `altri` e `fallback` nascono dalla soglia del badge,
-non dalle bande geografiche — e Marco agganciava il tema mentre Giulia no, quindi
-finivano in due sezioni diverse. Ognuna aveva il suo `<div>` griglia ma **nessun
-titolo**, perché i divisori li mostriamo solo con una destinazione: il risultato
-era una griglia spezzata senza niente che dicesse perché. Il peggio dei due
-mondi. Ora senza destinazione c'è **una griglia sola**, come nel Figma 177:262,
-che è l'arrivo dal quiz. L'ordine non cambia di una virgola: il fallback resta in
-coda perché ce lo mette `match_designers()`, non l'impaginazione.
-
-*E in mezzo c'era una frase falsa.* La frase del fallback dice "Nessuno di questi
-lavora sulla meta che hai scelto" — ma senza destinazione nessuna meta è stata
-scelta, e su `/ricerca` liscia quella frase compariva davanti a **tutti** i
-risultati, perché senza filtri l'affinità è zero per chiunque e il fallback si
-mangia l'intera lista. Era un mio errore, non un testo da riscrivere: la frase è
-giusta dov'era pensata, cioè dietro il "Mostra di più" con una destinazione, ed è
-là che è rimasta. Senza destinazione oggi non c'è nessuna frase, ed è il vincolo
-in più per Gaia — le frasi del fallback sono due.
-
-**23 agosto 2026 — perché le immagini non si vedevano**
-
-Tre cause diverse sovrapposte, e una era un bug.
-
-*Il bucket era vuoto.* `td-media` esiste ed è pubblico (0017 applicata), ma non
-conteneva **nessun oggetto**: tutti i percorsi del seed rispondevano 400. Le 23
-immagini finte ora sono dentro, e le URL pubbliche rispondono 200 — verificato
-anche attraverso `next/image`, che è il pezzo che fallisce per primo quando un
-file manca.
-
-*Lo script di caricamento non poteva funzionare.* `scripts/carica-immagini-finte.sh`
-mandava solo `Authorization: Bearer`. Con le chiavi nuove `sb_secret_…` non basta:
-l'API Storage prova a leggere il valore come JWT, non ci riesce e risponde 403
-`Invalid Compact JWS`. Serve anche l'header **`apikey`**. Con le vecchie
-`service_role`, che erano JWT davvero, il Bearer da solo bastava: è una trappola
-che si vede solo provando, e vale per ogni script futuro che parli con Storage o
-con PostgREST a mano. Corretto, e provato: 23 caricate, 0 fallite.
-
-*Le foto profilo sono ancora rotte, e questa resta a te.* `travel_designers.photo_url`
-sul database di sviluppo vale ancora `https://example.com/<slug>.jpg`, che è un
-host vivo che risponde 404: `seed/0004_foto_finte.sql` sistema il puntatore ma
-**non è ancora applicato**. Riguarda tre posti — l'avatar delle card in
-`/ricerca`, la foto grande della vetrina, la scheda del designer nella pagina
-dell'itinerario.
-
-Da notare, perché è una scelta di codice e non un caso: un URL su un host che non
-è Supabase Storage non diventa un riquadro neutro, si mostra comunque come `<img>`
-grezzo. Il ragionamento è in `components/foto-vetrina.tsx` — una riga sbagliata
-nel database si deve **vedere**, e `next/image` su un host non dichiarato in
-`next.config.ts` non degrada: porta giù la pagina. Ecco perché example.com appare
-come immagine rotta invece che come vuoto elegante.
-
-**14 agosto 2026 — chi vince fra Figma e Flusso**
-
-Regola fissata da Simone e scritta in `CLAUDE.md`: **il Figma è autorevole sulla
-forma, il Flusso sul comportamento e sui contenuti.** Il disegno non è aggiornato
-al pari del documento, e resta indietro. Nel dubbio si chiede; finché non arriva
-risposta vince il Flusso.
-
-Con questo metro ho ricontrollato tutte le divergenze registrate finora. Sette
-reggono senza modifiche — palette e tipografia sono forma, e il Flusso aveva già
-vinto su "Cerca" che compare alla selezione, sul solo "Accedi", sui due box
-acquistabili, sul terzo gruppo di filtri non costruito, sull'ordine delle
-risposte del quiz e sui due bolli che non scrivono numeri falsi.
-
-**Una va riaperta.** La riga di tag della card in `/ricerca` mostra i temi
-agganciati quando ci sono e i paesi coperti quando non ce ne sono. Ma il Flusso
-è preciso su quella riga, e parla solo di paesi: *"Il tag paesi compare nella
-ricerca senza destinazione e nelle sezioni di fallback (dove serve capire cosa
-copre il TD), mai quando la copertura è implicita nella sezione."* I temi in
-quella riga vengono dal disegno, non dal documento.
-
-**Due erano etichettate come decisioni e sono invece domande aperte**, perché
-chiuse dall'assenza nel Figma — che sotto la regola nuova non chiude niente:
-
-- il **badge "match forte"**, che il Flusso dichiara esplicitamente "decisione UX
-  da chiudere con Chiara: l'algoritmo lo produce comunque";
-- la **foto di sfondo della card**, che il Flusso dà come "da definire con
-  Chiara".
-
-Restano spente entrambe come default reversibile, ma sono domande, non risposte.
-
-**14 agosto 2026 — il quiz**
-
-`/quiz` esiste: era il 404 in fondo al "Lasciati ispirare" della home, al "Non hai
-ancora le idee chiare?" e al tasto quiz della colonna filtri. Sei schermate, una
-domanda per volta, tutte obbligatorie. Tre file nuovi in `lib` e `components` più
-la pagina e una route: `lib/quiz.ts` (l'unica porta verso `public_quiz_axes`, solo
-lato server), `lib/quiz-risposte.ts` (il contratto delle risposte: query,
-`sessionStorage`, tipi), `components/quiz-domande.tsx`, `app/quiz/page.tsx`,
-`app/quiz/salva/route.ts`, `components/salva-quiz.tsx`. Nessuna vista nuova,
-nessuna migration.
-
-*Le sei domande non sono nel codice.* Codice, tipo, etichetta, domanda, scala e
-opzioni vengono da `public_quiz_axes`, quindi il numero delle schermate e il passo
-della barra si contano dagli assi: aggiungere un asse o correggere un'etichetta è
-un UPDATE da Studio, non un deploy. Le opzioni si costruiscono percorrendo la
-scala dichiarata (`scale_min`..`scale_max`) e non le chiavi del JSON: se un giorno
-mancasse la riga di un valore, quella risposta appare senza etichetta invece di
-sparire. Un buco si vede, una scelta che manca no.
-
-*Il quiz è incompleto e si vede, come deve.* Gli otto "DA SCRIVERE" dei valori 2 e
-3 sono in pagina così come sono. E ne è emerso un nono: **`question_it` è nullo su
-tutti e sei gli assi** — non è mai stato seminato — quindi l'intestazione ricade
-sull'etichetta dell'asse ("Coinvolgimento nella pianificazione"), che è una
-targhetta e non una domanda, con sotto un `domanda da scrivere` in rosso. Il Figma
-invece ha i testi buoni per le prime due domande, e anche le risposte del ritmo
-scritte meglio del seed ("Lento: poche cose, vissute a fondo" contro "Lento"). Non
-li ho copiati nel seed: sono contenuti, e vanno scritti tutti e sei insieme,
-altrimenti restano due domande buone e quattro targhette.
-
-*La trappola che stava in agguato.* Nel Figma la prima domanda elenca le risposte
-**dal massimo controllo al minimo**, mentre nel database `planning_involvement`
-cresce al contrario. Copiare l'ordine del disegno appiccicando i valori 1-4 alle
-righe avrebbe girato l'asse: è il rischio numero uno del piano, quello che nessuna
-prova tecnica intercetta, e si presenta esattamente così — come una questione di
-impaginazione. Le risposte si mostrano in ordine di valore. Da chiudere con
-Chiara, riordinando il disegno o girando il verso nel database: mai solo la vista.
-
-*Il travaso al login (deviazione 3).* Le risposte dell'anonimo vivono in
-`sessionStorage`; `components/salva-quiz.tsx` sta nel **layout radice**, non nella
-pagina del quiz, perché il momento da intercettare è il login e dopo Google si
-atterra su una pagina qualunque. Costa una lettura di `sessionStorage` quando non
-c'è niente da fare, che è quasi sempre. Scrive la route `/quiz/salva` con la
-chiave secret, dopo aver verificato la sessione dai cookie: `quiz_responses` ha la
-RLS accesa e nessuna policy, il client non parla mai con le tabelle. Tre cose che
-la route fa e vale la pena ricordare: **valida i codici degli assi e le scale
-leggendoli dal database**, quindi non si salva un `{pippo: 3}` arrivato da fuori;
-**rifiuta un quiz incompleto**, perché un profilo parziale nel briefing sembra una
-risposta e non lo è; e **confronta con l'ultima riga del viaggiatore** invece di
-inserire sempre, perché `quiz_responses` è un registro senza indice unico e il
-componente rimonta a ogni pagina — l'indice sarebbe stata una migration non
-richiesta. Non salva niente per gli anonimi: la tabella lo permetterebbe con
-`session_id`, ma sarebbe un endpoint di scrittura aperto a chiunque.
-
-*Il contratto verso i risultati era già scritto e non l'ho toccato.* `quiz=`,
-`livello`, `ref`, `temi`, `contesti` entrano ed escono identici, così chi arriva
-dal Vietnam torna al Vietnam. La lettura di quella stringa era duplicata nella
-pagina risultati: ora sta in `lib/quiz-risposte.ts` e la usano entrambe, insieme
-al tipo `Quiz` che `lib/match.ts` si limita a riesportare. Il passo del quiz
-invece **non** sta nell'URL, a differenza di tutto il resto del sito: le risposte
-vivono in `sessionStorage`, quindi un `/quiz?passo=4` condiviso mostrerebbe una
-domanda in mezzo al nulla. È l'unico pezzo di stato del sito che non è
-indirizzabile, e per questa ragione.
-
-*Sugli asset:* due frecce tonde nuove (`freccia-avanti`, `freccia-indietro`) e la
-foto, che è il **rendering del nodo** 346:946 a scala 1 — 568×709 e 592 KB, contro
-i 9 MB e 2731×4096 della sorgente Unsplash. Tre cose non si scaricano: la stella
-della barra, che è `img/stella.svg` (nel Figma è 34,238×36, cioè lo stesso path
-"Star 3" dei bolli scalato 5,0833 — misurata su entrambi i lati, che è la lezione
-dell'11 agosto sugli SVG con `preserveAspectRatio="none"`); la cucitura
-tratteggiata fra card e foto, che è una riga bianca da 3px con 10 pieni e 10 vuoti
-e sta in un gradiente ripetuto; e le stesse due frecce, che `galleria-prec.svg` e
-`galleria-succ.svg` già portavano come ritaglio del gruppo della galleria — qui
-sono l'esportazione pulita, con un nome che non parla di gallerie.
-
-*Rimasto fuori, detto:* il quiz su cellulare **non è disegnato**. Sotto `lg` la
-pagina impila la card e la foto sparisce: una foto alta 709 fra la domanda e le
-risposte allontanerebbe le due cose che devono stare insieme. E l'ultima schermata
-non è disegnata: il tasto resta "Continua" fino in fondo invece di inventarsi un
-"Vedi i risultati".
-
-**11 agosto 2026 — la vetrina del designer**
-
-`/designer/[slug]` esiste: era il 404 in fondo a ogni card di `/ricerca`. Cinque
-componenti nuovi più `lib/vetrina.ts`, che è l'unica porta verso
-`public_td_showcase` e sta solo lato server, esattamente come `lib/match.ts` lo è
-verso `match_designers`. Nessuna vista nuova.
-
-*Prima la pagina, il seed.* Le cinque tabelle del contenuto di vetrina —
-`td_signature_trips`, `td_signature_trip_images`, `td_ready_itineraries`,
-`td_service_bullets`, `td_showcase_reviews` — esistevano dalla migration 0024 e
-**nessuna riga le aveva mai popolate**: la pagina sarebbe stata verde e vuota
-insieme, e non si sarebbe visto niente. Ora Marco e Giulia hanno tre viaggi
-firma a testa con le foto, tre itinerari pronti, i punti dentro ogni box e le
-recensioni portate da fuori. Harness a 178 asserzioni, verde.
-
-Una cosa imparata sull'harness: **le sue asserzioni contavano le righe** del
-contenuto di vetrina (`signature_trips.length === 1`), quindi qualunque
-arricchimento del seed le avrebbe rotte. Ora cercano per titolo, e le prove che
-scrivono usano posizioni alte (91, 92) per non collidere col seed. Il test è
-diventato più difficile da rompere per il motivo sbagliato.
-
-*Quattro cose del Figma che questa pagina non mostra*, tutte con la ragione
-scritta nel codice e tutte reversibili:
-
-1. **Il voto "4.6" sulla foto e la sezione "Cosa dice chi ha viaggiato con me".**
-   Non esistono recensioni: `public_reviews` è vuota perché non ci sono ordini, e
-   `td_showcase_reviews` non è esposta da nessuna vista per la decisione del 6
-   agosto rimandata alla milestone 8. Le ho seminate lo stesso — quella decisione
-   si prende meglio guardando dei dati veri che una tabella vuota — ma la vetrina
-   non le mostra. Esporle da qui avrebbe voluto dire prendere quella decisione di
-   nascosto, aggiungendo una vista pubblica di mia iniziativa.
-2. **La riga "Membro XPETIS".** Vuole `joined_at`, che la vista non espone.
-   Leggerlo con la chiave secret sarebbe stato lecito ma avrebbe scavalcato la
-   regola "la superficie pubblica è la vista".
-3. **La sezione "Viaggi di gruppo".** Non ha una sorgente, e non è un buco
-   nostro: il form non raccoglie quei viaggi. Il servizio `group_trip` invece
-   esiste, quindi il selettore dei box lo mostra a chi lo attiva.
-4. **"Prenota la call" e "Ottieni maggiori informazioni" non navigano.** Il primo
-   aspetta l'iframe Cal.com (milestone 4), il secondo la pagina "Itinerario
-   pronto da vivere" (nodo 261:1068, non costruita). Inerti e detto, invece di un
-   link verso un 404.
-
-*E una dove il Figma e il Flusso non dicono la stessa cosa.* Il Figma disegna in
-cima al box bianco due pillole — "Consulenza" rossa e attiva, "Itinerario su
-misura" marrone e spenta — cioè un selettore fra i servizi, e sotto un solo tasto
-"Prenota la call". Il Flusso dice che **i box acquistabili sono due soltanto**.
-Le due cose si tengono insieme così: il selettore resta e mostra tutti i servizi
-attivi come nel disegno, ma **il tasto d'acquisto compare solo su consulenza e
-consulenza approfondita**; sugli altri, al suo posto, c'è la frase che dice
-quando si comprano. Il selettore passa dalla query (`?servizio=`) e non da uno
-stato nel browser, quindi la pagina resta interamente server-side e una scheda è
-condivisibile per link.
-
-*Un errore che ho fatto e che vale la pena ricordare*, perché il codice della
-sessione precedente già lo preveniva e io l'avevo perso per strada: `next/image`
-su un host non dichiarato in `next.config.ts` **non degrada, solleva e porta giù
-tutta la pagina**. Il `photo_url` del seed punta a `example.com` e la vetrina
-rispondeva 500. La difesa è la stessa dell'avatar di `card-designer.tsx`: fuori
-da Supabase Storage si mostra un `<img>` normale.
-
-*Sugli asset:* i due tondi con le frecce della galleria sono un ritaglio, non un
-download. Nel Figma sono un gruppo unico largo 396 con i tondi agli estremi, e
-lo script lo spiega. Gli SVG esportati hanno `preserveAspectRatio="none"`: le
-icone non quadrate vanno misurate su entrambi i lati, altrimenti si stirano senza
-che nessuno se ne accorga leggendo il codice.
-
-*Fuori dal repo:* `supabase/node_modules` era un symlink verso `/tmp/node_modules`
-committato per sbaglio nella 084c939, ed era rotto. Cancellato — il `.gitignore`
-lo copre già — e rifatto `npm install`, che ora produce un `package-lock.json` da
-committare.
-
-**10 agosto 2026 — la pagina risultati chiama il match**
-
-`/ricerca` esiste e gira sul database vero: bande, sezioni, badge, filtri e frase
-composta. Tre file nuovi — `lib/match.ts` (l'unica porta verso
-`match_designers`, e sta solo lato server), `lib/frase.ts` (i mattoncini),
-`app/ricerca/page.tsx` — più la card, i chip dei filtri e due proprietà nuove sul
-suggeritore, che ora conserva i filtri quando si cambia meta.
-
-*Il ricalcolo live passa dall'URL.* I filtri riscrivono la query e il Server
-Component richiama la funzione: è "una chiamata indicizzata al server" e non un
-ricalcolo nel browser. Stessa scelta per le risposte del quiz
-(`quiz=pace:1,comfort_wild:4`): la pagina resta interamente server-side e un
-risultato è condivisibile per link. Il travaso da `sessionStorage` lo farà la
-pagina del quiz.
-
-*Tre cose imparate scrivendo le frasi*, tutte di lingua e nessuna prevista dal
-Flusso, che le chiama "concordanze e articoli" in mezza riga:
-
-1. **`travel_designers` non ha il genere**, quindi nessun frammento può contenere
-   un participio ("è appassionato"). Si scrive tutto con verbi alla terza
-   persona. Aggiungere la colonna non basterebbe: andrebbe raccolta per 25
-   persone e mantenuta.
-2. **La tassonomia non porta l'articolo.** "Conosce il Vietnam" non si può
-   comporre: il default è il locativo "in {nome}", con una ventina di eccezioni
-   per identificatore in `lib/frase.ts` (isole e città-stato vogliono "a", i nomi
-   plurali "negli/nelle/nei"). Lo stesso problema colpisce il titolo di sezione
-   del Flusso, "Esperti di [paese]", che su alcuni paesi zoppica.
-3. **Un frammento non può contenere virgole**, perché i pezzi si uniscono con la
-   virgola. Il primo giro produceva "sta dalla parte del tempo lungo, come te,
-   conosce il ritmo dei viaggi in coppia".
-
-*Rimasto fuori.* La **maschera contestuale** dei filtri: `td_destination_tags` è
-dato chiuso e nessuna vista dice quali tag esistono su una destinazione, quindi
-serve una funzione server nuova — non l'ho scritta perché è una migration non
-richiesta.
-
-**10 agosto 2026 — la pagina ricerca vestita sul Figma**
-
-Arrivati i link: file `x1DYYagZ2moagmpEHZHYYE`, un nodo per pagina, ora scritti
-in `CLAUDE.md` perché non si perdano più (l'assenza di quella riga è costata
-mezza sessione). Deciso anche: pagamento col **plugin Stripe**, prenotazione con
-l'**iframe Cal.com** del designer.
-
-Rifatte card, filtri e impaginazione sul nodo 177:262: colonna bianca dei filtri
-a sinistra, griglia a due colonne di card alte 520 con il velo che scurisce verso
-il basso, avatar 130, "Vai alla vetrina", "Carica ancora" col tondo della freccia
-— che è byte per byte lo stesso asset della home. Aggiunti cinque asset allo
-script; `icona-quiz` e `icona-chevron` restano scaricati ma non usati.
-
-*Quattro punti dove il Figma e il Flusso non dicono la stessa cosa*, tutti
-risolti in modo reversibile e tutti da chiudere con Chiara e Gaia:
-
-1. **Il badge "match forte" non è disegnato.** Era la domanda aperta del Flusso
-   ("decisione UX da chiudere con Chiara"): oggi è spento da una costante sola.
-2. **Nessun divisore di sezione.** Ma quel nodo è l'arrivo dal quiz, cioè il caso
-   senza destinazione, dove il Flusso stesso vuole una fascia unica. I divisori
-   compaiono solo con una destinazione, dove dicono qualcosa che il viaggiatore
-   non può dedurre.
-3. **La riga di tag sulla card porta i temi**, il Flusso i paesi coperti. Si
-   mostrano i temi agganciati quando ci sono, i paesi quando non ce ne sono.
-4. **Il terzo gruppo di filtri e "Filtri avanzati" non esistono nel Flusso** e
-   `match_designers()` non li sa filtrare: lasciati fuori, con la ragione scritta
-   nel componente. Un gruppo di caselle che non filtrano sarebbe peggio del
-   vuoto.
-
-*Una cosa che il Figma decide e il database aspettava:* la **foto di sfondo della
-card** (`travel_designers.background_photo_url`, decisione aperta dal 1 agosto)
-**non c'è**. La card non ha immagine di sfondo: solo l'avatar sopra un velo che
-scurisce verso il basso, e sotto il velo si vede il crema della pagina.
-
-*E una che ho tolto di mia iniziativa:* i due bolli dicono "+100 Designer" e "4.9
-valutazione media". Il conteggio ora è quello vero (oggi 2); il bollo della
-valutazione è fuori, perché non ci sono recensioni e `td_review_stats` non è
-esposta al browser. Scriverli fissi sarebbe pubblicare due numeri falsi su un
-sito che incassa.
-
-**8 agosto 2026 — primo `db push` su Supabase vero**
-Fallito alla migration 0004: `gen_random_bytes does not exist`. Causa: **su
-Supabase le estensioni stanno nello schema `extensions`, non in `public`**,
-quindi `create extension if not exists pgcrypto` non fa niente (esiste già
-altrove) e le sue funzioni non sono sul search_path. Su PGlite finiscono in
-`public` e tutto passa: **l'harness non poteva accorgersene**, ed è il primo
-errore che il Postgres vero ha trovato e il nostro no.
-
-Corretto in 0001 (commento), 0002 (`set search_path` per `gin_trgm_ops`) e 0004
-(`search_path = public, extensions` sulla funzione). Uno schema inesistente nel
-search_path viene ignorato, quindi la stessa riga funziona in entrambi gli
-ambienti.
-
-*Deroga consapevole alla convenzione "mai modificare una migration applicata":*
-la catena non era mai arrivata in fondo da nessuna parte, quindi non c'era storia
-da proteggere. Su un database già popolato si sarebbe aggiunta una migration
-nuova. Regola aggiunta a `CLAUDE.md`.
-
-**S-01 chiuso.** Progetto `rsgyxbqzsxahsbdfgtbm`, 31 migration e i tre seed
-applicati, le query di verifica rispondono.
-
-**S-02 e S-07 chiusi, e il giro Google-Supabase-Vercel è provato.** Repo su
-GitHub, deploy su `xpetis-new.vercel.app`, login Google funzionante. Costruita
-l'app Next.js 16 con i tre client Supabase e una pagina di verifica
-dell'impianto che prova tre cose insieme: la lettura pubblica con la sola chiave
-publishable (129 paesi e i due designer di prova rispondono), il login, e la
-riga in `travelers` creata dal trigger su `auth.users`. **Tutte e tre verdi al
-primo tentativo.**
-
-*Punto aperto chiuso:* Google consegna davvero il nome in
-`raw_user_meta_data->>'full_name'`, quindi il trigger popola `full_name` da
-solo. Non serve raccoglierlo altrove.
-
-*Un intoppo che vale la pena ricordare:* il primo deploy rispondeva 404. Il
-progetto Vercel era stato creato **prima** che l'app Next.js esistesse, e il
-preset del framework si decide una volta sola all'import: da allora serviva file
-statici che non c'erano. Cambiato il preset a Next.js e ridistribuito senza
-cache. Login provato anche in produzione, dove il redirect passa dal proxy ed è
-un percorso di codice diverso da localhost.
-
-*Decisione che cambia una convenzione: le chiavi Supabase.* Installata nel repo
-la skill `supabase/server`, che documenta il passaggio alle nuove chiavi API:
-`anon` e `service_role` sono **legacy e verranno rimosse**, si usano
-`sb_publishable_…` (browser) e `sb_secret_…` (solo server). Aggiornati
-`CLAUDE.md` e i task che le nominavano. La chiave secret non passa mai da una
-conversazione né da un file versionato.
-
-**8 agosto 2026 — import della tassonomia geografica**
-Caricato `xpetis_destinazioni.json`: 6 continenti, 14 macro-aree, 129 stati, 244
-regioni, 1.220 città. Harness a 166 asserzioni, tutte verdi. Il seed geografico
-non si scrive a mano: lo genera `scripts/genera_geo.mjs` dal file, e l'harness
-confronta i conteggi contro le statistiche dichiarate dal file stesso.
-
-Tre cose che il mio schema provvisorio non prevedeva. **Non esistono codici
-ISO:** ogni voce ha un identificatore testuale (`corea_del_sud`) e quello diventa
-la chiave; inventare una corrispondenza ISO per 129 stati sarebbe stato
-indovinare. **Una città può stare in due regioni** — Jaipur è in India del Nord e
-in Rajasthan, ed è corretto — quindi l'unicità è per regione, non per stato.
-
-E la terza, che è una decisione aperta e non un dettaglio: **la destinazione non
-è sempre uno stato.** La tassonomia dichiara selezionabili le 14 macro-aree, i
-129 stati e le 20 regioni italiane; continenti, città e regioni estere vivono
-solo nel suggeritore. Ma il Flusso dice "la barra di ricerca normalizza qualunque
-input a un paese", e `match_designers()` accetta un solo stato. I due documenti
-non dicono la stessa cosa, e il codice oggi segue il Flusso.
-
-*Verifica sulle voci paese di un designer reale:* 22 su 30 agganciano per nome
-esatto ai 129 stati. Le altre otto sono i casi noti (cinque stati USA, la Scozia
-che nella tassonomia è una regione estera del Regno Unito, Balcani e Caraibi da
-scorporare), ora documentate in `MAPPATURA_VETRINA.md` con l'identificatore di
-destinazione di ciascuna.
-
-**8 agosto 2026 — la regola di ricerca (migration 0030)**
-Decisa da Simone e implementata: città e continenti **non filtrano** (la città
-porta al suo paese, il continente alle sue macro-aree), paesi e macro-aree sì.
-Harness a 174 asserzioni, tutte verdi.
-
-`match_designers` accetta ora la destinazione come livello + identificatore, e
-**rifiuta i livelli che non filtrano sollevando un errore** invece di ignorarli.
-La regola di prodotto vive nella funzione, non nella buona volontà di chi la
-chiama: chi passa una città se ne accorge subito.
-
-Una conseguenza logica da segnalare: **con una macro-area la banda 2 sparisce.**
-"Un altro paese della stessa macro-area" è già dentro la banda 3, perché è
-esattamente ciò che l'utente ha chiesto. Restano tre bande e serve una etichetta
-nuova per la sezione (`esperti_macro_area`), che Gaia dovrà scrivere. Il livello
-che entra nell'ordinamento è il migliore fra i paesi coperti là dentro, e il
-badge chiede almeno un paese di livello 1 dentro quella macro-area.
-
-Aggiunto `parent_ref` a `geo_search`, che è il filo per la navigazione del
-suggeritore: continente → macro-aree → paesi.
-
-*Regioni italiane: rimandate (migration 0031).* La tassonomia le dichiara
-selezionabili, la regola dei quattro livelli non le nomina, e non si vuole un
-quinto filtro. Invece di riscrivere il dato della tassonomia — che ne
-perderebbe l'intenzione — il database tiene due fatti distinti: `is_selectable`
-è cosa dichiara la tassonomia, `is_filterable` è cosa filtra oggi in XPETIS, e
-il sito obbedisce al secondo. I due valori differiscono su venti righe soltanto,
-e c'è un'asserzione che lo verifica: se un giorno quella differenza cambia, se
-ne accorge qualcuno. Harness a 177 asserzioni.
-
-**1 agosto 2026**
-Lettura del flusso completo. Scelte due decisioni architetturali di fondo:
-pagine token servite da route server-side con service key, e nessuna lettura
-diretta delle tabelle dal browser. Costruito lo schema Supabase completo: 17
-migration, 2 file di seed, 30 tabelle, la macchina a stati degli ordini imposta
-da trigger, sette viste pubbliche, RLS chiusa. Scritto l'harness di verifica su
-PGlite: 60 asserzioni, tutte verdi.
-
-**2 agosto 2026**
-Piano rivisto: design, flusso, tassonomia e i 25 profili TD esistono già, quindi
-il perimetro è solo tecnico e il percorso critico non è più il design ma la
-disponibilità di Simone. Aggiunta la milestone sull'import dei dati reali.
-Chiuse le decisioni sull'infrastruttura: Supabase cloud free in sviluppo e Pro
-al go-live, n8n self-hosted su Railway, Cal.com free con un account per TD,
-Vercel Pro. Emersi due punti non previsti dal Flusso: il piano Hobby di Vercel
-non copre l'uso commerciale, e la quota esecuzioni di n8n Cloud è incompatibile
-con il workflow insoluti ogni 5 minuti.
-
-**4 agosto 2026 — merge col piano di Alessandro**
-Lavorato punto per punto `XPETIS_CONFRONTO_PIANI.md`. Undici decisioni.
-
-*Base.* Resta il mio schema, da correggere strada facendo. Conseguenza: il
-risparmio di 16-18 sessioni calcolato nel confronto non si applica, perché
-valeva solo adottando il suo codice. Il merge riduce la varianza, non il
-calendario.
-
-*Accolte perché aveva ragione lui.* Il match va in una funzione Postgres: la mia
-`public_td_profiles` esponeva ad `anon` livelli dei paesi e valori degli assi,
-cioè esattamente ciò che il Flusso dice invisibile — era un difetto, non una
-scelta. Il designer si identifica con `cal_username` + slug, perché i 25 copiano
-lo stesso event type modello e lo slug da solo non identifica nessuno. La cassa
-la apre il server: un Payment Link è pubblico e riusabile e niente lo lega al
-prezzo di quella prenotazione. Lo slug sta in `payload.type`. Il workflow Stripe
-risponde sempre 2xx. Il quiz si salva al primo login, altrimenti il briefing del
-designer arriva vuoto. `td_publish_readiness` controlla la plausibilità e non
-solo la completezza: un profilo tutto "Base" era completo e non funzionava.
-
-*Corretto un conto del confronto.* Le 60.000 esecuzioni n8n al mese
-presuppongono sette cron separati a 5 minuti. Un orologio unico che verifica
-tutte le scadenze dovute costa 8.640 esecuzioni in totale, e su Railway sono
-illimitate: la "strada C" con `pg_cron` costerebbe più e dividerebbe le
-automazioni fra due sistemi. Resta un orologio unico su n8n self-hosted.
-
-*Trovato incrociando i due documenti.* Se cancellare su Cal.com richiede solo il
-codice della prenotazione, `cal_booking_uid` è una credenziale, e il mio
-`grant select on bookings to authenticated` la consegnava al viaggiatore.
-Da chiudere con una vista senza quel campo. E poiché le mail native di Cal.com
-contengono i link di cancellazione, le regole di rimborso vanno applicate sul
-webhook `BOOKING_CANCELLED`: non c'è modo di chiudere quella porta.
-
-*Rischi accettati.* Token in chiaro nel database. Verso degli assi non ancora
-fissato (nel nostro seed solo `pace` ha etichette vere) con controllo a vista
-all'import. Mail native di Cal.com lasciate accese, con i nostri testi scritti
-per convivere. Import fedele e correzione a mano dei 25 profili, 8-12 ore del
-team. Il `.docx` del Flusso resta superato su cinque punti, tracciati qui.
-
-*Chiuso.* S-05, con prove sul campo: webhook sì, prefill sì, e per cancellare
-non serve nessuna chiave. Annullato S-10.
-
-In attesa di: `GUIDA_PONTE_CALCOM.md` con le fixture, dataset geografico, link
-Figma, JSON delle 25 vetrine, e via a procedere.
-
-**6 agosto 2026 — mappatura del form vetrina**
-Arrivati `vetrina-dennis-milello/` e `GUIDA_PONTE_CALCOM.md`. Letto il form e
-scritto `supabase/MAPPATURA_VETRINA.md`: 30 campi mappati, 11 migration
-individuate. Deciso di **non importare ora i dati di Dennis**: serve come
-struttura, non come carico dati.
-
-Tre scoperte. **Il livello dei paesi non è un campo del form:** non esiste come
-campo modificabile, ogni riga nasce "Base" e nessuna interfaccia la cambia.
-Quindi i designer non sono disattenti, il form non glielo chiede. L'unico segnale
-di rilievo è `topDestinazioni` ("fino a 3, saranno messe in evidenza"), da cui la
-regola: top destinazioni → livello 1, gli altri → livello 2, campo `livello`
-ignorato. **I viaggi di gruppo nel JSON non sono del designer:** `gruppo[]` non ha
-campi modificabili e resta il contenuto d'esempio (il "Argentina: Trekking in
-Patagonia" di Dennis è l'esempio dentro il form). Non si importa mai, e la sezione
-prevista dal Flusso resta senza sorgente. **Un'etichetta non aggancia:** il mio
-seed dice "Aree estreme e polari", il form "Aree estreme/polari".
-
-*Deciso.* Assi allineati al verso dichiarato nel form, con `aesthetics`
-rinominato `curated_vs_real` perché il nome suggeriva il verso opposto a quello
-vero, e `companions` portato a cinque opzioni. Recensioni di vetrina in una
-tabella separata `td_showcase_reviews`, non esposta finché non si affrontano le
-recensioni (milestone 8).
-
-*Ancora aperti, non bloccanti:* se `group_trip` e `private_guiding` entrano
-nell'enum dei servizi acquistabili; se la sezione viaggi di gruppo va aggiunta al
-form o caricata dal team; se `giorni` e `prezzo` degli itinerari sono solo
-etichette di vetrina; conferma della regola `topDestinazioni` → livello 1.
-
-**6 agosto 2026 — migration 0018-0020, le correzioni**
-Scritte e verificate le tre migration che chiudono i difetti aperti. Harness a 90
-asserzioni, tutte verdi.
-
-`0018` sostituisce `public_td_profiles` con `match_designers()` in
-`SECURITY DEFINER`: l'algoritmo completo del Flusso in SQL — bande geografiche,
-punteggio quiz sui sei assi, punteggio filtri in frazione, affinità pesata,
-chiave di ordinamento a quattro livelli, badge, sezioni. Restituisce posizione,
-banda, sezione, badge, paesi coperti per nome, i due assi più salienti e i temi
-agganciati: nessun punteggio, nessun livello, nessun valore di asse. Una scelta
-che vale la pena ricordare: **per comporre la frase non serve il valore dell'asse
-del designer.** La salienza pesa l'affinità, quindi un asse saliente è per
-costruzione un asse dove i due stanno dalla stessa parte, e il frammento si
-scrive dalla risposta del viaggiatore, che lui già conosce. Avendo spostato il
-match lato server sono caduti anche i pesi degli assi e i parametri di matching
-dalla superficie pubblica: il browser non ne ha più bisogno.
-
-`0019` sostituisce il grant su `bookings` e `orders` con `my_bookings` e
-`my_orders`, filtrate su `auth.uid()` e prive di `cal_booking_uid`.
-
-`0020` aggiunge `td_publish_blockers()` — foto, bio, paesi, **almeno un paese di
-livello 1**, sei assi, consulenza attiva, account Cal.com — e un trigger di
-vincolo differito che rifiuta la pubblicazione elencando i motivi. Più
-`td_publish_warnings()` per ciò che non blocca ma fa perdere punteggio: paesi
-senza tema, paesi senza contesto, più di tre livelli 1, assi tutti sullo stesso
-valore, nessun servizio oltre la consulenza. Il caso del designer con 32 paesi
-tutti "Base" ora non si pubblica, e il messaggio dice perché.
-
-Aggiunti al seed tre paesi non coperti da nessuno (Cambogia, Corea del Sud,
-India) per poter provare le bande 2 e 1, che senza di loro non erano
-verificabili.
-
-**6 agosto 2026 — migration 0021-0024, allineamento al form**
-Harness a 133 asserzioni, tutte verdi.
-
-`0021` chiude il rischio numero uno del piano. Il verso degli assi non è più
-un'interpretazione: `quiz_axes.label_min` e `label_max` contengono gli estremi
-dichiarati nel form, e si legge il verso da lì. L'asse `aesthetics` è diventato
-`curated_vs_real`, perché il vecchio nome su scala crescente si leggeva "più
-estetica" mentre nel form crescere significa *meno* estetica curata. `companions`
-è passato a cinque opzioni con le parole esatte del form. Corretta l'etichetta
-"Aree estreme/polari", che con la nostra "Aree estreme e polari" avrebbe fatto
-perdere quel tag in silenzio a ogni import.
-
-`0022` e `0023` danno casa ai campi di profilo e ai campi per paese, con vincoli
-sulle liste chiuse: se il form cambia le parole, l'import fallisce in modo
-visibile invece di scrivere una stringa che nessuno leggerà mai bene. La
-copertura legale non è un campo decorativo: "ho già un'agenzia" è l'informazione
-che popola `agency_id` per gli ordini All Inclusive.
-
-`0024` porta i servizi da quattro a cinque. `group_trip` e `private_guiding`
-entrano nell'enum perché il designer li attiva e la vetrina li mostra, ma il
-vincolo su `orders.service_type` impedisce che nasca un ordine: **il database
-registra la decisione ancora aperta invece di lasciarla a un commento.**
-
-Da qui in avanti ogni tabella nuova nasce con RLS accesa e privilegi revocati in
-modo esplicito: su Supabase i privilegi di default concedono `anon` e
-`authenticated` sulle tabelle create dopo, quindi la revoca della 0016 non si
-eredita. L'harness lo verifica a ogni run e ha già trovato la prima dimenticanza.
-
-**6 agosto 2026 — migration 0025-0028, il contenuto di vetrina**
-Harness a 150 asserzioni, tutte verdi. Con questo blocco **lo schema ha una casa
-per ogni campo del form**: era il buco più grosso trovato leggendo il JSON, dove
-circa quattro quinti del form non aveva dove atterrare.
-
-Una tabella per sezione — viaggi firma con le foto, itinerari pronti, recensioni
-esterne — con righe ordinate e uniche per designer. Il vincolo sul titolo non
-vuoto serve all'import: il form nasce con tre righe di viaggio precompilate e
-vuote, e senza quel vincolo finirebbero in vetrina.
-
-Deroga consapevole alla convenzione degli importi in centesimi su
-`td_ready_itineraries`: durata e prezzo arrivano dal form come testo
-("5-7 giorni", "850€") e sono indicazioni di vetrina, non casse. La convenzione
-`*_cents` vale dove passa denaro vero.
-
-`public_td_showcase` serve ora tutta la vetrina in una query. Alzato a 15 MB il
-limite del bucket immagini: le foto di un pacchetto reale arrivano a 6 MB l'una,
-33 MB per 25 file. L'import dovrà comunque ridimensionarle — 1 GB di Storage sul
-piano gratuito basta per una trentina di designer e noi ne abbiamo 25.
-
-*Verifica strutturale sul JSON reale, senza importarlo.* Tutti i valori di lista
-chiusa del pacchetto di Dennis — temi, contesti, durate, budget, "con chi
-viaggi", copertura legale — sono riconosciuti dallo schema: **zero valori
-inattesi**. Restano confermati i tre problemi già noti, che sono di dato e non di
-struttura: due righe paese vuote, due nomi con spazio in coda ("Perù ",
-"Vietnam "), e le voci che non sono stati.
+Le voci di sessione stanno in **`REGISTRO.md`**, dalla più recente alla più
+vecchia. Sono uscite da qui il 24 agosto: erano diventate mille righe su
+milleseicento, e il piano non si leggeva più.
+
+**Chi lavora al progetto scrive lì**, in cima, una voce per sessione.

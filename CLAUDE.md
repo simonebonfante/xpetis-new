@@ -58,15 +58,19 @@ lib/supabase/   # client browser, server (cookie) e admin (chiave secret)
 public/img,logo # asset esportati dal Figma
 public/fonts/   # Ronzino (Merriweather arriva da next/font)
 scripts/        # scarica-asset-figma.sh (le URL Figma scadono in 7 giorni)
+n8n/            # copia versionata dei workflow + LEGGIMI su come si reimportano
 supabase/
   migrations/   # numerate, si applicano in ordine
   seed/         # config, tassonomia geografica generata, dati finti
   scripts/      # genera_geo.mjs: rigenera il seed geografico dal JSON
-  tests/run.mjs # harness: applica tutto su PGlite, ~177 asserzioni
+  tests/run.mjs # harness: applica tutto su PGlite, ~284 asserzioni
+  tests/fixtures/calcom/  # i 7 messaggi VERI di Cal.com, firme incluse
   README.md     # documentazione dello schema e delle decisioni
   MAPPATURA_VETRINA.md  # form Vetrina TD → schema
   MAPPATURA_CALCOM.md   # messaggi Cal.com → schema, da payload veri
-PIANO.md              # milestone, task, avanzamenti, deviazioni, stime
+PIANO.md              # stato, decisioni, task, deviazioni, stime
+REGISTRO.md           # una voce per sessione, dalla più recente alla più vecchia
+PUNTI_APERTI.md       # le domande aperte, scritte per il team non tecnico
 ACCESSI.md            # inventario dei servizi esterni e dove vivono i segreti
 ONBOARDING_CALCOM_TD.md  # procedura per i 25 designer
 ```
@@ -223,6 +227,12 @@ di chi ha agito.
   restare verde.
 - I file di deliverable finali vanno nella cartella del progetto, non in una
   cartella temporanea.
+- **Nessun segreto nei file versionati.** Password, chiavi e token stanno nel
+  password manager; in `ACCESSI.md` c'è solo l'inventario di cosa esiste e dove
+  sta. Se ne trovi uno scritto in chiaro, segnalalo: va rimosso **e ruotato**,
+  perché toglierlo dal file non lo toglie dalla storia di git.
+- Il racconto di ogni sessione va in `REGISTRO.md`, in cima. In `PIANO.md`
+  restano stato, decisioni e task.
 
 ## Cosa non fare
 
