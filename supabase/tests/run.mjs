@@ -60,6 +60,18 @@ await db.query(
   `insert into vault.decrypted_secrets (name, decrypted_secret) values ('calcom_webhook_secret', $1)`,
   [segretoCalcom.valore])
 
+// Lo signing secret di Stripe. Qui, a differenza di Cal.com, una parola
+// inventata basta e non toglie niente: le fixture Stripe **non portano una firma
+// vera** — la sessione è stata creata e fatta scadere via API, senza passare da
+// un endpoint webhook, quindi non c'è nessun `Stripe-Signature` autentico da
+// riprodurre. Quello che l'harness verifica è l'algoritmo (HMAC su
+// `"<t>.<corpo>"`, tolleranza, più `v1` durante una rotazione), e per quello la
+// parola segreta può essere qualunque cosa purché le due parti la condividano.
+const SEGRETO_STRIPE = 'whsec_parola_segreta_finta_per_l_harness'
+await db.query(
+  `insert into vault.decrypted_secrets (name, decrypted_secret) values ('stripe_webhook_secret', $1)`,
+  [SEGRETO_STRIPE])
+
 let failures = 0
 const ok   = (m) => console.log('  ok   ' + m)
 const fail = (m, e) => { failures++; console.log('  FAIL ' + m + (e ? '\n       ' + String(e).split('\n')[0] : '')) }
@@ -334,9 +346,17 @@ await expectFail('valore fuori scala', `
 await expectFail('tag su un paese non coperto dal TD', `
   insert into td_destination_tags (td_id, country_code, tag_code)
   values ('11111111-1111-1111-1111-111111111111','tanzania','food')`, 'foreign key')
-await expectFail('consulenza attiva senza Payment Link', `
+// Il Payment Link non è più fra i requisiti (0038): la deviazione 1 dice che la
+// cassa la apre il nostro server, e pretenderlo avrebbe voluto dire far
+// inventare 25 URL finte per pubblicare 25 profili. Restano le tre condizioni
+// che contano — senza prezzo la cassa non si apre, senza durata ed event type la
+// prenotazione non nasce.
+await expectOk('consulenza attiva senza Payment Link: ora si può', `
   insert into td_services (td_id, service_type, is_active, price_cents, duration_minutes, cal_event_type_slug)
-  values ('11111111-1111-1111-1111-111111111111','consultation_deep',true,9000,45,'x')`, 'bookable_complete')
+  values ('11111111-1111-1111-1111-111111111111','consultation_deep',true,9000,45,'x')`)
+await expectFail('consulenza attiva senza prezzo', `
+  insert into td_services (td_id, service_type, is_active, duration_minutes, cal_event_type_slug)
+  values ('22222222-2222-2222-2222-222222222222','consultation_deep',true,45,'x')`, 'bookable_complete')
 await expectFail('livello paese diverso da 1 o 2', `
   insert into td_countries (td_id, country_code, level)
   values ('22222222-2222-2222-2222-222222222222','tanzania',3)`, 'level')
@@ -982,6 +1002,22 @@ console.log('\n== Superficie pubblica ==')
     ? ok('i pesi e le soglie del matching non sono sulla superficie pubblica')
     : fail('public_config espone il gruppo matching');
 
+  // Il numero WhatsApp NON deve uscire da `public_config`. Oggi è il cellulare
+  // personale di Simone, prestato in attesa di un numero dedicato, e
+  // `public_config` è leggibile da chiunque senza nemmeno una sessione: i
+  // raccoglitori di contatti lo indicizzerebbero, e da lì non si torna indietro
+  // cambiando una riga. Le pagine lo leggono lato server con `leggiContatto()`.
+  // Quando arriverà un numero aziendale, questa asserzione si toglie apposta.
+  {
+    const pubblico = Number((await q(
+      `select count(*) from public_config where key = 'whatsapp_number'`)).rows[0].count);
+    const esiste = Number((await q(
+      `select count(*) from app_config where key = 'whatsapp_number' and config_group = 'contacts'`)).rows[0].count);
+    pubblico === 0 && esiste === 1
+      ? ok('il numero WhatsApp esiste in app_config ma non esce da public_config')
+      : fail(`whatsapp_number: ${pubblico} righe pubbliche, ${esiste} nel gruppo contacts`);
+  }
+
   const axCols = (await q(`select column_name from information_schema.columns
                             where table_name='public_quiz_axes'`)).rows.map(r => r.column_name);
   !axCols.includes('weight')
@@ -1480,6 +1516,475 @@ console.log('\n== Il ponte Cal.com → bookings ==')
         where provider='cal' and error is not null`)).rows
     rotti.length === 0
       ? ok('nessun messaggio si è fermato su un errore')
+      : fail('messaggi in errore: ' + JSON.stringify(rotti))
+  }
+}
+
+// ===========================================================================
+// Il ponte Stripe (migration 0039)
+// ===========================================================================
+console.log('\n== Il ponte Stripe ==')
+{
+  const fxDir = path.join(root, 'tests/fixtures/stripe')
+  const fx = {}
+  for (const f of readdirSync(fxDir).filter(f => f.endsWith('.json'))) {
+    fx[f.replace(/^checkout_session_|\.json$/g, '')] = JSON.parse(readFileSync(path.join(fxDir, f), 'utf8'))
+  }
+
+  // Le due chiavi di commento aggiunte a mano quando le fixture sono state
+  // salvate, come per Cal.com.
+  const senzaMeta = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => !k.startsWith('_')))
+  const clone = (o) => JSON.parse(JSON.stringify(o))
+
+  let nEvt = 0
+  // Una variante di un messaggio. L'`id` dell'evento cambia sempre: per Stripe
+  // la chiave di diario è quella e basta, quindi senza un id nuovo ogni
+  // variante passerebbe per un doppio scatto di quella da cui deriva.
+  const evento = (base, patch = {}) => {
+    const b = clone(senzaMeta(base))
+    b.id = `evt_harness_${String(++nEvt).padStart(4, '0')}`
+    b.created = Math.floor(Date.now() / 1000)
+    for (const [via, val] of Object.entries(patch)) {
+      const parti = via.split('.')
+      let n = b
+      for (const p of parti.slice(0, -1)) n = n[p]
+      n[parti.at(-1)] = val
+    }
+    return b
+  }
+
+  // La firma di Stripe: HMAC-SHA256 su `"<t>.<corpo grezzo>"`, non sul solo
+  // corpo. È la differenza con Cal.com che rende sbagliato copiare l'altro ponte.
+  const firmaStripe = (raw, t = Math.floor(Date.now() / 1000)) =>
+    `t=${t},v1=` + crypto.createHmac('sha256', SEGRETO_STRIPE).update(`${t}.${raw}`, 'utf8').digest('hex')
+
+  const chiama = async (corpo, firma) => {
+    const raw = typeof corpo === 'string' ? corpo : JSON.stringify(corpo)
+    const r = await db.query('select stripe_webhook($1, $2) as esito', [raw, firma ?? firmaStripe(raw)])
+    return r.rows[0].esito
+  }
+  const nAlert = async (kind) =>
+    Number((await db.query('select count(*) from team_alerts where kind = $1', [kind])).rows[0].count)
+  const pagamento = async (sessione) =>
+    (await db.query('select * from payments where stripe_checkout_session_id = $1', [sessione])).rows[0]
+  const prenotazione = async (id) =>
+    (await db.query('select * from bookings where id = $1', [id])).rows[0]
+
+  // ---------------------------------------------------------------- il campo
+  // Il viaggiatore e il designer delle fixture Cal.com esistono già: qui
+  // servono solo prenotazioni in stati diversi, create direttamente perché
+  // riusare quelle del blocco precedente le legherebbe a com'è finito quello.
+  const VIAGGIATORE = '69a37b12-b899-47c4-9bdb-31a17d9cb986'
+  const P = (n) => `7f3e1c2a-0000-4000-8000-00000000000${n}`
+  const SESSIONE_FIXTURE = fx.completed.data.object.id
+
+  for (const [n, stato] of [[1, 'pending_payment'], [2, 'pending_payment'], [3, 'pending_payment'],
+                            [4, 'pending_payment'], [5, 'pending_payment'], [6, 'pending_payment'],
+                            [7, 'pending_payment']]) {
+    await db.query(
+      `insert into bookings (id, traveler_id, td_id, service_type, status, cal_booking_uid,
+                             cal_event_type_slug, starts_at, ends_at, original_starts_at,
+                             price_cents, payment_deadline_at, last_actor)
+       values ($1, $2, '11111111-1111-1111-1111-111111111111', 'consultation', $3,
+               'uid-stripe-' || $4, 'consulenza-xpetis-30',
+               now() + interval '3 days', now() + interval '3 days' + interval '30 minutes',
+               now() + interval '3 days', 6000, now() + interval '30 minutes', 'traveler')`,
+      [P(n), VIAGGIATORE, stato, String(n)])
+  }
+  // La quarta è quella su cui l'orologio ha già liberato lo slot.
+  await db.query(`update bookings set status='cancelled_unpaid', cancelled_at=now(),
+                   cancelled_by='system', last_actor='system' where id = $1`, [P(4)])
+
+  // Le casse aperte dal nostro server. La 5 di proposito NON ce l'ha: è il caso
+  // della riga di pagamento da ricostruire.
+  const sessioneDi = (n) => (n === 1 ? SESSIONE_FIXTURE : `cs_test_harness_000${n}`)
+  for (const n of [1, 2, 3, 4, 6]) {
+    await db.query(
+      `insert into payments (booking_id, kind, status, amount_cents, currency,
+                             stripe_account, client_reference_id, stripe_checkout_session_id, expires_at)
+       values ($1, 'consultation', 'pending', 6000, 'EUR', 'xpetis', $2, $3, now() + interval '30 minutes')`,
+      [P(n), P(n), sessioneDi(n)])
+  }
+  // La settima ha la riga ma **senza sessione**: è la corsa in cui la route ha
+  // scritto la riga, ha chiamato Stripe, e il webhook è arrivato prima che
+  // l'identificativo della sessione fosse registrato.
+  await db.query(
+    `insert into payments (booking_id, kind, status, amount_cents, currency,
+                           stripe_account, client_reference_id, expires_at)
+     values ($1, 'consultation', 'pending', 6000, 'EUR', 'xpetis', $2, now() + interval '30 minutes')`,
+    [P(7), P(7)])
+
+  // ------------------------------------------------------------------- firma
+  console.log('  -- la firma, che NON è quella di Cal.com --')
+  {
+    const raw = JSON.stringify(senzaMeta(fx.expired))
+    const v = (await db.query('select stripe_signature_ok($1,$2) as v', [raw, firmaStripe(raw)])).rows[0].v
+    v === true ? ok('firma valida verificata sui byte grezzi') : fail('firma valida rifiutata')
+  }
+  {
+    // La prova che l'HMAC è su `"<t>.<corpo>"` e non sul solo corpo: firmare
+    // come fa Cal.com non deve passare. Senza questa asserzione, un ponte che
+    // copia l'altro sembrerebbe funzionare finché non arriva Stripe davvero.
+    const raw = JSON.stringify(senzaMeta(fx.expired))
+    const t = Math.floor(Date.now() / 1000)
+    const allaCalcom = crypto.createHmac('sha256', SEGRETO_STRIPE).update(raw, 'utf8').digest('hex')
+    const v = (await db.query('select stripe_signature_ok($1,$2) as v', [raw, `t=${t},v1=${allaCalcom}`])).rows[0].v
+    v === false ? ok('firmare come Cal.com (solo il corpo) non passa') : fail('la firma alla Cal.com è passata')
+  }
+  {
+    const raw = JSON.stringify(senzaMeta(fx.expired))
+    const t = Math.floor(Date.now() / 1000) - 600
+    const firma = `t=${t},v1=` + crypto.createHmac('sha256', SEGRETO_STRIPE).update(`${t}.${raw}`, 'utf8').digest('hex')
+    const v = (await db.query('select stripe_signature_ok($1,$2) as v', [raw, firma])).rows[0].v
+    v === false
+      ? ok('firma valida ma vecchia di 10 minuti: fuori tolleranza, rifiutata')
+      : fail('una firma fuori tolleranza è passata: il rigioco è possibile')
+  }
+  {
+    const raw = JSON.stringify(senzaMeta(fx.expired))
+    const t = Math.floor(Date.now() / 1000) + 600
+    const firma = `t=${t},v1=` + crypto.createHmac('sha256', SEGRETO_STRIPE).update(`${t}.${raw}`, 'utf8').digest('hex')
+    const v = (await db.query('select stripe_signature_ok($1,$2) as v', [raw, firma])).rows[0].v
+    v === false ? ok('e nemmeno una datata dieci minuti nel futuro') : fail('firma dal futuro accettata')
+  }
+  {
+    // Rotazione del segreto: Stripe manda due `v1`, uno per parola segreta.
+    // Accettarne uno solo farebbe cadere il ponte proprio mentre si cambia la
+    // parola segreta.
+    const raw = JSON.stringify(senzaMeta(fx.expired))
+    const t = Math.floor(Date.now() / 1000)
+    const buona = crypto.createHmac('sha256', SEGRETO_STRIPE).update(`${t}.${raw}`, 'utf8').digest('hex')
+    const v = (await db.query('select stripe_signature_ok($1,$2) as v',
+      [raw, `t=${t},v1=${'0'.repeat(64)},v1=${buona}`])).rows[0].v
+    v === true ? ok('due v1 (rotazione del segreto): basta che uno combaci') : fail('rotazione del segreto: rifiutata')
+  }
+  {
+    const raw = JSON.stringify(senzaMeta(fx.expired))
+    const t = Math.floor(Date.now() / 1000)
+    const buona = crypto.createHmac('sha256', SEGRETO_STRIPE).update(`${t}.${raw}`, 'utf8').digest('hex')
+    const v = (await db.query('select stripe_signature_ok($1,$2) as v', [raw, `t=${t},v0=${buona}`])).rows[0].v
+    v === false ? ok('una firma di sola versione v0 non passa') : fail('v0 accettata')
+  }
+  for (const [etichetta, firma] of [
+    ['una firma sbagliata', `t=${Math.floor(Date.now() / 1000)},v1=${'a'.repeat(64)}`],
+    ['un header senza timestamp', `v1=${'a'.repeat(64)}`],
+    ['un header senza v1', `t=${Math.floor(Date.now() / 1000)}`],
+    ['un timestamp che non è un numero', `t=domani,v1=${'a'.repeat(64)}`],
+    ['una firma vuota', ''],
+    ['nessuna firma', null],
+  ]) {
+    const raw = JSON.stringify(senzaMeta(fx.expired))
+    const v = (await db.query('select stripe_signature_ok($1,$2) as v', [raw, firma])).rows[0].v
+    v === false ? ok(`${etichetta} non passa`) : fail(`${etichetta} è passata`)
+  }
+  {
+    const raw = JSON.stringify(senzaMeta(fx.expired))
+    const v = (await db.query('select stripe_signature_ok($1,$2) as v', [raw + ' ', firmaStripe(raw)])).rows[0].v
+    v === false ? ok('un corpo alterato di un solo carattere non passa più') : fail('corpo alterato passato')
+  }
+  {
+    const prima = Number((await db.query("select count(*) from webhook_events where provider='stripe'")).rows[0].count)
+    const e = await chiama(evento(fx.expired), `t=${Math.floor(Date.now() / 1000)},v1=${'b'.repeat(64)}`)
+    const dopo = Number((await db.query("select count(*) from webhook_events where provider='stripe'")).rows[0].count)
+    e.esito === 'firma_non_valida' && e.ok === false && dopo === prima
+      ? ok('firma non valida: nessuna riga nel diario, come per Cal.com')
+      : fail(`firma non valida gestita male: ${JSON.stringify(e)}, diario ${prima}→${dopo}`)
+  }
+
+  // ------------------------------------------------ checkout.session.completed
+  console.log('  -- checkout.session.completed --')
+  {
+    const e = await chiama(evento(fx.completed))
+    if (e.esito !== 'confermata') fail(`conferma: ${JSON.stringify(e)}`)
+    else {
+      ok('pagamento che combacia: prenotazione confermata')
+      const b = await prenotazione(P(1))
+      b.status === 'confirmed' ? ok('la prenotazione è confirmed') : fail('stato: ' + b.status)
+      b.confirmed_at ? ok('con confirmed_at valorizzato') : fail('confirmed_at vuoto')
+      b.last_actor === 'traveler'
+        ? ok('last_actor = traveler: ha pagato lui, n8n è il mezzo') : fail('last_actor: ' + b.last_actor)
+
+      const p = await pagamento(SESSIONE_FIXTURE)
+      p.status === 'paid' && p.paid_at ? ok('la riga di pagamento è paid') : fail('pagamento: ' + p.status)
+      p.stripe_payment_intent_id === 'pi_3UD5QwB5Y7cSwqYh1kZmR8Tq'
+        ? ok('il PaymentIntent è annotato: è il filo verso l\'incasso su Stripe')
+        : fail('payment_intent: ' + p.stripe_payment_intent_id)
+
+      const h = (await db.query(
+        `select from_status, to_status, actor from booking_status_history
+          where booking_id = $1 order by created_at`, [P(1)])).rows
+      h.at(-1).to_status === 'confirmed' && h.at(-1).actor === 'traveler'
+        ? ok('la storia registra chi ha pagato: è l\'unica prova, il TD non ha login')
+        : fail('storia: ' + JSON.stringify(h))
+
+      const w = (await db.query(
+        `select external_id, processed_at, error from webhook_events
+          where provider='stripe' order by received_at desc limit 1`)).rows[0]
+      w.processed_at && !w.error
+        ? ok('messaggio registrato nel diario e marcato lavorato') : fail('diario: ' + JSON.stringify(w))
+    }
+  }
+  {
+    // Stripe ritenta: stesso `evt_`, stessa chiave di diario. Nessuna
+    // composizione come per Cal.com — l'id lo dà il mittente.
+    const corpo = evento(fx.completed)
+    await chiama(corpo)
+    const e = await chiama(corpo)
+    e.esito === 'duplicato' && e.ok === true
+      ? ok('stesso evt_ due volte: duplicato riconosciuto')
+      : fail('doppio scatto: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(evento(fx.completed))
+    e.esito === 'gia_confermata' && e.ok === true
+      ? ok('completed su una prenotazione già confermata: niente da fare, e non è un guasto')
+      : fail('già confermata: ' + JSON.stringify(e))
+  }
+  {
+    // Lo scarto sull'importo non si conferma in silenzio. È il controllo che
+    // rende inutile manomettere la cassa: il prezzo vero sta in `bookings`.
+    const e = await chiama(evento(fx.completed, {
+      'data.object.id': sessioneDi(2),
+      'data.object.amount_total': 100,
+      'data.object.client_reference_id': P(2),
+      'data.object.metadata.booking_id': P(2),
+    }))
+    const b = await prenotazione(P(2))
+    const p = await pagamento(sessioneDi(2))
+    e.esito === 'importo_non_combacia' && e.ok === false
+      && b.status === 'pending_payment' && p.status === 'pending'
+      && await nAlert('stripe_importo_non_combacia') === 1
+      ? ok('1 € incassati su una consulenza da 60: alert critico, nessuna conferma')
+      : fail(`importo non combacia: ${JSON.stringify(e)}, prenotazione ${b.status}, pagamento ${p.status}`)
+  }
+  {
+    const e = await chiama(evento(fx.completed, {
+      'data.object.id': sessioneDi(2),
+      'data.object.currency': 'usd',
+      'data.object.client_reference_id': P(2),
+      'data.object.metadata.booking_id': P(2),
+    }))
+    e.esito === 'importo_non_combacia' && (await prenotazione(P(2))).status === 'pending_payment'
+      ? ok('importo giusto ma in dollari: stesso trattamento (è l\'adaptive pricing acceso)')
+      : fail('valuta diversa: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(evento(fx.completed, {
+      'data.object.id': 'cs_test_di_nessuno',
+      'data.object.client_reference_id': null,
+      'data.object.metadata': {},
+    }))
+    e.esito === 'prenotazione_sconosciuta' && await nAlert('stripe_pagamento_senza_prenotazione') === 1
+      ? ok('soldi incassati senza prenotazione a cui attaccarli: alert critico')
+      : fail('prenotazione sconosciuta: ' + JSON.stringify(e))
+  }
+  {
+    // Il caso che succederà davvero: l'orologio libera lo slot al minuto 30, il
+    // pagamento arriva al minuto 30 e qualcosa.
+    const e = await chiama(evento(fx.completed, {
+      'data.object.id': sessioneDi(4),
+      'data.object.client_reference_id': P(4),
+      'data.object.metadata.booking_id': P(4),
+    }))
+    const b = await prenotazione(P(4))
+    const p = await pagamento(sessioneDi(4))
+    e.esito === 'pagamento_su_prenotazione_chiusa' && b.status === 'cancelled_unpaid'
+      && p.status === 'paid' && await nAlert('stripe_pagamento_su_prenotazione_chiusa') === 1
+      ? ok('pagamento su uno slot già liberato: incasso registrato, prenotazione no, alert critico')
+      : fail(`pagamento su chiusa: ${JSON.stringify(e)}, ${b.status}, ${p.status}`)
+  }
+  {
+    // Metodi a notifica differita: `completed` arriva con l'incasso ancora per
+    // aria. Confermare qui vorrebbe dire regalare una consulenza.
+    const e = await chiama(evento(fx.completed, {
+      'data.object.id': sessioneDi(6),
+      'data.object.payment_status': 'unpaid',
+      'data.object.client_reference_id': P(6),
+      'data.object.metadata.booking_id': P(6),
+    }))
+    e.esito === 'pagamento_non_ancora_incassato' && (await prenotazione(P(6))).status === 'pending_payment'
+      && await nAlert('stripe_pagamento_differito') === 1
+      ? ok('completed con payment_status unpaid: si aspetta, non si conferma')
+      : fail('pagamento differito: ' + JSON.stringify(e))
+  }
+  {
+    // La riga di pagamento manca: la route era arrivata ad aprire la cassa e
+    // non a registrarla. Il registro si ricostruisce invece di restare monco.
+    const e = await chiama(evento(fx.completed, {
+      'data.object.id': 'cs_test_harness_0005',
+      'data.object.client_reference_id': P(5),
+      'data.object.metadata.booking_id': P(5),
+    }))
+    const p = await pagamento('cs_test_harness_0005')
+    e.esito === 'confermata' && (await prenotazione(P(5))).status === 'confirmed'
+      && p && p.status === 'paid' && p.stripe_account === 'xpetis'
+      && await nAlert('stripe_riga_pagamento_ricostruita') === 1
+      ? ok('pagamento senza riga in payments: riga ricostruita, conferma buona, alert al team')
+      : fail('riga ricostruita: ' + JSON.stringify(e))
+  }
+
+  {
+    // La corsa: riga scritta, sessione non ancora registrata. Il ripiego per
+    // prenotazione deve agganciare **quella** riga, non fabbricarne una nuova.
+    const e = await chiama(evento(fx.completed, {
+      'data.object.id': 'cs_test_harness_0007',
+      'data.object.client_reference_id': P(7),
+      'data.object.metadata.booking_id': P(7),
+    }))
+    const righe = (await db.query(
+      `select status, stripe_checkout_session_id from payments where booking_id = $1`, [P(7)])).rows
+    e.esito === 'confermata' && righe.length === 1
+      && righe[0].status === 'paid' && righe[0].stripe_checkout_session_id === 'cs_test_harness_0007'
+      && await nAlert('stripe_riga_pagamento_ricostruita') === 1
+      ? ok('webhook arrivato prima che la sessione fosse registrata: aggancia la riga che c\'è, non ne crea una seconda')
+      : fail(`corsa route/webhook: ${JSON.stringify(e)}, righe ${JSON.stringify(righe)}`)
+  }
+
+  // -------------------------------------------------- checkout.session.expired
+  console.log('  -- checkout.session.expired --')
+  {
+    const statoPrima = (await prenotazione(P(3))).status
+    const e = await chiama(evento(fx.expired, {
+      'data.object.id': sessioneDi(3),
+      'data.object.client_reference_id': P(3),
+      'data.object.metadata.booking_id': P(3),
+    }))
+    const p = await pagamento(sessioneDi(3))
+    const b = await prenotazione(P(3))
+    e.esito === 'scaduta' && p.status === 'expired' && b.status === statoPrima
+      ? ok('cassa scaduta: solo la riga di pagamento; la prenotazione NON si tocca')
+      : fail(`scadenza: ${JSON.stringify(e)}, pagamento ${p.status}, prenotazione ${b.status}`)
+    b.cancelled_at === null
+      ? ok('e lo slot non si libera qui: è compito dell\'orologio, in un posto solo')
+      : fail('la scadenza della cassa ha cancellato la prenotazione')
+  }
+  {
+    const e = await chiama(evento(fx.expired, { 'data.object.id': SESSIONE_FIXTURE }))
+    e.esito === 'gia_chiusa' && (await pagamento(SESSIONE_FIXTURE)).status === 'paid'
+      ? ok('expired su una cassa già pagata: il pagamento non si declassa')
+      : fail('expired su pagata: ' + JSON.stringify(e))
+  }
+  {
+    // La sessione non la conosciamo ma la prenotazione sì, e ha una cassa
+    // ancora viva: la scadenza NON deve toccarla. Vale solo per la sessione che
+    // la porta — su un `completed` invece il ripiego per prenotazione ricuce il
+    // registro, ed è la differenza fra i due casi.
+    const vivaPrima = (await db.query(
+      'select status from payments where stripe_checkout_session_id = $1', [sessioneDi(6)])).rows[0].status
+    const e = await chiama(evento(fx.expired, {
+      'data.object.id': 'cs_test_mai_vista',
+      'data.object.client_reference_id': P(6),
+      'data.object.metadata.booking_id': P(6),
+    }))
+    const vivaDopo = (await db.query(
+      'select status from payments where stripe_checkout_session_id = $1', [sessioneDi(6)])).rows[0].status
+    e.esito === 'pagamento_sconosciuto' && e.ok === true
+      && vivaPrima === 'pending' && vivaDopo === 'pending'
+      ? ok('expired di una sessione ignota: si annota, e la cassa viva di quella prenotazione resta aperta')
+      : fail(`expired sconosciuta: ${JSON.stringify(e)}, cassa viva ${vivaPrima}→${vivaDopo}`)
+  }
+
+  // ------------------------------------------------------------ il contorno
+  console.log('  -- rimborsi, eventi non gestiti, corpi storti --')
+  {
+    const e = await chiama(evento(fx.completed, { type: 'charge.refunded' }))
+    const n = Number((await db.query(
+      `select count(*) from event_log where event='stripe_rimborso'`)).rows[0].count)
+    e.esito === 'rimborso_annotato' && e.ok === true && n === 1
+      ? ok('rimborso: annotato e basta, le regole sono milestone 5')
+      : fail('rimborso: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(evento(fx.completed, { type: 'customer.created' }))
+    e.esito === 'evento_non_gestito' && e.ok === true
+      ? ok('evento fuori dal nostro giro: annotato, non un guasto') : fail('non gestito: ' + JSON.stringify(e))
+  }
+  {
+    const e = await chiama(evento(fx.completed, { data: { object: null } }))
+    e.esito === 'corpo_non_riconosciuto'
+      ? ok('corpo firmato ma senza data.object: esito, non errore') : fail('senza oggetto: ' + JSON.stringify(e))
+  }
+  {
+    const raw = 'questo non è json'
+    const e = (await db.query('select stripe_webhook($1,$2) as esito', [raw, firmaStripe(raw)])).rows[0].esito
+    e.esito === 'corpo_non_json'
+      ? ok('corpo firmato ma non JSON: esito, non errore') : fail('non json: ' + JSON.stringify(e))
+  }
+
+  // ----------------------------------------------------- una sola cassa aperta
+  console.log('  -- una sola cassa aperta per prenotazione --')
+  await expectFail('seconda cassa aperta sulla stessa prenotazione', `
+    insert into payments (booking_id, kind, status, amount_cents, stripe_account, stripe_checkout_session_id)
+    values ('${P(6)}', 'consultation', 'pending', 6000, 'xpetis', 'cs_test_doppione')`,
+    'payments_one_pending_per_kind')
+  await expectOk('ma una cassa nuova dopo che la precedente è scaduta, sì', `
+    update payments set status='expired' where booking_id='${P(6)}' and status='pending';
+    insert into payments (booking_id, kind, status, amount_cents, stripe_account, stripe_checkout_session_id)
+    values ('${P(6)}', 'consultation', 'pending', 6000, 'xpetis', 'cs_test_seconda_buona')`)
+
+  // ------------------------------------------------------- su quale conto incassa
+  console.log('  -- su quale conto incassa (deviazione 9) --')
+  {
+    const r = (await db.query('select * from consultation_payment_account()')).rows[0]
+    r.stripe_account === 'xpetis' && r.agency_id === null
+      ? ok('oggi incassa xpetis, e l\'agenzia non serve') : fail('conto: ' + JSON.stringify(r))
+  }
+  {
+    await db.query(`update app_config set value_text='agency' where key='consultation_stripe_account'`)
+    await db.query(`update agencies set is_default_partner=false, is_active=true`)
+    let esploso = false
+    try { await db.query('select * from consultation_payment_account()') } catch { esploso = true }
+    esploso
+      ? ok('conto agency senza agenzia partner: fallisce con una frase leggibile, invece che su un check')
+      : fail('agency senza agenzia è passata')
+
+    await db.query(`insert into agencies (id, name, operational_email, is_default_partner)
+                    values ('aaaaaaaa-0000-4000-8000-000000000001','Agenzia di prova','ops@example.com', true)
+                    on conflict (id) do update set is_default_partner = true`)
+    const r = (await db.query('select * from consultation_payment_account()')).rows[0]
+    r.stripe_account === 'agency' && r.agency_id === 'aaaaaaaa-0000-4000-8000-000000000001'
+      ? ok('con l\'agenzia partner attiva: conto agency e il suo id, che payments_agency_required pretende')
+      : fail('conto agency: ' + JSON.stringify(r))
+
+    await db.query(`update app_config set value_text='xpetis' where key='consultation_stripe_account'`)
+  }
+  {
+    // Il default della colonna non si tocca: il passaggio è la riga di
+    // app_config, non una migration.
+    const d = (await db.query(
+      `select column_default from information_schema.columns
+        where table_name='payments' and column_name='stripe_account'`)).rows[0].column_default
+    String(d).includes('xpetis')
+      ? ok('il default della colonna stripe_account resta xpetis, come dice il PIANO')
+      : fail('default cambiato: ' + d)
+  }
+
+  // ------------------------------------------------------------ la superficie
+  console.log('  -- chi può chiamare il ponte --')
+  for (const f of ['stripe_webhook(text,text)', 'stripe_webhook_secret()',
+                   'stripe_signature_ok(text,text,integer)', 'consultation_payment_account()']) {
+    for (const ruolo of ['anon', 'authenticated']) {
+      const v = (await db.query(`select has_function_privilege($1, $2, 'EXECUTE') as v`, [ruolo, f])).rows[0].v
+      v === false ? ok(`${ruolo} non può chiamare ${f.split('(')[0]}`) : fail(`${ruolo} può chiamare ${f}`)
+    }
+  }
+  {
+    const v = (await db.query(
+      `select has_function_privilege('service_role', 'stripe_webhook(text,text)', 'EXECUTE') as v`)).rows[0].v
+    v === true ? ok('service_role sì: è la chiave secret che usa n8n') : fail('service_role non può chiamare il ponte')
+  }
+  {
+    const cols = (await db.query(
+      `select column_name from information_schema.columns where table_name='my_bookings'`)).rows.map(r => r.column_name)
+    cols.includes('payment_deadline_at') && !cols.includes('cal_booking_uid')
+      ? ok('my_bookings dà la scadenza del pagamento e continua a non dare cal_booking_uid')
+      : fail('my_bookings: ' + JSON.stringify(cols))
+  }
+  {
+    const rotti = (await db.query(
+      `select external_id, error from webhook_events where provider='stripe' and error is not null`)).rows
+    rotti.length === 0
+      ? ok('nessun messaggio Stripe si è fermato su un errore')
       : fail('messaggi in errore: ' + JSON.stringify(rotti))
   }
 }

@@ -74,6 +74,8 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0035_geo_accent_insensitive.sql` | `name_norm` sulle tabelle geo: "peru" trova "Perù" |
 | `0036_tags_for_destination.sql` | La maschera contestuale dei filtri |
 | `0037_calcom_webhook.sql` | Il ponte Cal.com → `bookings`: firma, diario, creazione, riprogrammazione, cancellazione |
+| `0038_checkout_consulenza.sql` | Una sola cassa aperta per prenotazione, la scadenza in `my_bookings`, il Payment Link non più richiesto |
+| `0039_stripe_webhook.sql` | Il ponte Stripe → `payments`/`bookings`: firma con tolleranza, diario, conferma con verifica dell'importo |
 
 ## La geografia
 
@@ -357,6 +359,90 @@ nell'ambiente (o da `.env.local`, che non è versionato). Se non la trova, il
 ponte si prova comunque con una parola inventata e il test **dice** che le firme
 vere non sono state verificate, invece di tacerlo.
 
+## Il ponte Stripe
+
+`stripe_webhook(p_corpo text, p_firma text)`, e la forma è **la stessa** della
+0037: n8n passa il corpo grezzo e la firma, non guarda dentro, e risponde sempre
+2xx. Due ponti identici nella forma sono due ponti che una persona sola può
+tenere in testa. Quello che cambia sono tre dettagli di protocollo, e sono
+esattamente i punti in cui copiare l'altro ponte sarebbe stato un errore.
+
+**La firma non è quella di Cal.com.** Header `Stripe-Signature`, formato
+`t=<timestamp>,v1=<hex>`, e l'HMAC-SHA256 si calcola su **`"<t>.<corpo grezzo>"`**
+— non sul solo corpo. Due conseguenze che l'harness verifica una per una: firmare
+"alla Cal.com" non passa, e le coppie `v1` possono essere **più di una** (durante
+una rotazione del segreto Stripe ne manda due, e ne basta una che combaci —
+accettarne una sola farebbe cadere il ponte proprio mentre si cambia parola
+segreta). C'è poi una **finestra di tolleranza di 5 minuti**: senza, una firma
+valida intercettata resta valida per sempre. La parola segreta sta in Supabase
+Vault sotto `stripe_webhook_secret`, accanto a quella di Cal.com.
+
+I 5 minuti sono l'eccezione consapevole alla regola "nessun numero nel codice":
+sono un argomento con default della funzione e non una riga di `app_config`,
+perché quella regola esiste per i parametri di prodotto che il team cambia da
+Studio — e una riga mancante o messa a zero disattiverebbe in silenzio la
+protezione. Un parametro di sicurezza che si guasta *aprendo* è peggio del numero
+scritto.
+
+**Il diario è più semplice.** Stripe manda un `id` di evento (`evt_…`), quindi
+`webhook_events.external_id` è quello e basta. La chiave composta della 0037
+esisteva solo perché Cal.com un id non lo dà.
+
+**L'importo si ricontrolla, sempre.** Una consulenza si conferma solo se
+`amount_total` combacia con `bookings.price_cents` **e** la valuta è EUR.
+Altrimenti: alert critico, prenotazione non confermata, riga di pagamento lasciata
+`pending` — marcarla `paid` con un importo sbagliato renderebbe il registro
+sbagliato quanto il silenzio. Il controllo sulla valuta ha già trovato una cosa
+vera: Stripe accende l'**adaptive pricing** di default, e con quello acceso una
+sessione può incassare nella valuta del visitatore. La route lo spegne
+esplicitamente; se un giorno riaccendesse da sé, ce ne accorgeremmo da un alert
+invece che da un bilancio storto.
+
+**Gli altri casi, che sono quelli che succedono davvero:**
+
+| Cosa arriva | Cosa facciamo |
+|---|---|
+| `completed` con `payment_status` diverso da `paid` (metodi a notifica differita) | Si aspetta. Confermare qui vorrebbe dire regalare una consulenza |
+| `completed` su una prenotazione già `confirmed` | `gia_confermata`, e non è un guasto |
+| `completed` su una prenotazione già chiusa dall'orologio | **Alert critico.** L'incasso si registra (i soldi sono veri), la prenotazione no: lo slot è già stato dato via. È il caso del pagamento al minuto 30 e qualcosa |
+| `completed` su una sessione senza riga in `payments` | La riga si ricostruisce, leggendo il conto dalla stessa funzione che usa la route, più un alert. Il registro non resta monco |
+| `expired` | **Solo** la riga di pagamento va a `expired`. La prenotazione non si tocca e lo slot non si libera: cancellare su Cal.com è compito dell'orologio, e il liberamento deve avvenire in un posto solo |
+| Rimborsi | Si annotano in `event_log` e basta. Le regole sono milestone 5, e dopo la deviazione 9 il tasto "rimborsa" è in mano all'agenzia |
+
+Il ripiego "cerca la riga per prenotazione quando non conosco la sessione" vale
+**solo sul `completed`**, ed è una distinzione che il test ha trovato prima di
+noi: su un `expired` lo stesso ripiego chiuderebbe la cassa *nuova* di quella
+prenotazione mentre il viaggiatore ci sta pagando dentro.
+
+**Su quale conto si incassa non sta nel codice.** `consultation_payment_account()`
+legge `app_config.consultation_stripe_account` (oggi `xpetis`, in produzione
+`agency` — deviazione 9 del `PIANO.md`) e, quando dice `agency`, restituisce
+l'agenzia partner di default che `payments_agency_required` pretende. Il
+**default della colonna `payments.stripe_account` non si tocca**: il passaggio è
+una riga da Studio. La stessa funzione la usano la route che apre la cassa e il
+ponte che ricostruisce una riga mancante — due letture dello stesso parametro
+sono due occasioni di divergere.
+
+**Una sola cassa aperta per prenotazione**, e per costruzione:
+`payments_one_pending_per_kind` (0038) è il gemello di
+`payments_one_paid_per_kind` sul lato "in attesa". Serve perché fra il `select`
+che non trova una cassa e l'`insert` che la crea c'è una finestra, e un doppio
+clic ci passa dentro due volte. Per lo stesso motivo la route inserisce la riga
+**prima** di chiamare Stripe: così la seconda richiesta si ferma sull'indice
+senza aver creato nessuna sessione da ripulire.
+
+Sulle **fixture**, una differenza onesta rispetto a Cal.com. Il
+`checkout.session.expired` in `tests/fixtures/stripe/` è vero: la sessione è
+stata creata sulla sandbox con l'API e chiusa con
+`POST /v1/checkout/sessions/:id/expire`. Il `checkout.session.completed` invece è
+**ricostruito** — involucro e oggetto sono quelli veri, cambiano solo i campi che
+Stripe cambia quando una sessione si chiude pagata — perché completare una
+Checkout Session richiede di pagare a mano sulla pagina ospitata: il suo
+PaymentIntent non si può confermare via API, e nella versione `2026-07-29.dahlia`
+nasce addirittura nullo. E **nessuna delle due porta una firma vera**: non sono
+passate da un endpoint webhook. Quello che l'harness verifica è l'algoritmo, e lo
+verifica su tutti i modi in cui può sbagliare.
+
 ## La pubblicazione di un profilo
 
 `td_publish_blockers(td_id)` restituisce i motivi che impediscono di pubblicare:
@@ -432,6 +518,9 @@ numerico, modificabile a vista da Supabase Studio senza deploy:
 - `booking_rules` — preavviso 12h, orizzonte 30gg, finestra di pagamento 30min, rimborso 24h, limiti di riprogrammazione (5 / 2 / 20 giorni), 15 minuti di attesa in call
 - `orders` — silenzio-conferma 48h, revisione 5 giorni, acconto 30%
 - `reviews` — buon viaggio 3 giorni prima, recensione viaggio 3 giorni dopo, alert sotto le 3 stelle
+- `payments` — su quale conto Stripe incassa una consulenza (`xpetis` oggi, `agency` in produzione)
+- `showcase` — le stringhe che il sito stampa in pagina: la nota sotto il prezzo degli itinerari
+- `contacts` — i recapiti del team (numero WhatsApp), **fuori** dalla superficie pubblica
 
 Il sito legge dalla vista `public_config` i gruppi `booking_rules` e `showcase`;
 `matching` è chiuso dalla 0018 (il match è lato server) e i parametri operativi
@@ -445,6 +534,23 @@ in un workflow. Il primo parametro di testo è `ready_itinerary_price_note`
 ("volo non incluso • IVA inclusa"), gruppo `showcase`: dice cosa comprende un
 prezzo, quindi si cambia da Studio e non con un deploy. Svuotarlo lo fa sparire
 dalla pagina.
+
+Le altre due righe di testo sono arrivate con la cassa, ed entrambe stanno in
+gruppi che `public_config` **non** espone. `consultation_stripe_account` (gruppo
+`payments`) dice chi incassa, e al browser non serve saperlo.
+`whatsapp_number` (gruppo `contacts`) è il numero del team, **provvisorio**:
+oggi è un cellulare personale, e `public_config` è leggibile da chiunque senza
+nemmeno una sessione — i raccoglitori di contatti lo indicizzerebbero, e da lì
+non si torna indietro cambiando una riga. Un dato che il nostro server scrive in
+pagina dove serve non è la stessa cosa di un dato che l'API serve in blocco: le
+pagine lo leggono con `leggiContatto()` in `lib/config.ts`, che passa dalla
+chiave secret. Il giorno del numero aziendale dedicato può tornare in `showcase`.
+
+⚠️ **Un database già seminato non le ha.** Il seed si applica a `db reset`, e i
+parametri nuovi arrivano da lì: su un progetto vivo si rigira
+`seed/0001_config.sql`, che è idempotente (`on conflict (key) do nothing`), o si
+inseriscono le due righe a mano. Senza `consultation_stripe_account` la cassa non
+si apre e lo dice con una frase leggibile, invece di indovinare un conto.
 
 ## Note sul modello dati
 

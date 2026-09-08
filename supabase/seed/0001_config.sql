@@ -102,3 +102,46 @@ insert into app_config (key, value, value_text, config_group, label_it, notes) v
    'Nota sotto il prezzo degli itinerari pronti',
    'Vale per tutti gli itinerari di tutti i designer: il form non raccoglie questo dato riga per riga. Testo del Figma 261:1068.')
 on conflict (key) do nothing;
+
+-- Su quale conto Stripe incassa una consulenza (deviazione 9 del PIANO, 6
+-- settembre 2026). Oggi `xpetis`, cioè la nostra sandbox; in produzione
+-- `agency`, perché XPETIS come entità legale non esiste e la partita IVA è
+-- dell'agenzia affiliata. Il **default della colonna `payments.stripe_account`
+-- non si tocca**: il passaggio è questa riga, cambiata da Studio, non un deploy.
+-- La legge `consultation_payment_account()` (migration 0039), che quando dice
+-- `agency` va a prendere l'agenzia partner di default.
+--
+-- Gruppo `payments`, che `public_config` non espone: al browser non serve sapere
+-- chi incassa, e la cassa la apre comunque il server.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('consultation_stripe_account', null, 'xpetis', 'payments',
+   'Conto Stripe che incassa le consulenze',
+   'xpetis oppure agency. Con agency serve un''agenzia partner attiva: payments_agency_required la pretende.')
+on conflict (key) do nothing;
+
+-- Il numero WhatsApp del team. È **provvisorio** e va sostituito: sta qui e non
+-- nel codice proprio perché sostituirlo dev'essere una riga da Studio. Lo usa il
+-- percorso "slot introvabile" e ogni pagina che offre di parlare con una
+-- persona quando la macchina non basta.
+--
+-- ## Perché `contacts` e non `showcase`
+--
+-- La prima versione lo metteva in `showcase`, cioè fra i parametri che
+-- `public_config` serve ad `anon`. Era sbagliato, e non per un principio: oggi
+-- quel numero è il **cellulare personale di Simone**, prestato in attesa di un
+-- numero dedicato. `public_config` è leggibile dal browser di chiunque senza
+-- nemmeno una sessione, quindi il numero finirebbe negli indici dei crawler che
+-- raccolgono contatti — e da lì non si torna indietro cambiando una riga.
+--
+-- Un dato che il visitatore legge in pagina non è la stessa cosa di un dato
+-- servito a chiunque interroghi l'API: nel primo caso lo mette lì il nostro
+-- server, dove serve; nel secondo si raccoglie in blocco. Le pagine lo leggono
+-- con `leggiContatto()` in `lib/config.ts`, che passa dalla chiave secret.
+--
+-- Il giorno che arriva un numero aziendale dedicato, questa riga può tornare in
+-- `showcase` e la lettura semplificarsi: cambia il gruppo, non il resto.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('whatsapp_number', null, '+39 347 891 1018', 'contacts',
+   'Numero WhatsApp del team',
+   'PROVVISORIO: cellulare personale, non un numero aziendale. Per questo il gruppo è `contacts`, che public_config non espone. Formato internazionale con spazi: chi costruisce un link wa.me toglie spazi e "+".')
+on conflict (key) do nothing;

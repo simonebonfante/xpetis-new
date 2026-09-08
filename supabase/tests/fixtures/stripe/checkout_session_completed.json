@@ -1,0 +1,151 @@
+{
+  "_nota": "checkout.session.completed RICOSTRUITO, e vale la pena sapere da cosa. L'involucro dell'evento e l'oggetto `checkout.session` sono quelli VERI della sandbox (stesso `api_version`, stessa forma campo per campo): l'unico modo di ottenere un `completed` autentico è pagare a mano sulla pagina ospitata di Stripe, perché il PaymentIntent di una Checkout Session non si può confermare via API — nella versione 2026-07-29.dahlia nasce addirittura nullo. Rispetto al `expired` vero cambiano solo i campi che Stripe cambia quando una sessione si chiude pagata: `type`, `status`, `payment_status`, `payment_intent`, `customer_details`, `id` e `created` dell'evento. Niente è stato inventato di struttura.",
+  "id": "evt_1UD5QwB5Y7cSwqYhpJ3vN4Le",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1788797970,
+  "data": {
+    "object": {
+      "id": "cs_test_a1j6TfOmsg4lro5z03lcVmiGEM82VDR2VFbuj0lrSIFMmc35dhgHNyG99b",
+      "object": "checkout.session",
+      "adaptive_pricing": {
+        "enabled": true
+      },
+      "after_expiration": null,
+      "allow_promotion_codes": null,
+      "allowed_payment_method_types": null,
+      "amount_subtotal": 6000,
+      "amount_total": 6000,
+      "automatic_tax": {
+        "enabled": false,
+        "liability": null,
+        "provider": null,
+        "status": null
+      },
+      "billing_address_collection": null,
+      "branding_settings": {
+        "background_color": "#ffffff",
+        "border_style": "rounded",
+        "button_color": "#0074d4",
+        "display_name": "Sandbox di xpetis",
+        "font_family": "default",
+        "icon": null,
+        "logo": null
+      },
+      "cancel_url": "https://example.com/prenotazione/7f3e1c2a-0000-4000-8000-000000000001",
+      "client_reference_id": "7f3e1c2a-0000-4000-8000-000000000001",
+      "client_secret": null,
+      "collected_information": null,
+      "consent": null,
+      "consent_collection": null,
+      "created": 1788797887,
+      "currency": "eur",
+      "currency_conversion": null,
+      "custom_fields": [],
+      "custom_text": {
+        "after_submit": null,
+        "shipping_address": null,
+        "submit": null,
+        "terms_of_service_acceptance": null
+      },
+      "customer": null,
+      "customer_account": null,
+      "customer_creation": "if_required",
+      "customer_details": {
+        "address": {
+          "city": null,
+          "country": "IT",
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": "pinco.pallino@example.com",
+        "name": "Pinco Pallino",
+        "phone": null,
+        "tax_exempt": "none",
+        "tax_ids": []
+      },
+      "customer_email": null,
+      "discounts": [],
+      "expires_at": 1788800286,
+      "integration_identifier": null,
+      "invoice": null,
+      "invoice_creation": {
+        "enabled": false,
+        "invoice_data": {
+          "account_tax_ids": null,
+          "custom_fields": null,
+          "description": null,
+          "footer": null,
+          "issuer": null,
+          "metadata": {},
+          "rendering_options": null
+        }
+      },
+      "livemode": false,
+      "locale": null,
+      "managed_payments": {
+        "enabled": false
+      },
+      "metadata": {
+        "booking_id": "7f3e1c2a-0000-4000-8000-000000000001",
+        "xpetis": "consultation"
+      },
+      "mode": "payment",
+      "origin_context": null,
+      "payment_intent": "pi_3UD5QwB5Y7cSwqYh1kZmR8Tq",
+      "payment_link": null,
+      "payment_method_collection": "if_required",
+      "payment_method_configuration_details": {
+        "id": "pmc_1U2GUZB5Y7cSwqYhRQPSe5km",
+        "parent": null
+      },
+      "payment_method_options": {
+        "card": {
+          "request_three_d_secure": "automatic"
+        }
+      },
+      "payment_method_types": [
+        "card",
+        "bancontact",
+        "eps",
+        "klarna",
+        "link",
+        "mb_way",
+        "amazon_pay",
+        "satispay"
+      ],
+      "payment_status": "paid",
+      "permissions": null,
+      "phone_number_collection": {
+        "enabled": false
+      },
+      "recovered_from": null,
+      "saved_payment_method_options": null,
+      "setup_intent": null,
+      "shipping_address_collection": null,
+      "shipping_cost": null,
+      "shipping_options": [],
+      "status": "complete",
+      "submit_type": null,
+      "subscription": null,
+      "success_url": "https://example.com/prenotazione/7f3e1c2a-0000-4000-8000-000000000001",
+      "total_details": {
+        "amount_discount": 0,
+        "amount_shipping": 0,
+        "amount_tax": 0
+      },
+      "ui_mode": "hosted_page",
+      "url": null,
+      "wallet_options": null
+    }
+  },
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "checkout.session.completed"
+}

@@ -52,10 +52,48 @@ entrate nel progetto Supabase vero anche le migration `0033`-`0036`, che erano
 state applicate a mano dal SQL Editor senza essere registrate nella storia delle
 migration: ora la storia e il database dicono la stessa cosa.
 
+**Aggiornamento del 7 settembre 2026.** Il giro del pagamento della consulenza è
+chiuso: dalla prenotazione alla cassa alla conferma. Il ponte Stripe
+(`0039_stripe_webhook.sql`) ha **la stessa forma** di quello Cal.com — n8n
+fattorino, tutta la decisione in una funzione Postgres — e la route
+`app/prenotazione/[id]/cassa/route.ts` apre la Checkout Session leggendo
+l'importo da `bookings.price_cents`. Harness a **343 asserzioni** (erano 284),
+tutte verdi.
+
+**Aggiornamento dell'8 settembre 2026 — collaudato in sandbox, e passato.**
+Migration applicate, workflow Stripe attivo su n8n, endpoint creato nella sandbox
+con API version `2026-07-29.dahlia`, `whsec_` in Vault. Un pagamento vero da
+60 € ha attraversato tutta la catena: prenotazione **`confirmed`**, pagamento
+**`paid`**, `processed_at` pieno e **`team_alerts` vuoto** — quindi importo
+combaciante, adaptive pricing neutralizzato, e percorso normale invece di quello
+di recupero.
+
+Con questo **cade il limite dichiarato il 7 settembre**: la fixture del
+`completed` era ricostruita, e l'unico percorso su cui passano i soldi non era
+mai stato attraversato da un payload Stripe autentico. Ora firma, controllo
+dell'importo e conferma sono stati esercitati su un evento vero.
+
+⚠️ **Il giro è stato costruito dal centro verso i bordi, e i bordi mancano
+entrambi.** Da un lato l'orologio dei 5 minuti: nessuna prenotazione non pagata
+scade, e nessuno slot si libera. Dall'altro l'**imbocco**: il tasto *Prenota la
+call* sulla vetrina è `disabled` per scelta, l'iframe Cal.com non è incorporato,
+e nel sito non esiste nessun bottone per entrare — il login funziona ma si
+raggiunge solo da `/prova`. Il collaudo dell'8 settembre ha saltato l'imbocco
+incollando il codice XPETIS a mano. **Oggi la milestone 4 funziona e non si
+vede.**
+
 ### Cosa resta a te
 
-- **S-08**, numero WhatsApp. Non dipende da nulla, mezz'ora.
-- **Stripe**: fermo sulla questione societaria, non sulla tecnica.
+- ~~**S-08**, numero WhatsApp~~ → **chiuso in via provvisoria il 6 settembre**:
+  +39 347 891 1018, numero personale prestato. Da sostituire prima del pubblico.
+- ~~**"Chi è il venditore"**~~ → **deciso il 6 settembre: l'agenzia affiliata**,
+  su tutto, non solo sull'All Inclusive. Deviazione 9. Da qui discendono due
+  cose che restano tue: **chi preme il tasto "rimborsa"** in agenzia e con quali
+  tempi, e **come si tocca il loro Stripe** — le loro chiavi in mano nostra sono
+  una responsabilità che non vogliamo, Stripe Connect è la strada pulita.
+- ~~**Stripe**: non è più fermo~~ → **costruito il 7 settembre in sandbox**. Il
+  passaggio al conto dell'agenzia è la riga `app_config.consultation_stripe_account`,
+  come previsto. Ti restano l'endpoint webhook e lo `whsec_…` in Vault.
 - **Guardare le quattro pagine accanto al Figma** e dirmi cosa non torna: è la
   cosa che vale più di tutte adesso, perché io non ho un browser e le pagine sono
   verificate sul dato, non sull'occhio.
@@ -74,9 +112,12 @@ migration: ora la storia e il database dicono la stessa cosa.
 2. ~~**Il ponte Cal.com → `bookings`**~~ → **fatto il 6 settembre**, e non in
    n8n ma nel database: `0037_calcom_webhook.sql`, con n8n ridotto a quattro
    nodi che non decidono niente. Provato sull'indirizzo di produzione.
-3. **Il suggeritore destinazioni** sulla tassonomia: è logica, non grafica, e
+3. **L'orologio unico dei 5 minuti**: è il pezzo che manca perché il giro del
+   pagamento si chiuda da solo — oggi una cassa scaduta lascia lo slot occupato
+   su Cal.com finché non lo guarda qualcuno.
+4. **Il suggeritore destinazioni** sulla tassonomia: è logica, non grafica, e
    funziona indipendentemente da come sarà disegnata la barra di ricerca.
-4. Chiudere la milestone 3 dalla mia parte: ricerca accento-insensibile
+5. Chiudere la milestone 3 dalla mia parte: ricerca accento-insensibile
    ("peru" non trova "Perù"), maschera contestuale dei filtri, test del match sui
    25 profili.
 
@@ -113,14 +154,34 @@ tassonomia geografica.
 | 6 | "La barra di ricerca normalizza qualunque input a un paese" (§1) | Filtrano **paesi e macro-aree**. Città e continenti sono solo navigazione: la città porta al suo paese, il continente alle sue macro-aree | La tassonomia dichiara selezionabili anche le macro-aree, e cercare "Sud America" è una richiesta legittima | 8 ago |
 | 7 | *(deviazione dalla tassonomia)* Le 20 regioni italiane sono dichiarate selezionabili | **Non filtrano.** Nessun quinto livello di filtro: come trattarle si deciderà | Il dato della tassonomia non si perde: `is_selectable` conserva la sua intenzione, `is_filterable` dice cosa filtra oggi. Sono le uniche 20 righe su cui i due valori differiscono, e l'harness lo verifica | 8 ago |
 | 8 | "Colore brand: verde `#1b5e24`" (§0) | La palette è **crema `#F0EEDF`, nero `#1C1C1A`, primario `#E53619`**, con Merriweather Bold sui titoli e Ronzino Regular sul testo | Sono i token del Figma, e concordano con il form Vetrina TD, che usa le stesse due tinte. Il verde non compare in nessuno dei due: è un dato più vecchio del design | 9 ago |
+| 9 | Consulenze e itinerario su misura incassano sul conto XPETIS; solo l'All Inclusive sul conto dell'agenzia (§4) | **Incassa l'agenzia affiliata su tutto.** È lei ad avere ragione sociale e partita IVA; XPETIS come entità legale non esiste e non esisterà nel primo periodo | Senza partita IVA Stripe non attiva i pagamenti veri, e costituire una società non è nei tempi. Conseguenza operativa: **il tasto "rimborsa" è in mano all'agenzia**, quindi rimborsi, no-show e arbitrati diventano richieste a qualcun altro, con i suoi tempi | 6 set |
 
 **Conseguenza della 5, da non perdere di vista.** Le mail native di Cal.com
 contengono i link *cancella* e *riprogramma*, e cancellare su Cal.com richiede
 solo il codice della prenotazione, senza credenziali. Il viaggiatore ha quindi
 **sempre** una via per cancellare fuori dal nostro flusso, e non possiamo
 impedirlo. Le regole di rimborso non si difendono controllando l'accesso al
-link: **si applicano da n8n sul webhook `BOOKING_CANCELLED`**, guardando quanto
+link: **si applicano alla ricezione di `BOOKING_CANCELLED`**, guardando quanto
 manca alla call. Vale anche per il caso 4.
+
+*Aggiornamento del 6 settembre:* quella ricezione non è più "in n8n". Dal ponte
+`0037_calcom_webhook.sql` **n8n non decide niente**: registra chi ha cancellato,
+quando e quante ore mancavano alla call, e le regole di rimborso si applicheranno
+sopra quei dati, nel database. n8n resta il fattorino.
+
+**Conseguenza della 9, da decidere prima della produzione.** Lo schema è già
+pronto — `payments.stripe_account` è un enum `xpetis | agency` e
+`payments_agency_required` obbliga l'`agency_id` quando incassa l'agenzia — ma il
+**valore di default oggi è `xpetis`**, che con questa decisione diventa falso in
+produzione. Non si cambia il default: **quale conto incassa una consulenza va in
+`app_config`**, così passare all'agenzia è una riga da Studio e non un deploy.
+Fino a lì i test girano sul nostro Stripe sandbox, cioè `xpetis`.
+
+Resta aperta la domanda che questa decisione rende urgente e che prima era
+rimandata: **come si tocca il conto Stripe dell'agenzia.** Le loro chiavi in
+mano nostra sono una responsabilità che non vogliamo (e `CLAUDE.md` vieta di
+metterle in colonna); **Stripe Connect** è la strada che non ce le fa mai
+vedere. Da chiarire con l'agenzia, non con il codice.
 
 ---
 
@@ -132,7 +193,7 @@ manca alla call. Vale anche per il caso 4.
 | 1 | Import dei dati reali | 🟡 **a metà** — geografia dentro; le 25 vetrine per ultime, per scelta | 2-3 sessioni | 8-12 h |
 | 2 | Infrastruttura e accessi | 🟡 **in corso** | 2 sessioni | 7-9 h |
 | 3 | Sito pubblico: ricerca, quiz, match, vetrina | 🟡 **le quattro pagine disegnate ci sono**; restano tre task miei e le domande per Chiara | 1-2 sessioni | — |
-| 4 | Prenotazione e pagamento consulenza | 🟡 **aperta** — il ponte Cal.com → `bookings` è dentro e provato | 4-5 sessioni | 3-4 h |
+| 4 | Prenotazione e pagamento consulenza | 🟡 **a metà** — i due ponti (Cal.com e Stripe) sono dentro, e con loro il giro del pagamento. Restano l'orologio dei 5 minuti, le mail e il form | 3-4 sessioni | 3-4 h |
 | 5 | Prima della call: riprogrammazioni e reminder | ⚪ | 2-3 sessioni | — |
 | 6 | Post-call e Itinerario su misura | ⚪ | 5-6 sessioni | — |
 | 7 | All Inclusive | ⚪ | 4-5 sessioni | 4-6 h |
@@ -648,11 +709,34 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
 - [ ] **[C]** Login Google al momento del Prenota, con registrazione automatica
 - [ ] **[C]** Embed Cal.com con nome, email e ID utente XPETIS precompilati.
       Torna in `payload.responses.xpetis_user_id.value`
-- [ ] **[C]** Pagina form + pagamento nei tre stati (in attesa, confermata,
-      scaduta): cellulare, domanda di contesto, flag servizi
-- [ ] **[C]** **Cassa aperta dal server**: Checkout Session creata da una route
-      con l'importo letto dal database, più verifica dell'importo a valle in n8n
-      prima di portare la riga a "pagata"
+- [~] **[C]** Pagina form + pagamento nei tre stati (in attesa, confermata,
+      scaduta): cellulare, domanda di contesto, flag servizi. **Gli stati ci
+      sono** (`app/prenotazione/[id]/page.tsx`), il form no: cellulare, domanda
+      di contesto e flag servizi restano da fare
+- [x] **[C]** **Il passaggio dall'embed alla cassa**, che non era in questo
+      elenco e andava progettato: il viaggiatore finisce di prenotare **prima**
+      che il webhook Cal.com sia arrivato, quindi la pagina non ha niente su cui
+      aprire una cassa. Pagina d'attesa che interroga il server con pause
+      crescenti per ~33 secondi (`app/attesa/`). Non si legge l'uid dall'evento
+      dell'embed: è un campo non documentato e soprattutto quel codice non deve
+      stare nel browser (S-05). Il viaggiatore è loggato, e tanto basta al server
+      per ritrovare la *sua* prenotazione. Se non compare, alert
+      `calcom_webhook_non_arrivato` in `team_alerts`: **esiste uno slot occupato
+      senza riga, e nessun orologio lo libererà**
+- [x] **[C]** **Cassa aperta dal server**: Checkout Session creata da una route
+      con l'importo letto dal database, più verifica dell'importo prima di
+      portare la riga a "pagata". **Chiuso il 7 settembre 2026** →
+      `app/prenotazione/[id]/cassa/route.ts`, `lib/stripe.ts`, migration `0038`.
+      La verifica dell'importo **non** è finita in n8n come diceva questa riga:
+      sta nel ponte Postgres insieme a tutto il resto, perché n8n non decide
+      niente. Tre cose imparate costruendola: `payments_one_pending_per_kind` è
+      l'unico modo di rendere impossibile la doppia cassa (fra il `select` e
+      l'`insert` un doppio clic passa), quindi la riga si scrive **prima** di
+      chiamare Stripe; `expires_at` di Stripe accetta solo 30 minuti-24 ore e la
+      nostra finestra vale esattamente 30, quindi si taglia invece di esplodere,
+      e l'autorità resta `payment_deadline_at`; l'**adaptive pricing è acceso di
+      default** e farebbe incassare nella valuta del visitatore, cioè un alert
+      critico su un pagamento buono — si spegne esplicitamente
 - [x] **[C]** **Ponte Cal.com → `bookings`** (created, rescheduled, cancelled)
       → migration `0037_calcom_webhook.sql` + workflow n8n
       `n8n/calcom-consulenze.json`. **Chiuso il 6 settembre 2026**, provato
@@ -668,9 +752,26 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       legge da `rescheduledBy`/`cancelledBy` confrontati con `organizer.email`.
       Le sette fixture vere si rigiocano in sequenza nell'harness, catena
       compresa
-- [ ] **[C]** Workflow Stripe → conferma e mail. **Risponde sempre 2xx** anche
-      quando non ha niente da fare: un 500 ripetuto porta Stripe a disattivare
-      l'endpoint
+- [~] **[C]** Workflow Stripe → conferma. **Risponde sempre 2xx** anche quando
+      non ha niente da fare: un 500 ripetuto porta Stripe a disattivare
+      l'endpoint. **Il ponte è dentro il 7 settembre 2026** → migration
+      `0039_stripe_webhook.sql` + workflow `n8n/stripe-pagamenti.json`, stessa
+      forma della 0037 perché due ponti identici sono due ponti che una persona
+      sola può tenere in testa. Quello che NON è una copia: la firma di Stripe è
+      un HMAC su `"<t>.<corpo>"` con **finestra di tolleranza di 5 minuti**
+      (senza, una firma intercettata resta valida per sempre) e può portare più
+      `v1` durante una rotazione del segreto; il diario usa l'`evt_` che Stripe
+      manda, senza comporre chiavi. Restano da fare le **mail** (serve il
+      provider, punto aperto 3) e i due passi di Simone qui sotto
+- [ ] **[S]** Creare l'endpoint webhook su Stripe verso `stripe-pagamenti`,
+      mettere lo `whsec_…` in Vault e importare il workflow su n8n: la procedura
+      è in `n8n/LEGGIMI.md`. Finché non è fatto, nessun pagamento si conferma
+- [ ] **[S]** Inserire su Studio le due righe nuove di `app_config`
+      (`consultation_stripe_account` gruppo `payments`, `whatsapp_number` gruppo
+      `contacts`): il seed le contiene ma un database già seminato non le ha.
+      `seed/0001_config.sql` è idempotente e si può rigirare. **Nessuno dei due
+      gruppi è esposto da `public_config`**, ed è voluto: il numero WhatsApp
+      oggi è un cellulare personale e non va servito ad `anon`
 - [ ] **[C]** Orologio unico ogni 5 minuti: insoluti oltre i 30 minuti (annulla
       su Cal.com col solo codice prenotazione, stato a "non pagata", mail
       cortese) e tutte le altre scadenze dovute. **In produzione la cadenza deve

@@ -1,0 +1,139 @@
+{
+  "name": "Stripe → payments · consulenze",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stripe-pagamenti",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b2000000-0000-4000-8000-000000000000",
+      "webhookId": "db090436-730a-45ba-96eb-7b4087526764",
+      "name": "Webhook",
+      "notes": "Stripe POSTa qui. Opzione Raw Body accesa: la firma si calcola sui byte esatti."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Il corpo GREZZO, byte per byte, e la firma che lo accompagna.\n//\n// Gemello del nodo omonimo di `calcom-consulenze`, e per la stessa ragione: la\n// firma si calcola sui byte esatti che sono arrivati. Un JSON parsato e\n// riserializzato da n8n da' una firma diversa anche a contenuto identico —\n// l'ordine delle chiavi, gli spazi e il formato dei numeri non sopravvivono al\n// giro. Il nodo Webhook ha \"Raw Body\" acceso e qui si decodifica.\n//\n// Quello che cambia rispetto a Cal.com e' solo il nome dell'header:\n// `stripe-signature` invece di `x-cal-signature-256`. Il contenuto e' diverso\n// (`t=<timestamp>,v1=<hex>`, con la finestra di tolleranza) ma qui non si\n// guarda: tutta la verifica vive nella funzione Postgres `stripe_webhook()`\n// della migration 0039. Questo nodo non decide niente, e' idraulica.\n//\n// Se il corpo grezzo non arriva, FALLISCE di proposito invece di ripiegare su\n// una riserializzazione: il ripiego silenzioso darebbe \"firma_non_valida\" su\n// ogni messaggio, che e' il modo peggiore di rompersi — sembra un problema di\n// segreti e non lo e'.\nconst item = $input.first();\n\nconst b64 = item.binary && item.binary.data && item.binary.data.data;\nif (!b64) {\n  throw new Error(\n    'Il nodo Webhook non ha consegnato il corpo grezzo. Controlla che l\\'opzione ' +\n    '\"Raw Body\" sia accesa: senza i byte originali la firma non si puo\\' verificare.'\n  );\n}\n\nconst corpo = Buffer.from(b64, 'base64').toString('utf8');\nconst headers = item.json.headers || {};\nconst firma = headers['stripe-signature'] || '';\n\nreturn [{ json: { corpo, firma } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "b2000000-0000-4000-8000-000000000001",
+      "name": "Corpo grezzo e firma",
+      "notes": "Decodifica i byte e pesca l'header stripe-signature. Nessuna logica: solo idraulica."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rsgyxbqzsxahsbdfgtbm.supabase.co/rest/v1/rpc/stripe_webhook",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_corpo",
+              "value": "={{ $json.corpo }}"
+            },
+            {
+              "name": "p_firma",
+              "value": "={{ $json.firma }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "b2000000-0000-4000-8000-000000000002",
+      "name": "stripe_webhook()",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YCF5Wo9nOxBRWrRf",
+          "name": "Supabase XPETIS · chiave secret (server)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
+      "notes": "Tutta la decisione vive dentro questa funzione Postgres (migration 0039)."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ],
+      "id": "b2000000-0000-4000-8000-000000000003",
+      "name": "Sempre 2xx",
+      "notes": "Stripe disattiva un endpoint che risponde male troppe volte, e con lui ogni conferma di pagamento. La difesa dal doppio scatto è nel database."
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Corpo grezzo e firma",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Corpo grezzo e firma": {
+      "main": [
+        [
+          {
+            "node": "stripe_webhook()",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stripe_webhook()": {
+      "main": [
+        [
+          {
+            "node": "Sempre 2xx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  }
+}

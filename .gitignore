@@ -41,6 +41,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# L'opt-in di cui sopra. `.env.example` non contiene nessun valore: è l'elenco
+# delle variabili che devono esistere, e serve proprio a chi clona il repo e non
+# ha ancora niente. Tenerlo ignorato voleva dire che l'unico posto dove quella
+# lista viveva era il computer di chi l'aveva scritta. I valori stanno nel
+# password manager, l'inventario in `ACCESSI.md`.
+!.env.example
 
 # vercel
 .vercel

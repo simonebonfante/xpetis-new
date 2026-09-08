@@ -9,6 +9,244 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**8 settembre 2026 — il primo euro. Il giro del pagamento è vivo in sandbox**
+
+Collaudo del ponte Stripe sull'infrastruttura vera, in tre gradini. Passati tutti
+e tre.
+
+*L'ambiente.* Endpoint creato nella sandbox da **Workbench** — che ha sostituito
+la dashboard *Developers*, e si apre dal pulsante *Sviluppatori* in basso a
+sinistra, non dal menu laterale: mezz'ora persa a cercarlo dove non c'è.
+API version fissata a **`2026-07-29.dahlia`**, la stessa del codice e delle
+fixture: la versione decide la forma dell'evento, e prendere "latest" avrebbe
+consegnato al ponte un oggetto diverso da quello su cui è stato provato. Tre
+eventi iscritti. Lo `whsec_` in Vault, e **una correzione a quanto credevamo**:
+il signing secret di un endpoint **si può rivelare di nuovo** dalla dashboard
+quando si vuole — non è una chiave API, non si vede una volta sola. Perderlo non
+costa rifare l'endpoint.
+
+*Gradino 2, l'evento sintetico di Stripe.* Esito `prenotazione_sconosciuta` con
+alert critico, `riferimento: assente`. **Ed è la risposta giusta**: l'evento di
+prova di Stripe porta una sessione finta senza `metadata.booking_id`. Il valore
+del gradino sta in cosa dimostra il fatto che quella riga *esista*: se la firma
+non fosse stata verificata il ponte si sarebbe fermato al primo controllo, senza
+guardare la sessione e senza scrivere niente. Quindi in un colpo — URL giusto,
+workflow attivo, corpo grezzo sopravvissuto a n8n, **segreto in Vault identico a
+quello dell'endpoint**, e permessi di scrittura. L'alert è stato poi cancellato:
+un falso allarme di collaudo che resta in `team_alerts` è peggio di nessun
+allarme.
+
+*Gradino 3, un pagamento vero.* Saltando l'unico pezzo non ancora costruito —
+l'embed Cal.com sulla vetrina — con il codice XPETIS incollato a mano nella
+prenotazione, come nelle prove di agosto. Risultato: prenotazione **`confirmed`**,
+pagamento **`paid`**, 6.000 centesimi, `paid_at` e `stripe_checkout_session_id`
+pieni, `processed_at` pieno, **e `team_alerts` vuoto**.
+
+Quel silenzio è la parte informativa. Nessun `stripe_importo_non_combacia`
+significa che il controllo contro `bookings.price_cents` ha trovato l'importo
+giusto — e che l'adaptive pricing spento nella route sta facendo il suo lavoro.
+Nessun `stripe_riga_pagamento_ricostruita` significa che la route ha registrato
+la sessione **prima** che il webhook arrivasse: è passato il percorso normale,
+non quello di recupero.
+
+*Cosa chiude, precisamente.* Il limite dichiarato il 7 settembre era che la
+fixture del `completed` è **ricostruita**, perché il PaymentIntent di una
+Checkout Session non si può confermare via API: l'unico percorso su cui passano i
+soldi non era mai stato attraversato da un payload Stripe autentico e firmato.
+Adesso lo è. **La verifica della firma, il controllo dell'importo e la conferma
+della prenotazione sono stati esercitati su un evento vero**, non su una nostra
+ricostruzione.
+
+*Cosa il collaudo non ha toccato, e va detto.* L'imbocco del funnel non esiste:
+il tasto *Prenota la call* sulla vetrina è `disabled` per scelta, l'iframe Cal.com
+non è incorporato, e nel sito non c'è nessun bottone per entrare — il login
+funziona ma si raggiunge solo da `/prova`. Il giro del pagamento è stato
+costruito **dal centro verso i bordi**: manca l'orologio da un lato e
+l'imbocco dall'altro. Oggi funziona e non si vede.
+
+---
+
+**7 settembre 2026 (secondo giro) — tre correzioni, e una che era un bug vero**
+
+Revisione del giro del pagamento prima di passare all'orologio. Harness a **344
+asserzioni**, verdi.
+
+*La correzione che contava: non sapere non è sapere che no.* `riusaSeAperta`
+trattava allo stesso modo «Stripe dice che quella sessione non esiste» e «Stripe
+non ha risposto» — un `catch` solo, e in entrambi i casi "niente da riusare".
+Ma un errore di rete non dice niente sulla sessione: quella cassa può essere viva
+e il viaggiatore starci pagando dentro in quel momento. La riga `pending` veniva
+marcata `expired`, si liberava l'unico posto che `payments_one_pending_per_kind`
+teneva occupato, e nascevano **due indirizzi di pagamento vivi per la stessa
+consulenza** — cioè esattamente ciò che la 0038 esiste per impedire. Il difetto
+si sarebbe visto solo con Stripe lento, cioè con più traffico: il modo peggiore
+di rompersi. Ora gli esiti sono quattro (`aperta`, `pagata`, `morta`, `ignoto`) e
+solo `morta` — Stripe che dichiara la sessione scaduta o inesistente, 404
+compreso — autorizza a buttare la riga; `ignoto` diventa un 503 "riprova" che non
+tocca niente. Il commento diceva il contrario ed è stato riscritto: argomentava
+verso la conclusione sbagliata, che è il tipo di commento che fa più danno di
+nessun commento.
+
+Ne è uscito un quinto esito che non era nella correzione ma è lo stesso difetto
+dall'altro lato: una riga **senza sessione registrata** può essere una richiesta
+interrotta a metà (da buttare) o una richiesta parallela che in quell'istante sta
+parlando con Stripe (da lasciare stare). Si distinguono solo dall'età della riga,
+quindi `in_apertura` sotto i 30 secondi, e anche lì 503.
+
+*Il numero WhatsApp era pubblicato, e non doveva.* L'avevo messo in
+`config_group = 'showcase'`, cioè fra i parametri che `public_config` serve ad
+`anon`. Ragionamento sbagliato: «tanto il visitatore lo legge in pagina». Un dato
+che il nostro server scrive in pagina dove serve non è la stessa cosa di un dato
+che l'API serve in blocco a chiunque lo chieda — e quel numero oggi è il
+**cellulare personale di Simone**, prestato in attesa di un numero dedicato. I
+raccoglitori di contatti indicizzano, e da lì non si torna indietro cambiando una
+riga. Spostato nel gruppo `contacts`, che `public_config` non espone, e servito
+lato server da `leggiContatto()` con la chiave secret. C'è un'asserzione che lo
+tiene fermo, e dice nel suo nome perché esiste: il giorno del numero aziendale si
+toglie apposta.
+
+*`.env.example` era ignorato da git.* `.gitignore` ha `.env*` con sopra scritto
+"can opt-in for committing if needed", e l'opt-in non era mai stato fatto: la
+lista delle variabili che devono esistere viveva solo sul computer di chi
+l'aveva scritta. Verificato riga per riga che non contenga valori — l'unico non
+segnaposto è `NEXT_PUBLIC_SUPABASE_URL`, che è pubblico per definizione e sta
+già in `CLAUDE.md` e nel workflow Cal.com versionato — e aggiunto `!.env.example`.
+Nell'occasione ci sono finite anche `N8N_PUBLIC_URL` e `N8N_API_KEY`, che i
+comandi scritti in `n8n/LEGGIMI.md` danno per esistenti; la password e la chiave
+di cifratura di n8n no, perché nessuno script del repo le usa e il loro posto è
+`ACCESSI.md`.
+
+---
+
+**7 settembre 2026 — il giro del pagamento, e il secondo ponte fatto uguale al primo**
+
+Il ponte Cal.com creava prenotazioni in `pending_payment` che nessuno poteva
+pagare e che niente faceva scadere. Il giro adesso si chiude: prenotazione →
+cassa → conferma. Migration `0038` e `0039`, route
+`app/prenotazione/[id]/cassa/route.ts`, pagina d'attesa `app/attesa/`, workflow
+`n8n/stripe-pagamenti.json`. Harness a **343 asserzioni** (erano 284), verdi.
+
+*Il secondo ponte ha la forma del primo, e non per pigrizia.* `stripe_webhook()`
+è la fotocopia strutturale di `calcom_webhook()`: firma, diario, blocco di lavoro
+con gestore, esito in JSON, mai un'eccezione, `grant execute` al solo
+`service_role`. Chi ha capito uno ha capito l'altro, e la sola cosa che deve
+tenere in testa sono le tre differenze — che sono tutte di protocollo, non di
+disegno.
+
+*Le tre differenze, che sono i punti in cui copiare sarebbe stato un errore.*
+La prima è **la firma**: Stripe manda `t=<timestamp>,v1=<hex>` e l'HMAC si
+calcola su `"<t>.<corpo>"`, non sul corpo. C'è un'asserzione dedicata che verifica
+che firmare *alla Cal.com* non passi: senza, un ponte copiato sembrerebbe
+funzionare finché non arriva Stripe davvero. Poi la **finestra di tolleranza**:
+cinque minuti, oltre i quali il messaggio si rifiuta — senza, una firma valida
+intercettata resta valida per sempre, e il diario da solo non basta come difesa.
+E i `v1` possono essere **più di uno**: durante una rotazione del segreto Stripe
+ne manda due, e accettarne uno solo farebbe cadere il ponte esattamente nel
+momento in cui si cambia la parola segreta. La terza differenza è banale e va
+detta lo stesso: Stripe **manda un id di evento**, quindi il diario usa quello e
+la chiave composta della 0037 qui non serve. Quella esisteva per un difetto di
+Cal.com, non per una scelta nostra.
+
+*I cinque minuti sono un numero nel codice, e l'ho lasciato lì apposta.*
+`CLAUDE.md` dice di non mettere finestre temporali nel codice. Quella regola
+esiste per i parametri di prodotto, che il team cambia da Studio senza deploy —
+e nessuno in XPETIS regolerà mai la finestra di replay di un webhook. Metterla in
+`app_config` avrebbe creato un modo di disattivare la protezione in silenzio
+svuotando o azzerando una riga: un parametro di sicurezza che si guasta *aprendo*
+è peggio del numero scritto. È un argomento con default, così un test può
+spostarlo.
+
+*L'ordine delle operazioni nella cassa non è quello ovvio.* Prima la riga in
+`payments`, poi la sessione su Stripe. L'ordine naturale — crei la cassa, la
+registri — ha una finestra fra il `select` che non trova niente e l'`insert`, e
+un doppio clic ci passa dentro due volte: due indirizzi di pagamento vivi per la
+stessa consulenza. Con la riga prima, è l'indice `payments_one_pending_per_kind`
+(0038, gemello di `payments_one_paid_per_kind` sul lato "in attesa") a fermare la
+seconda richiesta **prima** che tocchi Stripe, e non resta nessuna sessione
+orfana da ripulire. Se poi Stripe fallisce, la riga si cancella e il viaggiatore
+può riprovare subito.
+
+*Tre cose imparate parlando con Stripe davvero, e non dalla documentazione.*
+L'**adaptive pricing è acceso di default**, e con quello acceso una sessione può
+incassare nella valuta del visitatore: il controllo "valuta = EUR" del ponte
+avrebbe alzato un alert critico su un pagamento perfettamente buono fatto da
+qualcuno fuori area euro. Si spegne esplicitamente. Il **PaymentIntent di una
+Checkout Session non si può confermare via API** — nella versione
+`2026-07-29.dahlia` nasce addirittura nullo — quindi un `checkout.session.completed`
+autentico si ottiene solo pagando a mano sulla pagina ospitata. E `expires_at`
+accetta solo **fra 30 minuti e 24 ore**, mentre `booking_payment_window_min` vale
+esattamente 30: qualunque ritardo porta la nostra scadenza sotto il minimo e fa
+fallire la chiamata. Si taglia invece di esplodere, con un minuto di margine sul
+tempo di volo, e **l'autorità resta la nostra scadenza**: quella di Stripe è una
+cortesia verso chi ha la pagina aperta.
+
+*Le fixture, e cosa sono davvero.* Il `checkout.session.expired` è **vero**:
+sessione creata sulla sandbox con l'API e chiusa con
+`POST /v1/checkout/sessions/:id/expire`, che è l'unico modo di ottenere
+quell'evento senza aspettare un giorno. Il `completed` è **ricostruito** —
+involucro e oggetto sono quelli veri, cambiano solo i campi che Stripe cambia
+quando una sessione si chiude pagata — per la ragione appena scritta. E nessuna
+delle due porta una **firma vera**, perché non sono passate da un endpoint
+webhook: con Cal.com le firme vere sono state la differenza fra un ponte che
+sembrava giusto e uno che lo era, qui non ce l'ho, e il modo onesto di dirlo è
+scriverlo nel `_nota` della fixture e nel README invece di lasciarlo intendere.
+Quello che l'harness verifica è l'algoritmo, su tutti i modi in cui può
+sbagliare.
+
+*Il passaggio dall'embed alla cassa era una corsa da progettare, non da
+scoprire.* Il viaggiatore finisce di prenotare nell'embed **prima** che il
+webhook sia arrivato: in quel momento la prenotazione esiste su Cal.com e da noi
+no, e la pagina non ha niente su cui aprire una cassa. La strada corta — leggere
+l'uid dall'evento dell'embed — è sbagliata due volte: il campo non è documentato,
+e soprattutto quel codice non deve stare nel browser, perché dopo S-05 basta lui
+per cancellare la call. La strada giusta parte da ciò che già sappiamo: il
+viaggiatore è **loggato**, quindi il server può cercare *la sua* prenotazione in
+attesa di pagamento senza che il browser sappia niente di Cal.com. Pagina
+d'attesa con pause crescenti per ~33 secondi, poi la cassa. E se non compare
+niente non si lascia il viaggiatore a mani vuote: messaggio onesto (lo slot è
+suo, la conferma no, non è stato addebitato nulla), link WhatsApp, e alert
+`calcom_webhook_non_arrivato` — perché in quel caso **esiste uno slot occupato
+sul calendario di un designer senza nessuna riga dalla nostra parte, e nessun
+orologio lo libererà**: gli orologi guardano le righe che abbiamo.
+
+*Il caso che succederà davvero, e che il codice tratta a parte.* L'orologio
+libera lo slot al minuto 30, il pagamento arriva al minuto 30 e qualcosa. I soldi
+sono veri e si registrano; la prenotazione no, perché lo slot è già stato dato
+via. Alert critico e una persona che decide se rimborsare o rimettere in piedi la
+call. È l'unico modo onesto: confermare sarebbe una bugia, ignorare l'incasso
+peggio.
+
+*Un test ha trovato un bug prima di me.* Il ponte, quando non riconosce la
+sessione, ripiega a cercare la riga di pagamento per prenotazione — serve sul
+`completed`, quando la route ha aperto la cassa e non è riuscita a registrarla.
+Su un `expired` lo stesso ripiego avrebbe chiuso la cassa **nuova** di quella
+prenotazione mentre il viaggiatore ci stava pagando dentro. Il ripiego ora vale
+solo sul pagamento riuscito, e c'è un'asserzione che lo tiene fermo.
+
+*La pagina di ritorno da Stripe non decide niente.* Dice "stiamo confermando" e
+interroga il database. Il `?ritorno=1` è un'informazione del browser, non una
+prova di pagamento: chiunque può scriverlo nella barra degli indirizzi, e
+trattarlo come prova costa una consulenza regalata. La prova è la riga che arriva
+dal webhook firmato.
+
+*Due cose sistemate di passaggio.* `td_services_bookable_complete` pretendeva uno
+`stripe_payment_link_url` su ogni consulenza attiva: era più vecchio della
+deviazione 1, e tenerlo avrebbe voluto dire far inventare 25 URL finte per
+pubblicare 25 profili — cioè il task S-10 che il piano dà per sparito. La
+condizione è caduta, le altre tre (prezzo, durata, event type) restano. E
+`my_bookings` ora dà `payment_deadline_at`, che è un dato del viaggiatore: senza,
+la pagina non sa dire quanto tempo resta. `cal_booking_uid` continua a non
+uscire, e c'è un'asserzione che lo verifica.
+
+*Cosa NON ho fatto, di proposito.* Non ho caricato il workflow su n8n e non ho
+creato l'endpoint su Stripe: sono azioni verso l'esterno, e la procedura è
+scritta in `n8n/LEGGIMI.md` perché la faccia Simone. Finché non è fatta, nessun
+pagamento si conferma — e finché non ci sono le due righe nuove di `app_config`
+su Studio, la cassa non si apre e lo dice con una frase leggibile invece di
+indovinare un conto.
+
+---
+
 **6 settembre 2026 — il ponte Cal.com, e la scelta di non metterlo in n8n**
 
 Si apre la milestone 4. Il ponte Cal.com → `bookings` è dentro, provato e attivo:

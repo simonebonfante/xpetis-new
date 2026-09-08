@@ -149,3 +149,127 @@ Un messaggio con `processed_at` nullo e `error` pieno si è fermato su un guasto
 è di proposito, così il ritentativo di Cal.com riprova invece di scartarlo come
 duplicato. Gli alert operativi (designer sconosciuto, servizio senza prezzo,
 *Request reschedule* del designer) stanno in `team_alerts`.
+
+---
+
+## `stripe-pagamenti.json` — Stripe → `payments` e `bookings`
+
+Il ponte che trasforma i messaggi di Stripe in incassi registrati e consulenze
+confermate. **Stessa forma dell'altro, di proposito**: quattro nodi, nessuna
+decisione in n8n, tutta la logica in una funzione Postgres. Due ponti identici
+nella forma sono due ponti che una persona sola può tenere in testa.
+
+| | |
+|---|---|
+| Workflow su n8n | **da importare** — *Stripe → payments · consulenze* |
+| Indirizzo che si dà a Stripe | `https://<istanza n8n>/webhook/stripe-pagamenti` |
+| Credenziale usata | *Supabase XPETIS · chiave secret (server)*, tipo **Header Auth**, header `apikey` |
+| Eventi da iscrivere su Stripe | `checkout.session.completed`, `checkout.session.expired`, `charge.refunded` |
+| Provato in produzione | **non ancora**: il workflow è scritto e versionato, l'endpoint su Stripe va ancora creato |
+
+### I quattro nodi
+
+```
+Webhook  →  Corpo grezzo e firma  →  stripe_webhook()  →  Sempre 2xx
+(POST)         (Code)                (HTTP Request)      (Respond to Webhook)
+```
+
+Vale parola per parola quello che è scritto sopra per `calcom-consulenze`: *Raw
+Body* acceso, il nodo Code che decodifica i byte perché nessuna espressione di
+n8n sa toccare un buffer, il fallimento rumoroso se i byte grezzi non arrivano,
+e il 200 qualunque sia l'esito.
+
+**L'unica differenza è il nome dell'header**: `stripe-signature` invece di
+`x-cal-signature-256`. Il *contenuto* invece è tutt'altra cosa, ed è la ragione
+per cui il ponte Stripe non è una copia dell'altro:
+
+> Stripe manda `t=<timestamp>,v1=<hex>` e firma **`"<t>.<corpo>"`**, non il solo
+> corpo. C'è anche una **finestra di tolleranza di 5 minuti**: senza quella, una
+> firma valida intercettata resterebbe valida per sempre. Tutto questo vive in
+> `stripe_signature_ok()` (migration 0039), non qui: n8n passa header e corpo e
+> non li guarda.
+
+Perché `Sempre 2xx` conta ancora di più che con Cal.com: Stripe disattiva
+un endpoint che risponde male troppe volte, e quell'endpoint è l'unico modo che
+abbiamo di sapere che una consulenza è stata pagata.
+
+### Come si importa la prima volta
+
+1. n8n → *Workflows* → **Import from File** → `stripe-pagamenti.json`.
+2. Il nodo `stripe_webhook()` arriva **senza credenziale**: aprilo e scegli la
+   credenziale **Header Auth** già esistente *Supabase XPETIS · chiave secret
+   (server)* — è la stessa dell'altro ponte, non se ne crea una seconda.
+3. Controlla **path `stripe-pagamenti`** e **Raw Body** acceso.
+4. Attiva il workflow e copia l'indirizzo di produzione.
+5. Su Stripe (sandbox) → *Developers → Webhooks → Add endpoint*: quell'indirizzo,
+   e i tre eventi della tabella qui sopra.
+6. Stripe mostra lo **signing secret** `whsec_…` una volta sola. Mettilo nel
+   password manager **e** in Supabase Vault, dal SQL Editor:
+
+   ```sql
+   select vault.create_secret('<lo signing secret>', 'stripe_webhook_secret',
+                              'Firma dei webhook Stripe (header Stripe-Signature)');
+   ```
+
+   Finché quel segreto non c'è, il ponte rifiuta **ogni** messaggio: la funzione
+   non può verificare le firme e lo dice invece di lasciar passare.
+
+⚠️ **Si aggiorna il workflow esistente, non se ne crea uno nuovo.** Come per
+Cal.com: un workflow nuovo prende un path nuovo, e Stripe continuerebbe a puntare
+al vecchio. Dall'API, una volta noto l'id:
+
+```bash
+curl -X PUT "$N8N_PUBLIC_URL/api/v1/workflows/<id>" \
+     -H "X-N8N-API-KEY: $N8N_API_KEY" -H 'Content-Type: application/json' \
+     -d @n8n/stripe-pagamenti.json
+```
+
+### Come si prova senza pagare davvero
+
+Come per Cal.com, serve un corpo firmato — ma la firma si costruisce diversamente
+(`t` dentro l'HMAC, e non più vecchia di 5 minuti). La parola segreta è
+`STRIPE_WEBHOOK_SECRET` in `.env.local`, la stessa che sta in Vault:
+
+```bash
+node -e '
+const {readFileSync,writeFileSync}=require("fs"), crypto=require("crypto");
+const env=Object.fromEntries(readFileSync(".env.local","utf8").split("\n")
+  .filter(r=>r.includes("=")).map(r=>[r.slice(0,r.indexOf("=")).trim(), r.slice(r.indexOf("=")+1).trim()]));
+const o=JSON.parse(readFileSync("supabase/tests/fixtures/stripe/checkout_session_completed.json","utf8"));
+const b={}; for(const k of Object.keys(o)) if(!k.startsWith("_")) b[k]=o[k];
+const raw=JSON.stringify(b);
+const t=Math.floor(Date.now()/1000);              // DEVE essere adesso: 5 minuti di tolleranza
+writeFileSync("/tmp/stripe.json", raw);
+writeFileSync("/tmp/stripe-firma.txt", `t=${t},v1=` +
+  crypto.createHmac("sha256", env.STRIPE_WEBHOOK_SECRET).update(`${t}.${raw}`,"utf8").digest("hex"));
+'
+curl -X POST "$N8N_PUBLIC_URL/webhook/stripe-pagamenti" \
+     -H 'Content-Type: application/json' \
+     -H "Stripe-Signature: $(cat /tmp/stripe-firma.txt)" \
+     --data-binary @/tmp/stripe.json
+```
+
+La risposta è l'esito della funzione: `confermata`, `scaduta`, `duplicato`,
+`gia_confermata`, `gia_chiusa`, `importo_non_combacia`,
+`pagamento_non_ancora_incassato`, `pagamento_su_prenotazione_chiusa`,
+`prenotazione_sconosciuta`, `pagamento_sconosciuto`, `rimborso_annotato`,
+`evento_non_gestito`, `firma_non_valida`, `corpo_non_json`,
+`corpo_non_riconosciuto`, `errore`.
+
+La fixture punta a una prenotazione che sul database vero **non esiste**: l'esito
+onesto è `prenotazione_sconosciuta`, con il suo alert. Per vedere una conferma
+vera bisogna sostituire `data.object.metadata.booking_id` e
+`data.object.client_reference_id` con l'id di una riga `bookings` in
+`pending_payment`, e `data.object.id` con la sua sessione.
+
+### Quando qualcosa non torna
+
+```sql
+select received_at, event_type, external_id, processed_at, error
+  from webhook_events where provider = 'stripe'
+ order by received_at desc limit 20;
+```
+
+E gli alert operativi — importo che non combacia, pagamento senza prenotazione,
+pagamento su uno slot già liberato — stanno in `team_alerts` con `kind` che
+comincia per `stripe_`.

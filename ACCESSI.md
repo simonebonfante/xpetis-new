@@ -228,10 +228,27 @@ su un account personale di prova.
 | Stato | **sandbox / test mode** |
 | Piano | commissioni 1,5% + €0,25 su carta europea |
 
-**Segreto, nel password manager:** chiave `sk_test_…` → variabile
-`STRIPE_SECRET_KEY`. Serve solo quella: usiamo Checkout ospitato, quindi il
-server crea la sessione e reindirizza. Nessuna chiave pubblicabile, nessun
-Stripe.js nel browser.
+**Segreti, nel password manager:**
+
+| Cosa | Dove vive | A cosa serve |
+|---|---|---|
+| Chiave `sk_test_…` | `STRIPE_SECRET_KEY` in `.env.local` e nelle variabili di Vercel | Apre le Checkout Session dal nostro server |
+| Signing secret `whsec_…` | `STRIPE_WEBHOOK_SECRET` in `.env.local` **e** Supabase Vault sotto `stripe_webhook_secret` | Verifica la firma dei webhook, dentro `stripe_webhook()` |
+
+Nessuna chiave pubblicabile e nessun Stripe.js nel browser: usiamo Checkout
+ospitato, quindi il server crea la sessione e reindirizza.
+
+Lo signing secret Stripe lo mostra **una volta sola**, alla creazione
+dell'endpoint. Va nel password manager e in Vault:
+
+```sql
+select vault.create_secret('<lo signing secret>', 'stripe_webhook_secret',
+                           'Firma dei webhook Stripe (header Stripe-Signature)');
+```
+
+Senza quella riga il ponte rifiuta ogni messaggio invece di lasciar passare: è
+voluto. La copia in `.env.local` serve solo a poter firmare un corpo di prova
+(vedi `n8n/LEGGIMI.md`).
 
 🔴 **L'attivazione dei pagamenti reali è bloccata: non esiste un'entità legale
 XPETIS.** È il percorso critico del progetto, non la tecnica. La decisione "chi è
@@ -240,8 +257,12 @@ il venditore" è aperta — vedi i rischi in `PIANO.md`.
 **Da non fare:** creare prodotti, prezzi o Payment Link. Il prezzo vive solo nel
 database; la cassa la apre il nostro server.
 
-**Da aggiungere quando n8n avrà il suo posto:** l'endpoint webhook e il suo
-*signing secret*.
+**L'endpoint webhook.** Punta al workflow n8n `stripe-pagamenti`
+(`https://<istanza n8n>/webhook/stripe-pagamenti`) e va iscritto a tre eventi:
+`checkout.session.completed`, `checkout.session.expired`, `charge.refunded`. La
+procedura completa sta in `n8n/LEGGIMI.md`. **Al 7 settembre 2026 l'endpoint non
+è ancora creato**: il ponte e il workflow ci sono e sono verdi sull'harness, ma
+nessun messaggio vero è ancora passato.
 
 ---
 
@@ -293,7 +314,8 @@ I gruppi si creano a mano: le API non permettono di crearli.
 [ ] Cal.com · parola segreta del webhook (una per tutti i 25)
                                     ← anche in Supabase Vault: calcom_webhook_secret
 [ ] Stripe · chiave sk_test_
-[ ] Stripe · webhook signing secret            (quando esisterà)
+[ ] Stripe · webhook signing secret whsec_     (quando l'endpoint esisterà)
+                                    ← anche in Supabase Vault: stripe_webhook_secret
 [ ] Provider email · API key                   (quando esisterà)
 [ ] Stripe dell'agenzia · credenziali          (quando esisterà — e vedi sotto)
 ```
@@ -315,6 +337,7 @@ Vale la pena saperlo prima, non dopo.
 | Chiave `sb_secret_` | **Sì**, si ruota dalla console (poi va aggiornata dove è usata) |
 | Client secret di Google | **Sì**, se ne genera un altro |
 | Chiave `sk_test_` di Stripe | **Sì**, si ruota |
+| Signing secret del webhook Stripe | **Sì**, si rigenera dall'endpoint — poi va riscritto in Vault |
 | Parola segreta del webhook Cal.com | **Sì**, ma va riscritta su tutti i 25 account a mano |
 | Account proprietario di n8n | **Sì**, con accesso al database di n8n |
 | **`N8N_ENCRYPTION_KEY`** | 🔴 **No.** Le credenziali dentro n8n diventano illeggibili e si rifanno una per una |
