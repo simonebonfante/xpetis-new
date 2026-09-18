@@ -990,6 +990,38 @@ console.log('\n== Superficie pubblica ==')
     ? ok('nessuna vista pubblica tocca assi, livelli di copertura o parametri di matching')
     : fail('viste che perdono informazione: ' + leaks.map(v => v.relname).join(', '));
 
+  // ------------------------------------------------ l'embed Cal.com (0040)
+  // L'embed vive nel browser e senza queste due stringhe non si apre. Ciò che
+  // resta fuori è quello che conta: `cal_booking_uid`, che dopo S-05 è una
+  // credenziale di cancellazione.
+  {
+    const cols = (await q(`select column_name from information_schema.columns
+                            where table_name='public_td_showcase'`)).rows.map(r => r.column_name);
+    cols.includes('cal_username')
+      ? ok('public_td_showcase espone cal_username: senza, l\'embed non ha un link da aprire')
+      : fail('public_td_showcase senza cal_username: ' + JSON.stringify(cols));
+
+    const def = (await q(`select pg_get_viewdef('public_td_showcase'::regclass) as d`)).rows[0].d;
+    !/cal_booking_uid/.test(def)
+      ? ok('e continua a NON nominare cal_booking_uid, nemmeno dentro il jsonb')
+      : fail('public_td_showcase nomina cal_booking_uid');
+
+    const srv = (await q(`
+      select jsonb_path_query_first(services, '$[*] ? (@.service_type == "consultation")') as s
+        from public_td_showcase where slug = 'marco-rossi'`)).rows[0].s;
+    srv && srv.cal_event_type_slug === 'consulenza-xpetis-30'
+      ? ok('lo slug dell\'event type arriva dentro ogni servizio, non sul designer')
+      : fail('cal_event_type_slug nel servizio: ' + JSON.stringify(srv));
+
+    // `create or replace view` conserva i privilegi; un `drop` + `create` li
+    // avrebbe portati via e la vetrina sarebbe smessa di funzionare per `anon`.
+    const leggibile = (await q(
+      `select has_table_privilege('anon', 'public_td_showcase', 'SELECT') as v`)).rows[0].v;
+    leggibile === true
+      ? ok('il grant della 0028 è sopravvissuto al create or replace della 0040')
+      : fail('anon non legge più public_td_showcase');
+  }
+
   // `distinct` non promette un ordine: si ordina qui, altrimenti il test passa
   // o fallisce a seconda del piano di esecuzione.
   const cfgGroups = (await q(`select distinct config_group from public_config`))

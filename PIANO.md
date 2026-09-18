@@ -82,8 +82,45 @@ raggiunge solo da `/prova`. Il collaudo dell'8 settembre ha saltato l'imbocco
 incollando il codice XPETIS a mano. **Oggi la milestone 4 funziona e non si
 vede.**
 
+**Aggiornamento dell'8 settembre 2026 — l'imbocco, subito dopo il collaudo.**
+Il bordo che mancava da questo lato è entrato: **`/accedi` esiste**, il tasto
+*Prenota la call* **apre l'embed Cal.com** nella vetrina, e la corsa fra l'embed
+che finisce nel browser e il webhook che arriva dal server si chiude da sé.
+Migration `0040` (l'embed ha bisogno di `cal_username` e `cal_event_type_slug` nel
+browser), harness a **349 asserzioni**, verdi. Resta l'altro bordo: l'orologio.
+
+Tre cose da sapere.
+
+1. 🔴 **Il client secret di Google era in git** dal primo commit, e va ruotato:
+   è la prima voce di "cosa resta a te".
+2. La strada scelta per sapere che la prenotazione è finita — l'evento
+   `bookingSuccessfulV2` dell'embed, verificato sui tipi pubblicati del
+   pacchetto — **non richiede di toccare i 25 account Cal.com**. L'alternativa,
+   il *Redirect on booking* sull'event type, li avrebbe richiesti tutti e
+   venticinque e dentro un embed inline **non funziona comunque**: naviga
+   l'iframe invece della pagina (issue Cal.com `#18144`).
+3. ⚠️ **Il pezzo di oggi non è verificabile né dall'harness né da me**: è un
+   iframe di terze parti in un browser. Ho verificato il contratto degli eventi e
+   scartato il redirect su prova documentale; **non ho visto l'evento scattare.**
+   L'elenco preciso di cosa provare e in che ordine è in milestone 4, sotto
+   **"Le prove che devi fare tu"**.
+
 ### Cosa resta a te
 
+- 🔴 **COMMITTARE.** Dal 9 al 18 settembre non si è toccato niente, e l'imbocco
+  del funnel — `/accedi`, l'embed, l'header che riconosce chi è collegato, la
+  migration `0040`, `lib/supabase/utente.ts` — è **tutto in un albero di lavoro
+  non committato**: 13 file modificati, 858 righe, più 7 file mai aggiunti.
+  L'ultimo commit è `1374c2e`, che si ferma al giro del pagamento. Un
+  `git checkout` distratto e nove giorni di lavoro non ci sono più. È la prima
+  cosa da fare, prima delle prove.
+- ~~**Ruotare il client secret di Google**~~ → **fatto l'8 settembre 2026.**
+  Secret nuovo generato, incollato in Supabase, login riprovato, **vecchio
+  cancellato**: quello che sta in git dal commit `ce5aafa` non funziona più.
+  Cronaca e procedura in `ACCESSI.md`.
+- 🔴 **Resta da ruotare la password del database**, che è ancora quella dei primi
+  otto commit. Stesso ragionamento: toglierla dal file non l'ha tolta dalla
+  storia.
 - ~~**S-08**, numero WhatsApp~~ → **chiuso in via provvisoria il 6 settembre**:
   +39 347 891 1018, numero personale prestato. Da sostituire prima del pubblico.
 - ~~**"Chi è il venditore"**~~ → **deciso il 6 settembre: l'agenzia affiliata**,
@@ -91,9 +128,10 @@ vede.**
   cose che restano tue: **chi preme il tasto "rimborsa"** in agenzia e con quali
   tempi, e **come si tocca il loro Stripe** — le loro chiavi in mano nostra sono
   una responsabilità che non vogliamo, Stripe Connect è la strada pulita.
-- ~~**Stripe**: non è più fermo~~ → **costruito il 7 settembre in sandbox**. Il
-  passaggio al conto dell'agenzia è la riga `app_config.consultation_stripe_account`,
-  come previsto. Ti restano l'endpoint webhook e lo `whsec_…` in Vault.
+- ~~**Stripe**: non è più fermo~~ → **costruito il 7 settembre e collaudato
+  l'8** con un pagamento vero in sandbox. Endpoint, `whsec_` in Vault e workflow
+  n8n sono a posto. Il passaggio al conto dell'agenzia resta la riga
+  `app_config.consultation_stripe_account`, come previsto.
 - **Guardare le quattro pagine accanto al Figma** e dirmi cosa non torna: è la
   cosa che vale più di tutte adesso, perché io non ho un browser e le pagine sono
   verificate sul dato, non sull'occhio.
@@ -706,9 +744,20 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
 - [x] **[S]** ~~Account Cal.com di regia con l'event type modello~~ → **S-09
       chiuso nella milestone 2.** L'event type modello, con tutte le
       impostazioni verificate, è in `ONBOARDING_CALCOM_TD.md`
-- [ ] **[C]** Login Google al momento del Prenota, con registrazione automatica
-- [ ] **[C]** Embed Cal.com con nome, email e ID utente XPETIS precompilati.
-      Torna in `payload.responses.xpetis_user_id.value`
+- [x] **[C]** Login Google al momento del Prenota, con registrazione automatica.
+      **Chiuso l'8 settembre 2026** → `app/accedi/page.tsx`. Il tasto *Prenota*
+      di un anonimo porta a `/accedi?next=<vetrina col servizio scelto>`, e al
+      ritorno l'embed si apre. Il login **non è un cancello** sul resto del
+      sito: sulla prenotazione sì, e per un motivo tecnico non di prodotto —
+      senza UUID il ponte risponde `viaggiatore_non_identificato` e resta uno
+      slot occupato senza riga
+- [x] **[C]** Embed Cal.com con nome, email e ID utente XPETIS precompilati.
+      Torna in `payload.responses.xpetis_user_id.value`. **Chiuso l'8 settembre
+      2026** → `components/prenota-consulenza.tsx`, `lib/cal-embed.ts`,
+      migration `0040`. Il tasto *Prenota la call* non è più `disabled`: apre
+      l'iframe inline nella vetrina. Serviva esporre `cal_username` e
+      `cal_event_type_slug` su `public_td_showcase`, e nel commento della 0040
+      c'è scritto cosa diventa leggibile con gli strumenti di sviluppo aperti
 - [~] **[C]** Pagina form + pagamento nei tre stati (in attesa, confermata,
       scaduta): cellulare, domanda di contesto, flag servizi. **Gli stati ci
       sono** (`app/prenotazione/[id]/page.tsx`), il form no: cellulare, domanda
@@ -722,7 +771,17 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       stare nel browser (S-05). Il viaggiatore è loggato, e tanto basta al server
       per ritrovare la *sua* prenotazione. Se non compare, alert
       `calcom_webhook_non_arrivato` in `team_alerts`: **esiste uno slot occupato
-      senza riga, e nessun orologio lo libererà**
+      senza riga, e nessun orologio lo libererà**.
+      *Completato l'8 settembre col segnale che innesca l'attesa*, che l'8
+      settembre non c'era: l'evento `bookingSuccessfulV2` dell'embed. Verificato
+      sui **tipi pubblicati** di `@calcom/embed-core@1.5.3`, non dedotto —
+      `EventDataMap` li elenca, e marca `bookingSuccessful` come deprecato in
+      favore di V2. La **strada scartata** è il *Redirect on booking*
+      sull'event type: dentro un embed inline naviga l'iframe e non la pagina
+      (issue Cal.com `#18144`), quindi la pagina di pagamento comparirebbe
+      incorniciata nel calendario — **e sarebbero state 25 impostazioni da
+      cambiare**. Con l'evento non si tocca nessun account: l'unica nota in
+      `ONBOARDING_CALCOM_TD.md` è di lasciare quel campo **vuoto**
 - [x] **[C]** **Cassa aperta dal server**: Checkout Session creata da una route
       con l'importo letto dal database, più verifica dell'importo prima di
       portare la riga a "pagata". **Chiuso il 7 settembre 2026** →
@@ -763,15 +822,40 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       `v1` durante una rotazione del segreto; il diario usa l'`evt_` che Stripe
       manda, senza comporre chiavi. Restano da fare le **mail** (serve il
       provider, punto aperto 3) e i due passi di Simone qui sotto
-- [ ] **[S]** Creare l'endpoint webhook su Stripe verso `stripe-pagamenti`,
-      mettere lo `whsec_…` in Vault e importare il workflow su n8n: la procedura
-      è in `n8n/LEGGIMI.md`. Finché non è fatto, nessun pagamento si conferma
-- [ ] **[S]** Inserire su Studio le due righe nuove di `app_config`
-      (`consultation_stripe_account` gruppo `payments`, `whatsapp_number` gruppo
-      `contacts`): il seed le contiene ma un database già seminato non le ha.
-      `seed/0001_config.sql` è idempotente e si può rigirare. **Nessuno dei due
-      gruppi è esposto da `public_config`**, ed è voluto: il numero WhatsApp
-      oggi è un cellulare personale e non va servito ad `anon`
+- [ ] **[S]** Applicare la migration `0040_showcase_cal_link.sql`: senza,
+      l'embed non ha `cal_username` e il tasto *Prenota* mostra la frase di
+      cortesia invece del calendario
+- [x] **[S]** ~~Creare l'endpoint webhook su Stripe, `whsec_…` in Vault,
+      workflow su n8n~~ → **fatto nel collaudo dell'8 settembre**, con un
+      pagamento vero da 60 € che ha attraversato la catena
+- [x] **[S]** ~~Inserire su Studio le due righe nuove di `app_config`~~ →
+      **fatte nel collaudo dell'8 settembre.** ⚠️ Ma `whatsapp_number` era nel
+      gruppo `showcase`, che `public_config` espone ad `anon`: la correzione del
+      7 settembre l'ha spostata in **`contacts`**. Se la riga su Studio è stata
+      inserita col gruppo vecchio, va cambiata a mano:
+      `update app_config set config_group='contacts' where key='whatsapp_number';`
+      Altrimenti il tuo cellulare è servito dall'API a chiunque
+- [ ] **[C]** **"Le mie prenotazioni", l'area del viaggiatore.** Non era in
+      nessuna milestone e non è un pezzo dimenticato: **il Flusso guida il
+      viaggiatore con le mail**, non con un'area riservata — conferma,
+      promemoria, mail post-call coi bottoni, pagine a token per gli ordini. In
+      quel disegno una lista personale è comodità.
+      *Perché entra adesso.* Con la milestone 4 in piedi si è aperto un buco
+      concreto: **se il viaggiatore chiude la scheda fra la prenotazione e il
+      pagamento non ha nessun modo di tornare indietro.** Non c'è una lista, e la
+      mail che gli darebbe il link **non esiste** — il provider è S-04, non
+      fatto. Quella prenotazione diventa irraggiungibile e scade da sola,
+      lasciando occupato uno slot.
+      Le due vie non sono equivalenti: la mail serve comunque (sono quindici) ma
+      **dipende da cose non nostre** — provider, testi di Gaia, e una settimana
+      di dominio da scaldare; la pagina non dipende da nessuno e le viste
+      esistono dal 4 agosto (`my_bookings`, `my_orders`, migration `0019`,
+      costruite esattamente per questo). Si fa la pagina **e** la mail, in
+      quest'ordine, perché la pagina si può fare oggi.
+      *Deciso da Simone l'8 settembre 2026.* Minima di proposito: le prenotazioni
+      con il loro stato e, per quelle da pagare, il tasto. **Nessun profilo,
+      nessuna preferenza**: il Flusso non li chiede, e un'area personale che
+      cresce da sola è la strada per una milestone non prevista
 - [ ] **[C]** Orologio unico ogni 5 minuti: insoluti oltre i 30 minuti (annulla
       su Cal.com col solo codice prenotazione, stato a "non pagata", mail
       cortese) e tutte le altre scadenze dovute. **In produzione la cadenza deve
@@ -783,6 +867,85 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
 - [ ] **[C]** Percorso "slot introvabile": link WhatsApp, prenotazione creata a
       mano dal team che innesca gli stessi workflow
 - [ ] **[C]** Controllo periodico di vitalità dei 25 webhook Cal.com
+
+### 🔬 Le prove che devi fare tu, in questo ordine
+
+**Questa è la parte che non ho potuto verificare, e non è un dettaglio.** Tutto
+il resto del giro del pagamento gira nell'harness o l'ho provato contro l'API
+vera di Stripe. Il pezzo di oggi no: è un **iframe di terze parti in un
+browser**, e io non ho un browser. Ho verificato il *contratto* — i tipi
+pubblicati di `@calcom/embed-core@1.5.3` elencano `bookingSuccessfulV2` — e ho
+scartato la strada del redirect su prova documentale (issue Cal.com `#18144`);
+**non ho visto l'evento scattare.** Fra "il contratto dice che c'è" e "scatta sul
+nostro embed" c'è esattamente la distanza che con Cal.com abbiamo già pagato una
+volta, su `rescheduleUid`.
+
+Prerequisiti: migration `0040` applicata, il designer di prova pubblicato con
+`cal_username` scritto, il workflow Cal.com attivo. Le due righe di `app_config`
+e l'endpoint Stripe servono solo dal punto 4 in poi.
+
+| # | Cosa fai | Cosa deve succedere | Se non succede |
+|---|---|---|---|
+| 0a | L'header **da scollegato**, su qualunque pagina | A destra c'è *Accedi* rosso | — |
+| 0b | L'header **da collegato** | Al posto di *Accedi*: **"Ciao \<nome\>"** e un bottone *Esci* che ti riporta alla home scollegato | Se vedi ancora *Accedi* da collegato, la sessione non arriva all'header: guarda i cookie |
+| 0c | `/attesa` **in `npm run dev`**, aprendola a mano senza aver prenotato | Passa da "Stiamo registrando" a **"Lo slot è tuo, la conferma no"** dopo ~33 secondi. ⚠️ Prima dell'8 settembre restava su "Stiamo registrando" **per sempre** in sviluppo | Se resta bloccata: è tornata la guardia `useRef` sull'effetto, vedi `components/attesa-prenotazione.tsx` |
+| 1 | Vetrina di un designer **senza essere collegato** → *Prenota la call* | Vai a `/accedi`, e dopo Google torni **sulla stessa vetrina col servizio giusto**, non sulla home | Guarda il `?next=` nell'indirizzo: dev'essere `/designer/<slug>?servizio=…` |
+| 2 | Header: i tre link | *Accedi* → pagina; *Scopri i Travel Designer* → `/ricerca`; *Entra a far parte* → **spento**, con la spiegazione al passaggio del mouse | — |
+| 3 | Da collegato, *Prenota la call* | Il calendario compare **nella pagina**, e nel campo *Codice XPETIS* c'è il tuo UUID, **precompilato e non modificabile** | Se il campo è vuoto o scrivibile: l'identificatore sull'event type non è `xpetis_user_id` esatto |
+| 4 | Prenoti uno slot fino in fondo | **La pagina cambia da sé**, va su `/attesa` e poi su Stripe | ⚠️ **è il punto che conta.** Vedi sotto |
+| 5 | Dalla pagina Stripe torni indietro col tasto del browser | La pagina della prenotazione dice *Manca il pagamento* col conto alla rovescia, e il tasto riapre **la stessa** cassa, non una seconda | Se apre una cassa nuova, in `payments` compaiono due righe: dimmelo |
+| 6 | Paghi con `4242 4242 4242 4242` | *Stiamo confermando* per qualche secondo, poi *Consulenza confermata* col link della videochiamata | Guarda `webhook_events where provider='stripe'` |
+| 7 | Prenoti dopo aver **spento il workflow n8n Cal.com** | Dopo ~33 secondi: *"Lo slot è tuo, la conferma no"*, il link WhatsApp, e una riga `calcom_webhook_non_arrivato` in `team_alerts` | — |
+| 8 | Apri a mano `/accedi?next=https://example.com` | **Non ti porta fuori dal sito.** `next` accetta solo percorsi interni | Se esci dal dominio, la pagina è un trampolino: fermati e dimmelo |
+| 9 | Sotto il calendario, clicca **di proposito** *"Hai finito di prenotare e la pagina non è cambiata? → Vai al pagamento"* | Stessa destinazione dell'evento automatico | È il paracadute se `bookingSuccessfulV2` cambia nome: se è rotto lo scopriamo il giorno in cui serve |
+| 10 | Sulla pagina della prenotazione, *Paga la consulenza* **due volte in rapida successione** | `select count(*) from payments where booking_id='<id>'` deve dare **1** | È ciò per cui esistono `payments_one_pending_per_kind` e l'ordine invertito nella route: riga prima, Stripe dopo |
+| 11 | Da un **secondo account Google**, apri `/prenotazione/<id di una prenotazione del primo>` | **404**, non un errore di permessi: inesistente e "non è tua" danno la stessa risposta di proposito | Controllo di autorizzazione che nessun test automatico copre |
+| 12 | `update bookings set payment_deadline_at = now() - interval '1 minute' where id='<id>';` poi *Paga* | **Rifiuta.** L'autorità è `payment_deadline_at`, non lo stato | Conta doppio finché l'orologio dei 5 minuti non esiste |
+
+⚠️ **Le prove 0c e 7 scrivono un alert critico vero** (`calcom_webhook_non_arrivato`):
+è corretto che lo facciano, ma è un falso allarme di collaudo e va tolto, come
+già fatto per quello di Stripe —
+`delete from team_alerts where kind = 'calcom_webhook_non_arrivato';`
+
+**Sul punto 4, se non si muove niente.** Non è un caso da rincorrere a mano:
+sotto il calendario c'è **sempre** la riga *"Hai finito di prenotare e la pagina
+non è cambiata? → Vai al pagamento"*, che porta esattamente dove porta l'evento.
+Il flusso quindi non è mai bloccato, è solo meno liscio. Se accade, apri la
+console del browser **prima** di ricaricare e guarda quale evento arriva:
+
+```js
+// nella console, sulla vetrina, dopo aver aperto il calendario e prima di prenotare
+["bookingSuccessfulV2", "bookingSuccessful", "*"].forEach((a) =>
+  window.Cal.ns[Object.keys(window.Cal.ns)[0]]("on", {
+    action: a,
+    callback: (e) => console.log("EVENTO:", a, e.detail),
+  }),
+)
+```
+
+Il nome che compare è la risposta, e si cambia in `lib/cal-embed.ts`: due
+costanti in cima al file. **Dimmelo invece di sistemarlo** — se il nome è
+cambiato è cambiato per tutti, e va scritto nel registro, perché è la stessa
+classe di trappola di `rescheduleUid`.
+
+⚠️ **Il punto 7 mostra in pagina il numero WhatsApp, che è il tuo cellulare.**
+Non è pubblicato (gruppo `contacts`, che `public_config` non espone) ma resta
+visibile a chi apre quella pagina: fai quella prova su localhost, non su un
+indirizzo Vercel condiviso.
+
+
+### ❓ Domande aperte nate dall'imbocco (8 settembre 2026)
+
+Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario di
+`CLAUDE.md` — e nessuna si chiude scrivendo codice.
+
+| Domanda | Perché è aperta | Chi decide |
+|---|---|---|
+| **La pagina "Entra a far parte di XPETIS" esiste?** L'header e il footer la linkano entrambi. Il Flusso non descrive nessuna pagina di reclutamento dei Travel Designer, il Figma non la mostra, e i 25 arrivano da un form esterno (`Vetrina TD (2).html`) gestito a mano dal team. Costruirla vorrebbe dire decidere chi può candidarsi e cosa succede dopo: non è una scelta tecnica. **Per ora le due voci sono spente con una spiegazione**, non linkano un 404 | Serve sapere se il reclutamento è pubblico o su invito | Alessandro, Andrea |
+| **`/viaggi-di-gruppo`, `/about`, `/privacy`, `/contatti`**: quattro voci del footer che portano a 404. Le ho **lasciate come link** di proposito, al contrario di quella sopra: quelle pagine *devono* esistere — la privacy per obbligo di legge — e spegnerle direbbe "non ci saranno", che è falso. Aspettano un contenuto, non una decisione tecnica | I testi non sono lavoro mio; la privacy passa da S-14 | Gaia (testi), legale (privacy) |
+| **La sezione "Viaggi di gruppo" della vetrina** resta senza sorgente, come già segnato in milestone 3. La voce del footer punta allo stesso buco | — | Chiara, Gaia |
+| **Come si vede l'header di chi è collegato?** Il Figma non lo mostra, e per il corollario di `CLAUDE.md` l'assenza non è una decisione. La versione costruita l'8 settembre è la minima onesta — *"Ciao \<nome\>"* e un bottone *Esci* — e le domande sono tre: **nome o avatar** (Google dà `avatar_url`, non l'ho usato: un'immagine tonda nella pillola è una scelta di disegno, non una mia); **testo o tendina**; **dove sta l'uscita**, se dentro una tendina o in chiaro come adesso. ⚠️ Qualunque tendina va riempita con voci che **esistono**: *"Le mie prenotazioni"* non c'è, ed è una decisione di prodotto aperta, non un pezzo mancante | Serve una riga di Figma, o un ok a quella che c'è | Chiara |
+
 
 ---
 

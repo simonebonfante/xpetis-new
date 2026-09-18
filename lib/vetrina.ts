@@ -58,6 +58,17 @@ export type Servizio = {
   text_during_call: string | null
   text_after_call: string | null
   bullets: string[]
+  /**
+   * Lo slug dell'event type Cal.com di questo servizio (migration 0040). Sta sul
+   * servizio e non sul designer perché consulenza e consulenza approfondita sono
+   * due event type distinti. Insieme a `Vetrina.cal_username` forma il link
+   * `<username>/<slug>` che l'embed apre.
+   *
+   * `null` su un servizio che non si prenota da calendario (su misura, All
+   * Inclusive) e su un servizio che il team non ha ancora collegato: in
+   * entrambi i casi l'embed non si apre, e il tasto non compare.
+   */
+  cal_event_type_slug: string | null
 }
 
 export type ViaggioFirma = {
@@ -132,6 +143,12 @@ export type Vetrina = {
   services: Servizio[]
   signature_trips: ViaggioFirma[]
   ready_itineraries: ItinerarioPronto[]
+  /**
+   * L'account Cal.com del designer (migration 0040). `null` finché il team non
+   * l'ha collegato — ed è un blocco alla pubblicazione, quindi su un profilo
+   * pubblicato c'è; il tipo lo ammette perché la colonna lo ammette.
+   */
+  cal_username: string | null
 }
 
 /** La vetrina di un designer pubblicato, o `null` se lo slug non esiste. */

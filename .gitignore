@@ -3,7 +3,14 @@ node_modules/
 supabase/.temp/
 .env*.local
 .DS_Store
-client_secret*/.next/
+# Il client secret OAuth di Google, come lo scarica la console (un .json con un
+# nome lunghissimo). Fino all'8 settembre 2026 questa riga era
+# `client_secret*/.next/`: due righe finite in una, e `client_secret*/` è un
+# pattern di CARTELLA — non ha mai coperto un file, e il segreto è rimasto
+# tracciato dal commit `ce5aafa`. Il file è stato tolto dall'indice e dal
+# disco, ma **la storia di git lo conserva**: va ruotato. Vedi `ACCESSI.md`.
+# (`.next/`, l'altra metà di quella riga, era già coperto più sotto da `/.next/`.)
+client_secret*
 /out/
 /node_modules/
 next-env.d.ts

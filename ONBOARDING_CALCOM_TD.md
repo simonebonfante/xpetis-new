@@ -131,6 +131,28 @@ altro deve rincorrerla" a "non si può fare".
 > **L'identificatore deve essere scritto `xpetis_user_id` esatto**, minuscolo,
 > con i trattini bassi. È il nome con cui lo leggiamo nel messaggio.
 
+### Il redirect dopo la prenotazione: lasciarlo VUOTO
+
+**Non è un passo da fare, è un passo da non fare** — e per questo sta scritto:
+in *Impostazioni avanzate* c'è **"Redirect on booking"** (o *Reindirizza a URL
+dopo la prenotazione*). **Va lasciato vuoto su tutti e venticinque.**
+
+Sembrerebbe la strada naturale per portare il viaggiatore dalla prenotazione al
+pagamento, e non lo è. La prenotazione avviene dentro un **embed inline** sulla
+vetrina XPETIS, cioè dentro un iframe: un redirect configurato lì fa navigare
+**l'iframe**, non la pagina, e la nostra pagina di pagamento finirebbe disegnata
+dentro il calendario, incorniciata. È un difetto noto e aperto di Cal.com
+(issue `#18144`).
+
+Al passaggio ci pensa il sito, che ascolta l'evento che l'embed emette a
+prenotazione fatta. Il vantaggio, oltre a funzionare: **niente da configurare su
+25 account**, e nessuna impostazione che qualcuno possa cambiare per sbaglio
+spegnendo il pagamento di un designer solo.
+
+Se un giorno servisse davvero — per esempio per chi prenota dalla pagina Cal.com
+nuda invece che dalla vetrina — sarebbe una modifica su tutti e venticinque gli
+account, quindi va decisa e programmata, non aggiunta a metà.
+
 ---
 
 ## 3. La consulenza approfondita (solo per chi la offre)
@@ -227,6 +249,7 @@ webhook è scritto giusto? gli eventi sono spuntati?
 [ ] disable cancelling: spento
 [ ] require cancellation reason: solo host
 [ ] campo nascosto xpetis_user_id
+[ ] redirect on booking LASCIATO VUOTO
 [ ] consulenza approfondita (se prevista per questo designer)
 [ ] webhook verso n8n, 3 eventi, secret condiviso
 [ ] event type di fabbrica spenti

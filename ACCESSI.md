@@ -13,7 +13,12 @@
 > identificatori di progetto e la chiave publishable di Supabase, che finisce
 > comunque nel browser di chiunque apra il sito.
 
-Aggiornato al 10 agosto 2026. Se cambia qualcosa, si aggiorna qui.
+Aggiornato all'8 settembre 2026. Se cambia qualcosa, si aggiorna qui.
+
+> **Un segreto esposto si chiude ruotandolo, non cancellandolo.** Toglierlo da un
+> file non lo toglie dalla storia di git, dai backup, né dalle copie che qualcuno
+> ha già. Vale per il client secret di Google (ruotato l'8 settembre) e vale per
+> la password del database, **che è ancora quella dei primi otto commit**.
 
 ---
 
@@ -113,8 +118,62 @@ https://rsgyxbqzsxahsbdfgtbm.supabase.co/auth/v1/callback
 
 **Segreto:** il client secret sta nel password manager **e** dentro Supabase
 (Authentication → Providers → Google). Il file `client_secret_*.json` scaricato da
-Google **non va tenuto nella cartella**: è coperto da `.gitignore`, ma una volta
-incollato in Supabase non serve più.
+Google non va tenuto nella cartella: una volta incollato in Supabase non serve
+più.
+
+### ✅ Il client secret è stato ruotato — 8 settembre 2026
+
+**Chiuso.** Secret nuovo generato su Google Auth Platform, incollato in Supabase,
+login riprovato, **secret vecchio cancellato**. Quello che sta in git dal commit
+`ce5aafa` **non funziona più**: è la sola cosa che chiude davvero un segreto
+esposto, perché la storia di git non si ripulisce.
+
+Il `client_id` non è cambiato — la rotazione tocca solo il secret — quindi non è
+stato necessario aggiornare né i redirect URI, né le variabili di Vercel, né
+`.env.local`. Il client secret vive in due posti: Supabase Auth e il password
+manager.
+
+*Come si rifà, se serve.* Google Auth Platform → **Clients** → il client →
+**Add Secret**. Il nuovo nasce abilitato e il vecchio resta valido, quindi la
+rotazione non ha finestre di disservizio; il massimo è **due secret per client**.
+Le sessioni già aperte non si rompono: il secret serve solo nello scambio del
+codice, quindi tocca i login nuovi e non chi è già dentro.
+
+⚠️ **La trappola da ricordare la prossima volta.** Provare il login *mentre
+entrambi i secret sono attivi* non dimostra niente: funzionerebbe anche con il
+vecchio, quindi un incolla andato male darebbe comunque verde. Il segnale vero
+si ottiene **disabilitando** il vecchio (reversibile) e riprovando; solo dopo si
+cancella. La verifica oggettiva non è la pagina che si ricarica ma
+`select email, last_sign_in_at from auth.users order by last_sign_in_at desc` —
+quel timestamp si muove solo se lo scambio con Google è riuscito.
+
+<details>
+<summary>Com'era andata (storico)</summary>
+
+**Non era coperto da `.gitignore`, ed è finito in git.** La riga che doveva
+coprirlo era `client_secret*/.next/` — due righe finite in una — e
+`client_secret*/` con la barra è un pattern di **cartella**: non ha mai
+intercettato un file. Il file
+`client_secret_947311069781-….apps.googleusercontent.com.json` è quindi
+tracciato dal commit **`ce5aafa`** ("init nextjs project with google auth").
+
+L'8 settembre 2026 il file è stato tolto dall'indice (`git rm --cached`),
+cancellato dal disco, e la riga di `.gitignore` corretta in `client_secret*`.
+**Questo non basta:** togliere un file dall'indice non lo toglie dalla storia.
+Chiunque abbia o ottenga una copia del repository può leggere quel segreto con
+`git show ce5aafa`, e riscrivere la storia di un repo condiviso è peggio del
+problema. **Per questo si è ruotato: è la rotazione che chiude il buco, non la
+cancellazione del file.**
+
+</details>
+
+*Cosa poteva farci chi l'aveva.* Da solo un client secret non dà accesso agli
+account Google di nessuno: serve insieme al client ID per farsi passare per la
+nostra applicazione nello scambio del codice OAuth, e lo scambio arriva a
+Supabase, sul redirect URI registrato. È abbastanza per montare un login che
+sembra XPETIS, non per entrare in un account. Va ruotato comunque, e non è una
+cosa da rimandare a dopo il lancio: dopo il lancio quel client ID sarà su una
+pagina pubblica.
 
 **Da fare al lancio:** portare l'app da "Test" a "Produzione". In Test entrano
 solo utenti elencati a mano, massimo 100.
@@ -306,8 +365,8 @@ I gruppi si creano a mano: le API non permettono di crearli.
 
 ```
 [ ] Supabase · chiave sb_secret_
-[ ] Supabase · password del database
-[ ] Google Cloud · OAuth client secret
+[ ] Supabase · password del database           ← 🔴 DA RUOTARE: è in git dai primi 8 commit
+[ ] Google Cloud · OAuth client secret         ← ✅ ruotato l'8 set 2026, il vecchio non funziona più
 [ ] Railway · accesso all'account
 [ ] n8n · N8N_ENCRYPTION_KEY        ← irrecuperabile
 [ ] n8n · account proprietario (email + password)
@@ -335,7 +394,7 @@ Vale la pena saperlo prima, non dopo.
 |---|---|
 | Password del database Supabase | **Sì**, si rigenera dalla console |
 | Chiave `sb_secret_` | **Sì**, si ruota dalla console (poi va aggiornata dove è usata) |
-| Client secret di Google | **Sì**, se ne genera un altro |
+| Client secret di Google | **Sì**, *Add Secret* sul client: il nuovo nasce vivo accanto al vecchio, senza disservizio (massimo due) |
 | Chiave `sk_test_` di Stripe | **Sì**, si ruota |
 | Signing secret del webhook Stripe | **Sì**, si rigenera dall'endpoint — poi va riscritto in Vault |
 | Parola segreta del webhook Cal.com | **Sì**, ma va riscritta su tutti i 25 account a mano |

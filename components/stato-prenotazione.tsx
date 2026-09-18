@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -160,18 +160,33 @@ async function paga(
   setMotivo(corpo?.motivo ?? 'Non siamo riusciti ad aprire il pagamento. Riprova.')
 }
 
-/** Quanto manca alla scadenza, aggiornato al secondo. */
+/**
+ * Quanto manca alla scadenza, aggiornato al secondo.
+ *
+ * `fine` era un ref inizializzato dalla prop, ed è diventato un valore derivato
+ * l'8 settembre 2026, nella stessa passata in cui è caduta la guardia di
+ * `attesa-prenotazione.tsx`. Non era la stessa guardia — questo non ha mai
+ * bloccato niente — ma era sbagliato in un altro modo: **un ref inizializzato da
+ * una prop rivaluta l'espressione a ogni resa e ne conserva soltanto la prima.**
+ * Se `scadenza` cambiasse (un `router.refresh()` che riporta una riga
+ * aggiornata), il conto continuerebbe a puntare alla scadenza vecchia, in
+ * silenzio.
+ *
+ * Un numero derivato dalla prop non ha quel difetto e sta nelle dipendenze
+ * dell'effetto, che così riparte quando la scadenza cambia davvero. Un ref serve
+ * a ricordare qualcosa *fra* le rese; qui non c'era niente da ricordare.
+ */
 function Conto({ scadenza }: { scadenza: string | null }) {
   const [resta, setResta] = useState<number | null>(null)
-  const fine = useRef<number | null>(scadenza ? new Date(scadenza).getTime() : null)
+  const fine = scadenza ? new Date(scadenza).getTime() : null
 
   useEffect(() => {
-    if (fine.current === null) return
-    const calcola = () => setResta(Math.max(0, Math.floor((fine.current! - Date.now()) / 1000)))
+    if (fine === null) return
+    const calcola = () => setResta(Math.max(0, Math.floor((fine - Date.now()) / 1000)))
     calcola()
     const t = setInterval(calcola, 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [fine])
 
   if (resta === null) return null
   if (resta === 0) return <>Il tempo è finito: ricarica la pagina.</>

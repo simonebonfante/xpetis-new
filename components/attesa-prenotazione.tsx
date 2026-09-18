@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -27,14 +27,34 @@ export function AttesaPrenotazione({ whatsapp }: { whatsapp: string | null }) {
   const router = useRouter()
   const [stato, setStato] = useState<Stato>('cerco')
   const [dettaglio, setDettaglio] = useState<string | null>(null)
-  // React monta due volte in sviluppo: senza questa guardia il giro parte
-  // doppio e la cassa si apre due volte.
-  const avviato = useRef(false)
 
+  // ## Il ref che c'era qui, e perché bloccava la pagina per sempre
+  //
+  // Fino all'8 settembre 2026 questo effetto era protetto da
+  // `const avviato = useRef(false)`, messo lì per impedire il doppio giro sotto
+  // StrictMode. Il risultato era che **non girava nessun ciclo**: la pagina
+  // restava su "Stiamo registrando la tua prenotazione" per sempre, senza
+  // arrivare né alla cassa né al messaggio di fallimento dei 33 secondi.
+  //
+  // I due meccanismi si annullavano a vicenda, e la ragione vale la pena
+  // saperla: **un ref sopravvive al rimontaggio, una variabile della closure
+  // no.** StrictMode monta, smonta e rimonta. Al primo giro `avviato.current`
+  // diventa `true` e parte il ciclo; il cleanup dello smontaggio spegne il
+  // `vivo` di *quella* esecuzione, e il ciclo muore; al rimontaggio la seconda
+  // esecuzione trova `avviato.current` ancora `true` — perché il ref è lo
+  // stesso oggetto — e **esce prima di cominciare**. Il primo ciclo è morto, il
+  // secondo non è mai nato.
+  //
+  // `vivo` da solo è già la difesa giusta, e completa: ogni esecuzione
+  // dell'effetto ha la propria variabile, ogni cleanup spegne soltanto la
+  // propria, e resta in vita esattamente un ciclo — l'ultimo. Il ref non
+  // aggiungeva niente e toglieva l'unica esecuzione buona.
+  //
+  // Vale come regola generale: **un `useRef` che fa da guardia a un effetto che
+  // ha anche un cleanup è quasi sempre un errore.** Il cleanup è già il modo di
+  // dire "questa esecuzione non conta più"; un ref dice invece "nessuna
+  // esecuzione conta più", che è un'altra cosa.
   useEffect(() => {
-    if (avviato.current) return
-    avviato.current = true
-
     let vivo = true
     const attendi = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -85,8 +105,6 @@ export function AttesaPrenotazione({ whatsapp }: { whatsapp: string | null }) {
     return () => {
       vivo = false
     }
-    // `avviato` impedisce il secondo giro: le dipendenze qui non riavviano
-    // niente, ci sono perché la regola le vuole complete.
   }, [router])
 
   if (stato === 'cerco' || stato === 'apro') {

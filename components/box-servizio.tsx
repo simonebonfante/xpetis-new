@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { PrenotaConsulenza } from '@/components/prenota-consulenza'
 import {
   ETICHETTA_SERVIZIO,
   formattaPrezzo,
@@ -37,6 +38,17 @@ type Props = {
   attivo: Servizio
   /** Il percorso della vetrina, per costruire i link del selettore. */
   slug: string
+  /**
+   * L'account Cal.com del designer (migration 0040). `null` se il team non l'ha
+   * ancora collegato: in quel caso non c'è nessun calendario da aprire, e il
+   * tasto non compare — vedi `calLink` più sotto.
+   */
+  calUsername: string | null
+  /**
+   * Chi sta guardando, se collegato. Serve al tasto *Prenota*: senza UUID
+   * l'embed non si apre, e il perché sta in `components/prenota-consulenza.tsx`.
+   */
+  utente: { id: string; nome: string | null; email: string | null } | null
 }
 
 /** Nel Figma la scheda dice "Call con {nome}". Vale per ciò che è una call. */
@@ -80,9 +92,29 @@ function Pillola({
   )
 }
 
-export function BoxServizio({ nomeDesigner, servizi, attivo, slug }: Props) {
+export function BoxServizio({
+  nomeDesigner,
+  servizi,
+  attivo,
+  slug,
+  calUsername,
+  utente,
+}: Props) {
   const prezzo = formattaPrezzo(attivo.price_cents)
   const acquistabile = siCompraInVetrina(attivo.service_type)
+
+  // Il link dell'embed esiste solo se esistono entrambi i pezzi. Un servizio
+  // acquistabile senza calendario collegato è una riga incompleta che il team
+  // deve sistemare, non un tasto da mostrare speranzosi: `td_publish_blockers`
+  // lo impedisce alla pubblicazione, ma la vista può servire un profilo
+  // modificato dopo.
+  const calLink =
+    acquistabile && calUsername && attivo.cal_event_type_slug
+      ? `${calUsername}/${attivo.cal_event_type_slug}`
+      : null
+
+  // Il ritorno dal login riporta al box giusto, non al primo della lista.
+  const percorsoVetrina = `/designer/${slug}?servizio=${attivo.service_type}#servizi`
 
   // La spunta del Figma ("Voglio che {nome} progetti e prenoti tutto per me") ha
   // senso solo se quel designer offre davvero qualcosa da comprare dopo la call.
@@ -190,22 +222,27 @@ export function BoxServizio({ nomeDesigner, servizi, attivo, slug }: Props) {
             </div>
           )}
 
-          {/* **Il tasto non naviga, ed è voluto.** Alla prenotazione ci porta
-              l'iframe Cal.com del designer, incorporato in questa stessa pagina:
-              è milestone 4, insieme al login al momento del Prenota e alla cassa
-              aperta dal server. Un `href` verso una pagina che non esiste
-              sarebbe un 404 travestito da funzionalità. */}
-          <button
-            type="button"
-            disabled
-            aria-describedby="prenota-nota"
-            className="mt-8 w-full rounded-[20px] bg-primario px-5 py-2 text-corpo text-neutro opacity-60"
-          >
-            Prenota la call
-          </button>
-          <p id="prenota-nota" className="mt-2 text-center text-piccolo">
-            La prenotazione si apre qui a breve.
-          </p>
+          {/* Il tasto apre l'iframe Cal.com del designer in questa stessa
+              pagina (deciso il 10 agosto: nessuna pagina di prenotazione
+              disegnata). Fino all'8 settembre era `disabled` con la nota "a
+              breve": era la regola del 404 travestito da funzionalità, e ha
+              smesso di applicarsi quando la destinazione è comparsa. */}
+          {calLink ? (
+            <PrenotaConsulenza
+              calLink={calLink}
+              utente={utente}
+              percorsoVetrina={percorsoVetrina}
+              nomeDesigner={nomeDesigner}
+            />
+          ) : (
+            /* Nessun calendario collegato: la stessa scelta di prima, per la
+               stessa ragione. Un tasto che non può portare a un calendario è
+               peggio del vuoto. */
+            <p className="mt-8 rounded-[15px] bg-crema p-4 text-corpo">
+              La prenotazione di {nomeDesigner} non è ancora aperta. Scrivici e ti mettiamo in
+              contatto noi.
+            </p>
+          )}
         </>
       ) : (
         /* Niente tasto: su misura e All Inclusive non si comprano dalla vetrina.

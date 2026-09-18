@@ -2,17 +2,43 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { BadgeStella } from './badge-stella'
 
-const COLONNE = [
+/**
+ * Le voci del footer, come le elenca il Figma.
+ *
+ * `inerte` marca una voce che **non ha una destinazione e non l'avrà**: la si
+ * mostra spenta con una spiegazione invece di linkare un 404. Oggi ne esiste una
+ * sola, "Entra nella Community", e la ragione è la stessa scritta in
+ * `components/header.tsx`: il Flusso non descrive una pagina di reclutamento dei
+ * Travel Designer, i 25 arrivano da un form esterno gestito a mano, e
+ * costruirne una vorrebbe dire decidere per il business. Domanda aperta in
+ * `PIANO.md`, non un pezzo mancante.
+ *
+ * ⚠️ Le altre voci senza pagina — `/viaggi-di-gruppo`, `/about`, `/privacy`,
+ * `/contatti` — restano link normali di proposito: quelle pagine **devono
+ * esistere** (la privacy per obbligo di legge) e i loro testi non sono lavoro
+ * tecnico. Spegnerle direbbe "non ci saranno", che è falso. Sono in `PIANO.md`
+ * fra le cose che aspettano un contenuto.
+ */
+const COLONNE: {
+  titolo: string
+  voci: { testo: string; href?: string; inerte?: string }[]
+}[] = [
   {
     titolo: 'Per i viaggiatori',
     voci: [
-      { testo: 'Scopri i Travel Designer di XPETIS', href: '/designer' },
+      { testo: 'Scopri i Travel Designer di XPETIS', href: '/ricerca' },
       { testo: 'Esplora i viaggi di gruppo', href: '/viaggi-di-gruppo' },
     ],
   },
   {
     titolo: 'Per i Travel Designer',
-    voci: [{ testo: 'Entra nella Community', href: '/travel-designer' }],
+    voci: [
+      {
+        testo: 'Entra nella Community',
+        inerte:
+          'Le candidature dei Travel Designer passano ancora dal team: scrivici a info@xpetis.it.',
+      },
+    ],
   },
   {
     titolo: 'Company',
@@ -35,9 +61,19 @@ export function Footer() {
               <ul className="space-y-3 text-corpo">
                 {colonna.voci.map((voce) => (
                   <li key={voce.testo}>
-                    <Link href={voce.href} className="hover:text-primario">
-                      {voce.testo}
-                    </Link>
+                    {voce.href ? (
+                      <Link href={voce.href} className="hover:text-primario">
+                        {voce.testo}
+                      </Link>
+                    ) : (
+                      <span
+                        aria-disabled="true"
+                        title={voce.inerte}
+                        className="cursor-default opacity-50"
+                      >
+                        {voce.testo}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

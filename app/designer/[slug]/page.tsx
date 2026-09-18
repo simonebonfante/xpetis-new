@@ -2,6 +2,7 @@ import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 
+import { leggiUtente } from '@/lib/supabase/utente'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { BoxServizio } from '@/components/box-servizio'
@@ -35,9 +36,10 @@ import {
  *     `public_td_showcase` non espone. Vedi il commento in testa a
  *     `lib/vetrina.ts`.
  *  3. **La sezione "Viaggi di gruppo"**: non ha una sorgente. Vedi più sotto.
- *  4. **Il tasto "Prenota la call"**: non naviga, perché la sua destinazione è
- *     la milestone 4. *"Ottieni maggiori informazioni" invece naviga dal 23
- *     agosto*, da quando esiste la pagina dell'itinerario pronto.
+ *  4. ~~**Il tasto "Prenota la call"**: non naviga~~ → **dall'8 settembre apre
+ *     l'embed Cal.com** in questa stessa pagina, e chiede il login prima se
+ *     serve. *"Ottieni maggiori informazioni" naviga dal 23 agosto*, da quando
+ *     esiste la pagina dell'itinerario pronto.
  *
  * E una che il Figma dice in un modo e il Flusso in un altro: il selettore dei
  * servizi. La riconciliazione è in `components/box-servizio.tsx`.
@@ -185,6 +187,25 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
   const servizi = ordinaServizi(vetrina.services)
   const attivo = servizioAttivo(servizi, uno(query.servizio))
 
+  // Chi sta guardando, se collegato. Serve solo al tasto *Prenota*: la vetrina
+  // resta identica per un anonimo, perché il Flusso vuole la navigazione
+  // anonima e il login soltanto al momento della prenotazione.
+  //
+  // La pagina è già dinamica di fatto (legge la vista a ogni richiesta), quindi
+  // non cambia il regime di resa. `leggiUtente` è memorizzato per richiesta:
+  // l'header chiede la stessa cosa, e il giro verso Supabase si fa una volta.
+  const user = await leggiUtente()
+  const utente = user
+    ? {
+        id: user.id,
+        nome:
+          (user.user_metadata?.full_name as string | undefined) ??
+          (user.user_metadata?.name as string | undefined) ??
+          null,
+        email: user.email ?? null,
+      }
+    : null
+
   const viaggi = vetrina.signature_trips
   const itinerari = vetrina.ready_itineraries
   const storia = paragrafi(vetrina.bio)
@@ -233,6 +254,8 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
               servizi={servizi}
               attivo={attivo}
               slug={vetrina.slug}
+              calUsername={vetrina.cal_username}
+              utente={utente}
             />
           )}
         </div>

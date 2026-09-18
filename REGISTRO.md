@@ -66,6 +66,252 @@ l'imbocco dall'altro. Oggi funziona e non si vede.
 
 ---
 
+**8 settembre 2026 — l'imbocco del funnel, e un segreto in git**
+
+La milestone 4 funzionava e non si vedeva: costruita dal centro, senza l'orologio
+da un lato e senza l'imbocco dall'altro. Oggi entra l'imbocco. `/accedi`,
+l'embed Cal.com sulla vetrina, il passaggio automatico a `/attesa`, migration
+`0040`. Harness a **349 asserzioni**, verdi.
+
+*Prima di tutto: il client secret di Google era in git.* La riga di `.gitignore`
+che doveva coprirlo era `client_secret*/.next/` — due righe finite in una — e
+`client_secret*/` con la barra finale è un pattern di **cartella**: non ha mai
+intercettato un file. Il segreto è tracciato dal commit `ce5aafa`, cioè dal
+primo. Tolto dall'indice, cancellato dal disco, riga corretta; ma togliere un
+file dall'indice **non lo toglie dalla storia**, e riscrivere la storia di un
+repo condiviso è peggio del problema. Quindi va ruotato, la procedura in quattro
+passi è in `ACCESSI.md`, e la fa Simone. Vale la pena essere precisi su cosa
+poteva farci chi l'aveva: da solo un client secret non apre l'account Google di
+nessuno, serve a farsi passare per la nostra applicazione nello scambio del
+codice OAuth. Abbastanza per montare un login che sembra XPETIS, non per entrare
+in un account. Va ruotato comunque, e prima del lancio: dopo, quel client ID
+sarà su una pagina pubblica.
+
+> **Chiuso lo stesso giorno.** Simone ha generato il secret nuovo su Google Auth
+> Platform, l'ha incollato in Supabase, riprovato il login e **cancellato il
+> vecchio**: quello che sta in `ce5aafa` non funziona più. La rotazione non ha
+> avuto finestre di disservizio — *Add Secret* lascia vivo il precedente, e il
+> secret serve solo nello scambio del codice, quindi le sessioni aperte non si
+> rompono. Il `client_id` non cambia, quindi niente da aggiornare altrove.
+>
+> Una nota di metodo che vale la prossima volta: **provare il login con
+> entrambi i secret attivi non dimostra nulla** — funzionerebbe anche col
+> vecchio, quindi un incolla sbagliato darebbe verde comunque. Il segnale vero
+> arriva disabilitando il precedente (reversibile) e riprovando. E la prova
+> oggettiva non è la pagina che si ricarica, è `auth.users.last_sign_in_at`: quel
+> timestamp si muove solo se lo scambio con Google è riuscito.
+>
+> Resta 🔴 **la password del database**, che è ancora quella dei primi otto
+> commit. Stesso ragionamento, stessa cura richiesta.
+
+*Tre link nell'header, tre risposte diverse — ed è il punto.* Tutti e tre
+puntavano a un 404, ma non erano lo stesso problema. **`/accedi`** era una pagina
+mancante e basta: il componente esisteva, la catena OAuth funzionava, ho scritto
+il contenitore. **`/designer`** non era niente da inventare: la pagina che scopre
+i Travel Designer esiste, si chiama `/ricerca` e sta nel Figma — l'header ora ci
+punta diretto e `/designer` reindirizza, perché quell'indirizzo è già pubblicato
+su Vercel e un indirizzo dato una volta deve continuare a portare da qualche
+parte. **`/travel-designer`** invece è una **domanda**, non un buco: il Flusso non
+descrive nessuna pagina di reclutamento, il Figma non la mostra, i 25 designer
+arrivano da un form esterno gestito a mano, e costruirla vorrebbe dire decidere
+per il business chi può candidarsi. Voce spenta con la spiegazione al passaggio
+del mouse, e riga in `PIANO.md`. È il corollario di `CLAUDE.md` applicato tre
+volte con tre esiti: l'assenza di una cosa nel Figma non è una decisione, ma non
+è nemmeno sempre lo stesso tipo di assenza.
+
+Il footer aveva lo stesso `/travel-designer` più altri quattro 404. Ho spento
+solo quello, e ho **lasciato link** `/viaggi-di-gruppo`, `/about`, `/privacy`,
+`/contatti`: quelle pagine *devono* esistere — la privacy per obbligo di legge —
+e spegnerle direbbe "non ci saranno", che è falso. Sono due categorie diverse e
+meritano due trattamenti diversi.
+
+*Il login sulla prenotazione è un cancello, e per un motivo tecnico.* L'header
+dice giustamente che *Accedi* non è un cancello: la navigazione è anonima, lo
+vuole il Flusso. Prenotare no, e la ragione non è di prodotto: senza utente
+collegato non c'è UUID da mettere in `xpetis_user_id`, e una prenotazione senza
+quel codice produce uno slot occupato sul calendario del designer e **nessuna
+riga da noi** — il ponte risponde `viaggiatore_non_identificato`, alza un alert
+critico, e qualcuno deve rincorrere a mano una call che il viaggiatore crede
+prenotata. Il tasto quindi non deve *poter* aprire un embed senza UUID, e la
+garanzia è strutturale invece che un `if`: senza utente il componente non rende
+un bottone ma un link a `/accedi?next=<vetrina col servizio scelto>`, e il codice
+che monta l'iframe non è raggiungibile.
+
+Il `?next=` è validato: accetta **solo percorsi interni**. `next` arriva dalla
+query e finisce in un `redirect`, quindi senza controllo `/accedi?next=https://…`
+farebbe di quella pagina un trampolino verso l'esterno per chi si fida del nostro
+dominio.
+
+*La 0040, e la domanda che `CLAUDE.md` impone.* L'embed ha bisogno di
+`cal_username` e `cal_event_type_slug` nel browser, e nessuna vista li esponeva.
+Aggiunti a `public_td_showcase`, con la risposta scritta e non sottintesa: diventa
+leggibile la **corrispondenza designer → account Cal.com**, quindi si può
+prenotare dalla pagina Cal.com nuda saltando il nostro flusso. Non è un buco che
+apriamo noi — quella pagina è pubblica per costruzione, è raggiungibile cercando
+il nome del designer o leggendo il link in una delle mail native che teniamo
+accese (deviazione 5), e il ponte gestisce già quel caso con
+`viaggiatore_non_identificato`. Quello che **non** diventa leggibile è
+`cal_booking_uid`, e c'è un'asserzione che verifica che la vista non lo nomini
+nemmeno dentro il jsonb. Sapere *dove* prenotare è diverso dal poter cancellare
+la call di qualcun altro.
+
+`create or replace view` invece di `drop` + `create` come fa la 0028: aggiungere
+una colonna in coda è consentito, e così il `grant` non si perde. C'è
+un'asserzione anche su questo, perché un `drop view` avrebbe spento la vetrina
+per `anon` senza che niente fallisse in migration.
+
+*Come si sa che la prenotazione è finita: verificato, non dedotto.* Due strade
+possibili, e la differenza fra loro è grossa.
+
+La **prima** è il *Redirect on booking* sull'event type. **Scartata su prova
+documentale**: dentro un embed inline il redirect naviga *l'iframe*, non la
+pagina, quindi la nostra pagina di pagamento comparirebbe disegnata dentro il
+calendario, incorniciata. È un difetto noto e aperto di Cal.com (issue `#18144`).
+E anche se funzionasse sarebbero state **25 impostazioni da cambiare a mano**,
+con la conseguenza già registrata sul dominio e sull'URL n8n da decidere prima
+dell'onboarding.
+
+La **seconda** è l'evento che l'embed emette. Qui la verifica è la parte che
+conta, perché la pagina di documentazione degli eventi di Cal.com **non lo
+nomina**: elenca solo gli eventi interni (`__iframeReady`, `__dimensionChanged`)
+e dice espressamente di non fidarsene. Il contratto vero sta nei **tipi
+pubblicati** del pacchetto: `@calcom/embed-core@1.5.3`,
+`dist/src/sdk-action-manager.d.ts`, dove `EventDataMap` elenca
+`bookingSuccessfulV2` con il suo payload campo per campo e marca il vecchio
+`bookingSuccessful` come `@deprecated` con la nota — testuale — che V2 è quello
+che potranno "documentare bene". Stessa fonte per un'altra assunzione che
+altrimenti avrei dato per buona: `PrefillAndIframeAttrsConfig` è un
+`Record<string, string | …>`, quindi passare `xpetis_user_id` nel `config`
+dell'embed è supportato e non un trucco.
+
+Quindi: ci si iscrive a **entrambi** gli eventi, e la scelta **non richiede di
+toccare nessuno dei 25 account**. In `ONBOARDING_CALCOM_TD.md` è entrata una nota
+che è un passo *da non fare* — lasciare *Redirect on booking* vuoto — più una
+riga di checklist: se qualcuno lo compila per buone intenzioni, spegne il
+pagamento di quel designer solo, e sarebbe difficilissimo da diagnosticare.
+
+*Del payload dell'evento non si usa niente, e non è una dimenticanza.*
+`bookingSuccessfulV2` porta anche `uid`, cioè il codice della prenotazione. Serve
+solo il *fatto* che l'evento sia scattato: chi è il viaggiatore lo sa già il
+server dalla sessione, e la prenotazione la ritrova da sé. Vale la pena essere
+onesti su una cosa: quel codice **è comunque nel browser** appena l'embed mostra
+la conferma, e non possiamo impedirlo — è Cal.com che lo mette lì. Quello che
+dipende da noi è non accettarlo mai *dal* browser come se fosse una prova, e
+questo resta vero.
+
+*La via manuale, che deve esistere.* Sotto il calendario c'è sempre la riga «Hai
+finito di prenotare e la pagina non è cambiata? → Vai al pagamento», che porta
+esattamente dove porta l'evento. Se un giorno l'evento cambia nome, il
+viaggiatore non resta chiuso davanti a una conferma Cal.com senza via avanti,
+cioè con uno slot che il nostro orologio libererà fra mezz'ora mentre lui crede
+di avere un appuntamento. E `/attesa` era già scritta per fallire bene: cerca
+lato server, e se non trova avvisa il team. Cliccarla senza aver prenotato non fa
+danni.
+
+*Cosa ho verificato e cosa no, detto chiaro.* Ho verificato il contratto degli
+eventi sui tipi pubblicati, ho scartato il redirect su prova documentale, e
+l'harness copre la 0040. **Non ho visto l'evento scattare**, perché è un iframe
+di terze parti in un browser e io non ne ho uno: fra "il contratto dice che c'è"
+e "scatta sul nostro embed" c'è esattamente la distanza che con Cal.com abbiamo
+già pagato una volta, su `rescheduleUid`. L'elenco preciso di cosa provare e in
+che ordine — non collegato, collegato, prenotazione completata, webhook spento —
+è in `PIANO.md`, milestone 4, con dentro anche lo snippet da incollare in console
+per leggere quale evento arriva davvero se non si muove niente.
+
+---
+
+**8 settembre 2026 (terzo giro) — `bookingSuccessfulV2` è scattato, e il ref che bloccava `/attesa`**
+
+Due cose, e la prima è la notizia buona: **l'assunzione più fragile del pezzo di
+oggi ha tenuto.** `bookingSuccessfulV2` è scattato su un embed vero e la
+navigazione verso `/attesa` è avvenuta, quindi il contratto letto nei tipi
+pubblicati di `@calcom/embed-core` — quello che la pagina di documentazione degli
+eventi **non** elenca — descrive il comportamento reale. Era il punto su cui
+avevo scritto che fra "il contratto dice che c'è" e "scatta sul nostro embed" c'era
+la distanza già pagata una volta su `rescheduleUid`. Questa volta non c'era.
+
+*Il bug: due difese che si annullavano.* In `attesa-prenotazione.tsx` l'effetto
+era protetto da un `useRef` (`avviato`) messo lì contro il doppio montaggio di
+StrictMode, e aveva anche un cleanup che spegneva un flag di closure (`vivo`).
+Insieme non facevano girare **nessuno** dei due cicli: la pagina restava su
+"Stiamo registrando la tua prenotazione" per sempre, senza arrivare né alla cassa
+né al messaggio di fallimento dei 33 secondi.
+
+Il meccanismo, che vale la pena saper riconoscere: **un ref sopravvive al
+rimontaggio, una variabile della closure no.** Primo montaggio,
+`avviato.current = true`, il ciclo parte; smontaggio, il cleanup spegne il `vivo`
+di *quella* esecuzione e il ciclo muore; rimontaggio, la seconda esecuzione trova
+`avviato.current` ancora `true` — è lo stesso oggetto — ed esce prima di
+cominciare. Il primo ciclo morto, il secondo mai nato.
+
+`vivo` da solo era già la difesa completa: ogni esecuzione ha la propria
+variabile, ogni cleanup spegne soltanto la propria, e resta in vita esattamente
+un ciclo. Il ref non aggiungeva niente e toglieva l'unica esecuzione buona. La
+regola generale è scritta nel file: **un `useRef` che fa da guardia a un effetto
+che ha anche un cleanup è quasi sempre un errore** — il cleanup dice già "questa
+esecuzione non conta più", il ref dice "nessuna esecuzione conta più", e sono due
+cose diverse.
+
+*Perché conta più della prima nota:* **il difetto si vedeva solo in sviluppo.**
+In produzione StrictMode non raddoppia i montaggi, quindi l'unica esecuzione
+girava e la pagina funzionava. Un bug che esiste solo dove si prova è comunque un
+bug — è dove si prova che si decide se una cosa è pronta — e questo aveva la
+proprietà peggiore possibile: **si presentava come "il webhook Cal.com non
+arriva"**, mentre il webhook era arrivato benissimo e la riga era in tabella. Il
+sintomo puntava sul pezzo sbagliato, e su un pezzo che ha una sua storia di
+sorprese. Senza guardare il codice si sarebbe cercato in n8n.
+
+*La passata sul resto del codice.* Cercato lo stesso schema — un `useRef` che fa
+da guardia a un effetto con cleanup — e **non ce n'erano altri**: gli altri ref
+sono nodi del DOM (`contenitore`, `campo`), e `inViaggio` in
+`prenota-consulenza.tsx` non è quel caso, si alza soltanto quando l'evento scatta
+ed esiste perché siamo iscritti a due eventi.
+
+Ne è uscito un difetto **diverso** nello stesso posto concettuale: in
+`stato-prenotazione.tsx`, `fine` era un ref inizializzato da una prop. Non ha mai
+bloccato niente, ma un ref inizializzato da una prop rivaluta l'espressione a
+ogni resa e conserva soltanto la prima: se `scadenza` cambiasse, il conto alla
+rovescia continuerebbe a puntare alla scadenza vecchia, in silenzio. Diventato un
+valore derivato, che sta nelle dipendenze dell'effetto. Un ref serve a ricordare
+qualcosa *fra* le rese; là non c'era niente da ricordare.
+
+*L'header adesso dice chi sei, e il costo è stato misurato invece che stimato.*
+Leggere la sessione vuol dire leggere i cookie, e una pagina che legge i cookie
+non si prerenderizza. Prima della modifica le sole pagine statiche erano `/` e
+`/designer` — e `/designer` è un reindirizzamento che non rende l'header —
+quindi **la modifica rende dinamica una pagina sola: la home.** Verificato
+sull'uscita di `next build`, dove `/` è passata da `○` a `ƒ` e nient'altro si è
+mosso.
+
+E anche su quella il costo è più piccolo di come suona: `proxy.ts` intercetta già
+`/` e chiama `getUser()` a ogni richiesta per rinfrescare il token, quindi la home
+pagava già un giro verso Supabase e non è mai stata servita da una cache pura.
+Quello che si aggiunge è la resa React, non l'autenticazione. **La strada
+scartata** — header statico e stato del login risolto da un pezzo client — costa
+meno in resa e molto di più in sostanza: mostrerebbe *Accedi* a chi è collegato
+per qualche centinaio di millisecondi su ogni pagina, cioè il difetto che stiamo
+correggendo, solo più breve.
+
+Nel farlo è nato `lib/supabase/utente.ts`: `leggiUtente` avvolto in `cache()` di
+React, perché da quando l'header legge la sessione una pagina come la vetrina o
+`/accedi` la chiedeva **due volte** — una per sé e una per l'header — e ogni
+`getUser()` è un giro di rete verso il server di autenticazione, non una lettura
+locale del cookie. La memoria dura quanto la richiesta: non è una cache fra
+utenti diversi, che su un dato di sessione sarebbe un difetto grave.
+
+*Cosa NON ho messo nell'header.* Nessun menu a tendina, e *"Le mie
+prenotazioni"* non c'è: è una decisione di prodotto aperta, non un pezzo
+mancante, e una tendina con voci verso pagine inesistenti è il 404 travestito da
+funzionalità. Il Figma non mostra l'header da collegato, quindi la versione
+costruita è la minima onesta — chi sei e la via d'uscita — e le tre domande per
+Chiara (nome o avatar, testo o tendina, dove sta l'uscita) sono in `PIANO.md`.
+Il ripiego sul nome, quando Google non manda `full_name`, è **la parte della mail
+prima della chiocciola**: c'è sempre, è quasi sempre riconoscibile, e non stampa
+il dominio — una mail intera in cima alla pagina è un dato in più su uno schermo
+che qualcuno può guardare da sopra la spalla.
+
+---
+
 **7 settembre 2026 (secondo giro) — tre correzioni, e una che era un bug vero**
 
 Revisione del giro del pagamento prima di passare all'orologio. Harness a **344
