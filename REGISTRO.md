@@ -9,6 +9,129 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**18 settembre 2026 — "Le mie prenotazioni": non una comodità, un'uscita**
+
+La cosa non ovvia di questa pagina è che **non è un'area personale, è la toppa a
+un percorso che non aveva uscita**. Fino a oggi chi chiudeva la scheda fra la
+prenotazione e il pagamento non aveva nessun modo di tornare indietro: nessuna
+lista, e la mail che gli darebbe il link non esiste perché il provider di invio è
+ancora un punto aperto (S-04). Quella prenotazione diventava irraggiungibile e
+scadeva da sola, lasciando occupato uno slot sul calendario di un designer. In un
+disegno guidato dalle mail una lista personale sarebbe stata comodità; senza le
+mail è l'unica porta.
+
+**E la mail serve lo stesso**, non è stata sostituita: questa pagina copre chi
+torna sul sito da sé, che sono pochi. Gli altri li raggiunge solo chi li va a
+cercare nella loro casella.
+
+Costruita senza toccare il database: `my_bookings` esiste dal 4 agosto
+(migration `0019`) ed era già stata scritta per questo, `payment_deadline_at`
+compreso dalla `0038`. Quattro scelte, in ordine di quanto costavano se
+sbagliate.
+
+*Si legge con il client della sessione.* `my_bookings` filtra su `auth.uid()`, e
+con la chiave secret `auth.uid()` è **nullo**: la vista tornerebbe zero righe e
+la pagina direbbe "non hai prenotazioni" a chi ne ha tre, **senza nessun errore e
+senza nessun segno**. È il guasto peggiore di questa pagina proprio perché
+somiglia a un dato mancante invece che a un difetto.
+
+*Lo stato mostrato non è `status`.* `pending_payment` non vuol dire "pagabile":
+l'orologio dei 5 minuti non esiste ancora, quindi ci sono — e continueranno a
+esserci — righe scadute che nessuno ha portato a `cancelled_unpaid`. L'autorità è
+`payment_deadline_at`, la stessa che applica la route della cassa, **compreso il
+caso della scadenza assente**, che là vale pagabile e qui deve valere uguale. I
+sette stati diventano nove situazioni (`lib/prenotazioni.ts`), e nessuna resta
+muta: `completed`, `no_show` e `disputed` hanno la loro frase, perché una riga
+che non dice niente diventa un messaggio al team.
+
+*Il percorso è scelto, non ereditato.* `/le-mie-prenotazioni` e non
+`/prenotazioni`, che sarebbe più corto e disterebbe **una lettera** da
+`/prenotazione/[id]`. Una "i" persa o aggiunta in un `href`, in un redirect o in
+un `?next=` non rompe niente di visibile e nessun controllo di tipo la
+intercetta.
+
+*Estratto invece che ricopiato.* `Conto` e il tasto *Paga* vivevano dentro
+`stato-prenotazione.tsx`, e in quel tasto stanno tre comportamenti che si
+scoprono solo sbagliandoli: il bottone che si spegne mentre parla con Stripe (la
+prova 10), la risposta `in_conferma` che vuole attesa e non un secondo tentativo,
+il `router.refresh()` su ogni fallimento. Una seconda copia sarebbe partita
+completa e sarebbe rimasta indietro alla prima correzione.
+
+Nel farlo è saltato fuori un difetto vecchio: **la pagina della prenotazione era
+muta su `completed` e `no_show`** — testata con data e prezzo, e sotto il vuoto.
+Non si vedeva perché senza una lista nessuno ci arrivava; con la lista ogni riga
+ci manda. Corretto lì.
+
+Una cosa che non si è costruita: **gli ordini**. Nascono nelle milestone 6 e 7,
+`my_orders` esiste dalla `0019`, e in fondo alla pagina c'è il commento che dice
+dove vanno e cosa non rifare. Una sezione vuota per mesi sarebbe stata una
+promessa che il sito non mantiene.
+
+Harness verde (nessuna modifica allo schema), build e lint puliti. Il linter ha
+fermato una cosa giusta: `Date.now()` dentro la resa di un componente viola la
+regola di purezza di React, e l'orologio si legge una volta sola dentro
+`ordinaPrenotazioni`.
+
+---
+
+**18 settembre 2026 — le sedici prove, e l'evento visto scattare**
+
+Simone ha eseguito tutte e sedici le prove nel browser: **passate.**
+
+*Cosa chiude davvero.* Era la parte che nessuno dei due poteva verificare:
+l'harness gira su PGlite, io non ho un browser, e il pezzo centrale è un **iframe
+di terze parti**. Del contratto degli eventi Cal.com avevamo soltanto i tipi
+pubblicati di `@calcom/embed-core@1.5.3` — la pagina di documentazione non nomina
+`bookingSuccessfulV2`, elenca gli eventi interni e dice di non fidarsene — e la
+strada alternativa, il *Redirect on booking* sull'event type, era stata scartata
+su prova documentale (issue `#18144`) senza essere provata. **Ora l'evento è
+stato visto scattare su un embed vero.** Fra "il contratto dice che c'è" e
+"scatta da noi" c'era la distanza che con Cal.com avevamo già pagato una volta,
+su `rescheduleUid`. Questa volta non l'abbiamo pagata.
+
+*I quattro che contano più degli altri* sono quelli che nessun test automatico
+può coprire, perché vivono in un browser e in una sessione: l'open redirect su
+`?next=` non porta fuori dal sito; il doppio clic su *Paga* produce **una sola**
+riga in `payments`, che è la ragione per cui esistono
+`payments_one_pending_per_kind` e l'ordine invertito nella route — riga prima,
+Stripe dopo; la prenotazione di un altro account dà **404** e non un errore di
+permessi, perché "non esiste" e "non è tua" devono dare la stessa risposta; e una
+scadenza già passata fa **rifiutare** la cassa, che è la regola "l'autorità è
+`payment_deadline_at`" applicata dal lato del browser.
+
+*Cosa resta scoperto, per onestà.* Le prove sono state fatte **in sviluppo, su un
+solo designer** — Marco Rossi, l'unico con un account Cal.com vero — e con un
+solo account Google per il grosso. Restano fuori: la vetrina di un designer con
+`cal_username` sbagliato (Giulia Neri nel seed ne ha uno che su Cal.com non
+esiste: il controllo in `box-servizio.tsx` scatta su `cal_username` **nullo**,
+non su "l'account esiste", quindi lì il viaggiatore vedrebbe l'errore di Cal.com
+dentro l'iframe), e il comportamento in produzione, dove StrictMode non raddoppia
+i montaggi e la resa è quella di `next build`.
+
+Con questo la milestone 4 è completa **da bordo a bordo tranne l'orologio dei
+5 minuti**, che resta l'unico pezzo mancante: senza, nessuna prenotazione non
+pagata scade e nessuno slot si libera.
+
+---
+
+**18 settembre 2026 — "Le mie prenotazioni", e un percorso che non aveva uscita**
+
+Vedi la voce scritta da Claude Code più sotto per il dettaglio del lavoro. Qui la
+cosa da ricordare: questa pagina **non è una comodità**. Chiudeva un buco creato
+dalla milestone 4 stessa — chi chiudeva la scheda fra la prenotazione e il
+pagamento non aveva **nessun modo** di tornare indietro, perché la mail che gli
+avrebbe dato il link non esiste (provider email = S-04, non fatto) e una lista
+non c'era. Quella prenotazione diventava irraggiungibile e scadeva da sola,
+lasciando occupato uno slot sul calendario di un designer.
+
+⚠️ **La pagina copre solo chi torna sul sito da sé.** Chi non torna resta perso
+comunque: per lui serve la mail, che è bloccata su cose non nostre — provider,
+testi di Gaia, e una settimana di dominio da scaldare prima del primo viaggiatore
+vero. Quella settimana va prenotata **all'indietro dalla data di lancio**, non in
+avanti da oggi.
+
+---
+
 **8 settembre 2026 — il primo euro. Il giro del pagamento è vivo in sandbox**
 
 Collaudo del ponte Stripe sull'infrastruttura vera, in tre gradini. Passati tutti

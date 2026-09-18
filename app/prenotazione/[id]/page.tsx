@@ -118,6 +118,43 @@ function Esito({
     )
   }
 
+  // `completed` e `no_show` sono entrati il 18 settembre 2026, quando "Le mie
+  // prenotazioni" ha iniziato a mandare qui ogni riga: prima questa pagina, su
+  // quei due stati, non diceva **niente** — solo la testata con data e prezzo, e
+  // sotto il vuoto. Era già un difetto e si vedeva poco, perché senza una lista
+  // nessuno ci arrivava. Con la lista si vedrebbe subito.
+  if (stato === 'completed') {
+    return (
+      <section className="space-y-3">
+        <p className="font-titoli text-h4">Consulenza conclusa</p>
+        <p className="text-corpo-big">
+          La call si è svolta e questa prenotazione è chiusa. Non c&apos;è altro da fare.
+        </p>
+      </section>
+    )
+  }
+
+  if (stato === 'no_show') {
+    return (
+      <section className="flex flex-col items-start gap-3">
+        <p className="font-titoli text-h4">Risulti assente alla call</p>
+        <p className="text-corpo-big">
+          All&apos;appuntamento non c&apos;era nessuno da parte tua, e la consulenza è stata
+          chiusa così. <strong>Se non è andata come dice questa pagina, scrivici:</strong> lo
+          guardiamo noi, una persona alla volta.
+        </p>
+        {whatsapp && (
+          <a
+            href={`https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}`}
+            className="inline-block rounded-full bg-primario px-5 py-2 text-corpo text-neutro transition hover:brightness-110"
+          >
+            Scrivici su WhatsApp
+          </a>
+        )}
+      </section>
+    )
+  }
+
   if (stato === 'cancelled_unpaid') {
     return (
       <section className="space-y-3">

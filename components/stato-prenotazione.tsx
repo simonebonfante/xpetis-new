@@ -43,8 +43,6 @@ export function StatoPrenotazione({
   const router = useRouter()
   const [aspetto, setAspetto] = useState(ritorno && stato === 'pending_payment')
   const [rinunciato, setRinunciato] = useState(false)
-  const [motivo, setMotivo] = useState<string | null>(null)
-  const [apro, setApro] = useState(false)
 
   // ------------------------------------------------- l'attesa della conferma
   useEffect(() => {
@@ -114,19 +112,48 @@ export function StatoPrenotazione({
         <p className="text-corpo-big">
           Lo slot è tenuto per te fino al pagamento. <Conto scadenza={scadenza} />
         </p>
-        <button
-          onClick={() => paga(id, setApro, setMotivo, router)}
-          disabled={apro}
-          className="inline-block rounded-full bg-primario px-5 py-2 text-corpo text-neutro transition hover:brightness-110 disabled:opacity-60"
-        >
-          {apro ? 'Un attimo…' : 'Paga la consulenza'}
-        </button>
-        {motivo && <p className="text-corpo text-primario">{motivo}</p>}
+        <BottonePaga id={id} />
       </Riquadro>
     )
   }
 
   return null
+}
+
+/**
+ * Il bottone che apre la cassa, con tutto quello che serve a non aprirne due.
+ *
+ * Era dentro `StatoPrenotazione` fino al 18 settembre 2026, quando è nata la
+ * lista "Le mie prenotazioni" e ha avuto bisogno dello stesso gesto. **È stato
+ * estratto invece che riscritto**, e la ragione non è l'eleganza: qui dentro
+ * stanno tre comportamenti che si scoprono solo sbagliandoli — il bottone che si
+ * spegne mentre parla con Stripe (la prova 10 di `PIANO.md`), la risposta
+ * `in_conferma` che vuole attesa e non un secondo tentativo, e il
+ * `router.refresh()` su ogni fallimento, che fa ridisegnare la pagina dal server
+ * invece di lasciare in piedi un bottone che mente. Una seconda copia sarebbe
+ * partita completa e sarebbe rimasta indietro alla prima correzione.
+ *
+ * `etichetta` esiste perché nella lista il bottone sta accanto ad altre
+ * prenotazioni e "Paga la consulenza" è la frase giusta solo quando è chiaro
+ * quale: chi lo usa decide, il comportamento no.
+ */
+export function BottonePaga({ id, etichetta = 'Paga la consulenza' }: { id: string; etichetta?: string }) {
+  const router = useRouter()
+  const [apro, setApro] = useState(false)
+  const [motivo, setMotivo] = useState<string | null>(null)
+
+  return (
+    <>
+      <button
+        onClick={() => paga(id, setApro, setMotivo, router)}
+        disabled={apro}
+        className="inline-block rounded-full bg-primario px-5 py-2 text-corpo text-neutro transition hover:brightness-110 disabled:opacity-60"
+      >
+        {apro ? 'Un attimo…' : etichetta}
+      </button>
+      {motivo && <p className="text-corpo text-primario">{motivo}</p>}
+    </>
+  )
 }
 
 async function paga(
@@ -175,8 +202,11 @@ async function paga(
  * Un numero derivato dalla prop non ha quel difetto e sta nelle dipendenze
  * dell'effetto, che così riparte quando la scadenza cambia davvero. Un ref serve
  * a ricordare qualcosa *fra* le rese; qui non c'era niente da ricordare.
+ *
+ * Esportato dal 18 settembre 2026: lo usa anche la lista "Le mie prenotazioni",
+ * dove il conto alla rovescia dice la stessa cosa e deve dirla allo stesso modo.
  */
-function Conto({ scadenza }: { scadenza: string | null }) {
+export function Conto({ scadenza }: { scadenza: string | null }) {
   const [resta, setResta] = useState<number | null>(null)
   const fine = scadenza ? new Date(scadenza).getTime() : null
 

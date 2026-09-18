@@ -56,11 +56,25 @@ import { leggiUtente } from '@/lib/supabase/utente'
  * problema, si separa l'header in due pezzi e si paga il lampeggio soltanto lì.
  *
  * ⚠️ **Il Figma non mostra l'header da collegato.** Questa è la versione minima
- * e onesta — chi sei e la via d'uscita — e le domande per Chiara (nome o avatar?
- * tendina o testo? dove sta l'uscita?) sono in `PIANO.md`. In particolare **non
- * c'è nessun menu**: una tendina con voci verso pagine che non esistono sarebbe
- * il 404 travestito da funzionalità, di nuovo. *"Le mie prenotazioni"* non c'è
- * di proposito: è una decisione di prodotto aperta, non un pezzo mancante.
+ * e onesta — chi sei, dove stanno le tue cose e la via d'uscita — e le domande
+ * per Chiara (nome o avatar? tendina o testo? dove sta l'uscita?) sono in
+ * `PIANO.md`. In particolare **non c'è nessun menu**: una tendina con voci verso
+ * pagine che non esistono sarebbe il 404 travestito da funzionalità, di nuovo.
+ *
+ * ## "Le mie prenotazioni", e perché compare due volte (18 settembre 2026)
+ *
+ * Fino a oggi quella voce non c'era di proposito, perché la pagina non esisteva.
+ * Adesso esiste — `/le-mie-prenotazioni` — ed è l'unica strada che un
+ * viaggiatore ha per tornare su una consulenza prenotata e non pagata: se
+ * dall'header non si raggiunge, non l'ha nessuno.
+ *
+ * Nella pillola ci sta una cosa sola in più, e **su mobile non ci sta nemmeno
+ * quella**: a 360 px "XPETIS", il saluto, un link lungo e *Esci* non entrano.
+ * Quindi due porte per la stessa stanza. **Il saluto è un link**, sempre, a
+ * tutte le larghezze: è l'unico elemento personale già presente, e chi cerca
+ * "le mie cose" clicca il proprio nome. Accanto, **solo da desktop**, la voce
+ * scritta per esteso, perché "Ciao Simone" non dice dove porta e un link che non
+ * si annuncia vale quasi zero. La ridondanza è voluta e costa una riga.
  */
 
 /**
@@ -124,10 +138,19 @@ export async function Header() {
         </nav>
 
         {user ? (
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="max-w-[7rem] truncate text-corpo lg:max-w-[12rem]">
+          <div className="flex min-w-0 items-center gap-3 lg:gap-5">
+            <Link
+              href="/le-mie-prenotazioni"
+              className="max-w-[7rem] truncate text-corpo underline decoration-scuro/30 underline-offset-4 transition hover:text-primario lg:max-w-[12rem]"
+            >
               Ciao {nomeVisibile(user)}
-            </span>
+            </Link>
+            <Link
+              href="/le-mie-prenotazioni"
+              className="hidden shrink-0 text-corpo transition hover:text-primario lg:inline"
+            >
+              Le mie prenotazioni
+            </Link>
             {/*
               Un `form` e non un link: uscire cambia lo stato del server, e
               `app/auth/esci/route.ts` risponde solo a POST. Un `<a href>` verso

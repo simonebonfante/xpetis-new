@@ -107,13 +107,14 @@ Tre cose da sapere.
 
 ### Cosa resta a te
 
-- 🔴 **COMMITTARE.** Dal 9 al 18 settembre non si è toccato niente, e l'imbocco
-  del funnel — `/accedi`, l'embed, l'header che riconosce chi è collegato, la
-  migration `0040`, `lib/supabase/utente.ts` — è **tutto in un albero di lavoro
-  non committato**: 13 file modificati, 858 righe, più 7 file mai aggiunti.
-  L'ultimo commit è `1374c2e`, che si ferma al giro del pagamento. Un
-  `git checkout` distratto e nove giorni di lavoro non ci sono più. È la prima
-  cosa da fare, prima delle prove.
+- ~~🔴 **COMMITTARE**~~ → **fatto il 18 settembre 2026**, commit `be2e668`
+  *"giro di prenotazione testato"*. L'imbocco del funnel — `/accedi`, l'embed,
+  l'header che riconosce chi è collegato, la migration `0040`,
+  `lib/supabase/utente.ts` — non è più in un albero di lavoro non committato.
+- ~~**Le prove nel browser**~~ → **tutte e sedici passate il 18 settembre 2026**,
+  confermate da Simone. La tabella in milestone 4 resta come **prova di
+  regressione** da rigiocare quando si tocca il giro della prenotazione, non come
+  lista di cose da fare.
 - ~~**Ruotare il client secret di Google**~~ → **fatto l'8 settembre 2026.**
   Secret nuovo generato, incollato in Supabase, login riprovato, **vecchio
   cancellato**: quello che sta in git dal commit `ce5aafa` non funziona più.
@@ -835,7 +836,7 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       inserita col gruppo vecchio, va cambiata a mano:
       `update app_config set config_group='contacts' where key='whatsapp_number';`
       Altrimenti il tuo cellulare è servito dall'API a chiunque
-- [ ] **[C]** **"Le mie prenotazioni", l'area del viaggiatore.** Non era in
+- [x] **[C]** **"Le mie prenotazioni", l'area del viaggiatore.** Non era in
       nessuna milestone e non è un pezzo dimenticato: **il Flusso guida il
       viaggiatore con le mail**, non con un'area riservata — conferma,
       promemoria, mail post-call coi bottoni, pagine a token per gli ordini. In
@@ -855,7 +856,31 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       *Deciso da Simone l'8 settembre 2026.* Minima di proposito: le prenotazioni
       con il loro stato e, per quelle da pagare, il tasto. **Nessun profilo,
       nessuna preferenza**: il Flusso non li chiede, e un'area personale che
-      cresce da sola è la strada per una milestone non prevista
+      cresce da sola è la strada per una milestone non prevista.
+      **Costruita il 18 settembre 2026** → `app/le-mie-prenotazioni/page.tsx`,
+      `lib/prenotazioni.ts`, link nell'header. Nessuna migration: `my_bookings`
+      aveva già tutto dal 4 agosto. Quattro cose decise costruendola:
+      · il percorso è **`/le-mie-prenotazioni` e non `/prenotazioni`**, che
+        disterebbe una lettera da `/prenotazione/[id]` — una "i" persa in un
+        `href` o in un `?next=` non rompe niente di visibile e nessun controllo
+        di tipo la intercetta;
+      · **lo stato mostrato non è `status`**: `pending_payment` con
+        `payment_deadline_at` passata (righe che esistono, e continueranno a
+        esistere finché non c'è l'orologio) mostra "tempo scaduto" e **nessun
+        tasto**, perché la route della cassa lo rifiuterebbe con un 409. Sette
+        stati diventano nove situazioni, tutte con una frase;
+      · `Conto` e il tasto *Paga* sono stati **estratti** da
+        `stato-prenotazione.tsx` invece di ricopiati: dentro quel tasto stanno
+        tre comportamenti che si scoprono solo sbagliandoli (la prova 10, la
+        risposta `in_conferma`, il `router.refresh()` sul fallimento);
+      · la pagina della prenotazione era **muta su `completed` e `no_show`** —
+        testata e sotto il vuoto. Difetto vecchio che nessuno vedeva perché
+        nessuno ci arrivava: ora ogni riga della lista ci manda, e i due stati
+        hanno il loro racconto.
+      **Gli ordini non ci sono**: nascono nelle milestone 6 e 7 e il posto dove
+      andranno è segnato con un commento in fondo alla pagina, `my_orders`
+      compresa. La **mail resta da fare** e non è un doppione: questa pagina
+      copre chi torna sul sito da sé, la mail tutti gli altri
 - [ ] **[C]** Orologio unico ogni 5 minuti: insoluti oltre i 30 minuti (annulla
       su Cal.com col solo codice prenotazione, stato a "non pagata", mail
       cortese) e tutte le altre scadenze dovute. **In produzione la cadenza deve
@@ -868,39 +893,53 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       mano dal team che innesca gli stessi workflow
 - [ ] **[C]** Controllo periodico di vitalità dei 25 webhook Cal.com
 
-### 🔬 Le prove che devi fare tu, in questo ordine
+### ✅ Le prove nel browser — tutte passate il 18 settembre 2026
 
-**Questa è la parte che non ho potuto verificare, e non è un dettaglio.** Tutto
-il resto del giro del pagamento gira nell'harness o l'ho provato contro l'API
-vera di Stripe. Il pezzo di oggi no: è un **iframe di terze parti in un
-browser**, e io non ho un browser. Ho verificato il *contratto* — i tipi
-pubblicati di `@calcom/embed-core@1.5.3` elencano `bookingSuccessfulV2` — e ho
-scartato la strada del redirect su prova documentale (issue Cal.com `#18144`);
-**non ho visto l'evento scattare.** Fra "il contratto dice che c'è" e "scatta sul
-nostro embed" c'è esattamente la distanza che con Cal.com abbiamo già pagato una
-volta, su `rescheduleUid`.
+**Simone le ha eseguite tutte e sedici: passate.** La tabella resta qui come
+descrizione di *cosa* significa "funziona", non come lista di cose da fare: è la
+prova di regressione da rigiocare quando si tocca il giro della prenotazione.
 
-Prerequisiti: migration `0040` applicata, il designer di prova pubblicato con
-`cal_username` scritto, il workflow Cal.com attivo. Le due righe di `app_config`
-e l'endpoint Stripe servono solo dal punto 4 in poi.
+**Cosa chiude, precisamente.** Questa era la parte che nessuno di noi due poteva
+verificare: l'harness gira su PGlite e io non ho un browser, ma il pezzo centrale
+è un **iframe di terze parti**. Del contratto degli eventi avevamo solo i tipi
+pubblicati di `@calcom/embed-core@1.5.3` — la documentazione non nomina
+`bookingSuccessfulV2` — e la strada alternativa era stata scartata su prova
+documentale, non provata. **Adesso l'evento è stato visto scattare su un embed
+vero.** Fra "il contratto dice che c'è" e "scatta da noi" c'era la distanza che
+con Cal.com avevamo già pagato una volta, su `rescheduleUid`: questa volta non
+l'abbiamo pagata.
 
-| # | Cosa fai | Cosa deve succedere | Se non succede |
+Passano anche i quattro controlli che nessun test automatico può coprire, e sono
+quelli che conta di più aver visto con gli occhi: l'open redirect su `?next=`
+(8), il doppio clic su *Paga* che produce **una** riga in `payments` (10), la
+prenotazione di un altro account che dà 404 e non un errore di permessi (11), e
+il rifiuto su una scadenza passata (12).
+
+Prerequisiti di allora, se si rigioca: migration `0040` applicata, designer di
+prova pubblicato con `cal_username` scritto, workflow Cal.com attivo. Le due
+righe di `app_config` e l'endpoint Stripe servono dal punto 4 in poi.
+
+| # | Cosa fai | Cosa deve succedere | Esito |
 |---|---|---|---|
-| 0a | L'header **da scollegato**, su qualunque pagina | A destra c'è *Accedi* rosso | — |
-| 0b | L'header **da collegato** | Al posto di *Accedi*: **"Ciao \<nome\>"** e un bottone *Esci* che ti riporta alla home scollegato | Se vedi ancora *Accedi* da collegato, la sessione non arriva all'header: guarda i cookie |
-| 0c | `/attesa` **in `npm run dev`**, aprendola a mano senza aver prenotato | Passa da "Stiamo registrando" a **"Lo slot è tuo, la conferma no"** dopo ~33 secondi. ⚠️ Prima dell'8 settembre restava su "Stiamo registrando" **per sempre** in sviluppo | Se resta bloccata: è tornata la guardia `useRef` sull'effetto, vedi `components/attesa-prenotazione.tsx` |
-| 1 | Vetrina di un designer **senza essere collegato** → *Prenota la call* | Vai a `/accedi`, e dopo Google torni **sulla stessa vetrina col servizio giusto**, non sulla home | Guarda il `?next=` nell'indirizzo: dev'essere `/designer/<slug>?servizio=…` |
-| 2 | Header: i tre link | *Accedi* → pagina; *Scopri i Travel Designer* → `/ricerca`; *Entra a far parte* → **spento**, con la spiegazione al passaggio del mouse | — |
-| 3 | Da collegato, *Prenota la call* | Il calendario compare **nella pagina**, e nel campo *Codice XPETIS* c'è il tuo UUID, **precompilato e non modificabile** | Se il campo è vuoto o scrivibile: l'identificatore sull'event type non è `xpetis_user_id` esatto |
-| 4 | Prenoti uno slot fino in fondo | **La pagina cambia da sé**, va su `/attesa` e poi su Stripe | ⚠️ **è il punto che conta.** Vedi sotto |
-| 5 | Dalla pagina Stripe torni indietro col tasto del browser | La pagina della prenotazione dice *Manca il pagamento* col conto alla rovescia, e il tasto riapre **la stessa** cassa, non una seconda | Se apre una cassa nuova, in `payments` compaiono due righe: dimmelo |
-| 6 | Paghi con `4242 4242 4242 4242` | *Stiamo confermando* per qualche secondo, poi *Consulenza confermata* col link della videochiamata | Guarda `webhook_events where provider='stripe'` |
-| 7 | Prenoti dopo aver **spento il workflow n8n Cal.com** | Dopo ~33 secondi: *"Lo slot è tuo, la conferma no"*, il link WhatsApp, e una riga `calcom_webhook_non_arrivato` in `team_alerts` | — |
-| 8 | Apri a mano `/accedi?next=https://example.com` | **Non ti porta fuori dal sito.** `next` accetta solo percorsi interni | Se esci dal dominio, la pagina è un trampolino: fermati e dimmelo |
-| 9 | Sotto il calendario, clicca **di proposito** *"Hai finito di prenotare e la pagina non è cambiata? → Vai al pagamento"* | Stessa destinazione dell'evento automatico | È il paracadute se `bookingSuccessfulV2` cambia nome: se è rotto lo scopriamo il giorno in cui serve |
-| 10 | Sulla pagina della prenotazione, *Paga la consulenza* **due volte in rapida successione** | `select count(*) from payments where booking_id='<id>'` deve dare **1** | È ciò per cui esistono `payments_one_pending_per_kind` e l'ordine invertito nella route: riga prima, Stripe dopo |
-| 11 | Da un **secondo account Google**, apri `/prenotazione/<id di una prenotazione del primo>` | **404**, non un errore di permessi: inesistente e "non è tua" danno la stessa risposta di proposito | Controllo di autorizzazione che nessun test automatico copre |
-| 12 | `update bookings set payment_deadline_at = now() - interval '1 minute' where id='<id>';` poi *Paga* | **Rifiuta.** L'autorità è `payment_deadline_at`, non lo stato | Conta doppio finché l'orologio dei 5 minuti non esiste |
+| ✅ 0a | L'header **da scollegato**, su qualunque pagina | A destra c'è *Accedi* rosso | — |
+| ✅ 0b | L'header **da collegato** | Al posto di *Accedi*: **"Ciao \<nome\>"** e un bottone *Esci* che ti riporta alla home scollegato | Se vedi ancora *Accedi* da collegato, la sessione non arriva all'header: guarda i cookie |
+| ✅ 0c | `/attesa` **in `npm run dev`**, aprendola a mano senza aver prenotato | Passa da "Stiamo registrando" a **"Lo slot è tuo, la conferma no"** dopo ~33 secondi. ⚠️ Prima dell'8 settembre restava su "Stiamo registrando" **per sempre** in sviluppo | Se resta bloccata: è tornata la guardia `useRef` sull'effetto, vedi `components/attesa-prenotazione.tsx` |
+| ✅ 1 | Vetrina di un designer **senza essere collegato** → *Prenota la call* | Vai a `/accedi`, e dopo Google torni **sulla stessa vetrina col servizio giusto**, non sulla home | Guarda il `?next=` nell'indirizzo: dev'essere `/designer/<slug>?servizio=…` |
+| ✅ 2 | Header: i tre link | *Accedi* → pagina; *Scopri i Travel Designer* → `/ricerca`; *Entra a far parte* → **spento**, con la spiegazione al passaggio del mouse | — |
+| ✅ 3 | Da collegato, *Prenota la call* | Il calendario compare **nella pagina**, e nel campo *Codice XPETIS* c'è il tuo UUID, **precompilato e non modificabile** | Se il campo è vuoto o scrivibile: l'identificatore sull'event type non è `xpetis_user_id` esatto |
+| ✅ 4 | Prenoti uno slot fino in fondo | **La pagina cambia da sé**, va su `/attesa` e poi su Stripe | ⚠️ **è il punto che conta.** Vedi sotto |
+| ✅ 5 | Dalla pagina Stripe torni indietro col tasto del browser | La pagina della prenotazione dice *Manca il pagamento* col conto alla rovescia, e il tasto riapre **la stessa** cassa, non una seconda | Se apre una cassa nuova, in `payments` compaiono due righe: dimmelo |
+| ✅ 6 | Paghi con `4242 4242 4242 4242` | *Stiamo confermando* per qualche secondo, poi *Consulenza confermata* col link della videochiamata | Guarda `webhook_events where provider='stripe'` |
+| ✅ 7 | Prenoti dopo aver **spento il workflow n8n Cal.com** | Dopo ~33 secondi: *"Lo slot è tuo, la conferma no"*, il link WhatsApp, e una riga `calcom_webhook_non_arrivato` in `team_alerts` | — |
+| ✅ 8 | Apri a mano `/accedi?next=https://example.com` | **Non ti porta fuori dal sito.** `next` accetta solo percorsi interni | Se esci dal dominio, la pagina è un trampolino: fermati e dimmelo |
+| ✅ 9 | Sotto il calendario, clicca **di proposito** *"Hai finito di prenotare e la pagina non è cambiata? → Vai al pagamento"* | Stessa destinazione dell'evento automatico | È il paracadute se `bookingSuccessfulV2` cambia nome: se è rotto lo scopriamo il giorno in cui serve |
+| ✅ 10 | Sulla pagina della prenotazione, *Paga la consulenza* **due volte in rapida successione** | `select count(*) from payments where booking_id='<id>'` deve dare **1** | È ciò per cui esistono `payments_one_pending_per_kind` e l'ordine invertito nella route: riga prima, Stripe dopo |
+| ✅ 11 | Da un **secondo account Google**, apri `/prenotazione/<id di una prenotazione del primo>` | **404**, non un errore di permessi: inesistente e "non è tua" danno la stessa risposta di proposito | Controllo di autorizzazione che nessun test automatico copre |
+| ✅ 12 | `update bookings set payment_deadline_at = now() - interval '1 minute' where id='<id>';` poi *Paga* | **Rifiuta.** L'autorità è `payment_deadline_at`, non lo stato | Conta doppio finché l'orologio dei 5 minuti non esiste |
+| ✅ 13 | `/le-mie-prenotazioni` **da scollegato** | Ti porta a `/accedi`, e dopo Google **torni qui**, non sulla home | Guarda il `?next=`: dev'essere `/le-mie-prenotazioni` |
+| ✅ 14 | Da collegato, con prenotazioni in stati diversi. Il modo veloce di averceli: `update bookings set status='completed' where id='<id>';` su righe di prova, uno stato alla volta | **Nessuna riga muta**: tutte e sette gli stati dicono una frase. In cima quella da pagare col conto alla rovescia e il tasto, in fondo le chiuse, dalla più recente. Con `payment_deadline_at` già passata: "Tempo scaduto" e **nessun tasto** | Una riga senza frase o un tasto *Paga* su una scaduta: dimmelo, sono i due difetti che questa pagina esiste per non avere |
+| ✅ 15 | Da collegato, **con un account che non ha prenotato niente** | Non una pagina vuota: "Non hai ancora prenotato niente" e il tasto verso `/ricerca` | — |
+| ✅ 16 | Il link nell'header, **da desktop e da telefono** | Desktop: *"Le mie prenotazioni"* per esteso accanto al saluto. Telefono: la voce per esteso non c'è (non ci sta nella pillola) e **il saluto "Ciao \<nome\>" è il link** | Se da telefono il saluto non porta da nessuna parte, l'unica porta all'area sparisce proprio dove serve di più |
 
 ⚠️ **Le prove 0c e 7 scrivono un alert critico vero** (`calcom_webhook_non_arrivato`):
 è corretto che lo facciano, ma è un falso allarme di collaudo e va tolto, come
@@ -944,7 +983,7 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
 | **La pagina "Entra a far parte di XPETIS" esiste?** L'header e il footer la linkano entrambi. Il Flusso non descrive nessuna pagina di reclutamento dei Travel Designer, il Figma non la mostra, e i 25 arrivano da un form esterno (`Vetrina TD (2).html`) gestito a mano dal team. Costruirla vorrebbe dire decidere chi può candidarsi e cosa succede dopo: non è una scelta tecnica. **Per ora le due voci sono spente con una spiegazione**, non linkano un 404 | Serve sapere se il reclutamento è pubblico o su invito | Alessandro, Andrea |
 | **`/viaggi-di-gruppo`, `/about`, `/privacy`, `/contatti`**: quattro voci del footer che portano a 404. Le ho **lasciate come link** di proposito, al contrario di quella sopra: quelle pagine *devono* esistere — la privacy per obbligo di legge — e spegnerle direbbe "non ci saranno", che è falso. Aspettano un contenuto, non una decisione tecnica | I testi non sono lavoro mio; la privacy passa da S-14 | Gaia (testi), legale (privacy) |
 | **La sezione "Viaggi di gruppo" della vetrina** resta senza sorgente, come già segnato in milestone 3. La voce del footer punta allo stesso buco | — | Chiara, Gaia |
-| **Come si vede l'header di chi è collegato?** Il Figma non lo mostra, e per il corollario di `CLAUDE.md` l'assenza non è una decisione. La versione costruita l'8 settembre è la minima onesta — *"Ciao \<nome\>"* e un bottone *Esci* — e le domande sono tre: **nome o avatar** (Google dà `avatar_url`, non l'ho usato: un'immagine tonda nella pillola è una scelta di disegno, non una mia); **testo o tendina**; **dove sta l'uscita**, se dentro una tendina o in chiaro come adesso. ⚠️ Qualunque tendina va riempita con voci che **esistono**: *"Le mie prenotazioni"* non c'è, ed è una decisione di prodotto aperta, non un pezzo mancante | Serve una riga di Figma, o un ok a quella che c'è | Chiara |
+| **Come si vede l'header di chi è collegato?** Il Figma non lo mostra, e per il corollario di `CLAUDE.md` l'assenza non è una decisione. La versione costruita l'8 settembre è la minima onesta — *"Ciao \<nome\>"* e un bottone *Esci* — e le domande sono tre: **nome o avatar** (Google dà `avatar_url`, non l'ho usato: un'immagine tonda nella pillola è una scelta di disegno, non una mia); **testo o tendina**; **dove sta l'uscita**, se dentro una tendina o in chiaro come adesso. ⚠️ Qualunque tendina va riempita con voci che **esistono**. Dal 18 settembre *"Le mie prenotazioni"* esiste ed è nell'header: da desktop per esteso, da telefono sotto il saluto, che è diventato un link. **Se nasce una tendina, quella voce è la prima che ci va dentro** | Serve una riga di Figma, o un ok a quella che c'è | Chiara |
 
 
 ---
