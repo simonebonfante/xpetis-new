@@ -9,6 +9,187 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**20 settembre 2026 — l'orologio gira davvero, e i due bug erano nella giuntura**
+
+Uno slot non pagato si libera da solo su Cal.com. Il giro del pagamento è chiuso
+da bordo a bordo: si prenota, si paga, e se non si paga lo slot torna al
+designer senza che nessuno guardi.
+
+**La domanda che S-05 aveva lasciato aperta è chiusa.** L'API v2 pubblica di
+Cal.com cancella una prenotazione **senza nessuna chiave**, conoscendo solo il
+codice: 200, slot libero sul calendario, mail native di annullamento partite.
+Quindi l'onboarding dei 25 designer resta senza la voce "raccogliere 25 chiavi
+API", che era il rischio appeso a questo pezzo da luglio.
+
+Ma l'orologio ha funzionato solo dopo **due correzioni fatte a mano sul
+workflow**, e sono la parte che vale la pena ricordare.
+
+*Il payload non era appiattito.* `clock_tick()` restituisce righe
+`(task, entity_type, entity_id, payload)`, e `cancel_url`, `api_version` e
+`reason` stanno dentro `payload`: il nodo `Cancella su Cal.com` li leggeva dal
+livello alto e trovava `undefined`. L'appiattimento è finito nel nodo `Un compito
+per riga` e non nei quattro riferimenti del nodo HTTP, così `task` ed `entity_id`
+restano dove li legge l'ack e la forma del compito si accorda in un posto solo.
+
+*Il corpo aveva due campi di troppo.* `uid` e `allRemainingBookings` sono campi
+della v1; la v2 risponde **400 — "uid property should not exist,
+allRemainingBookings property should not exist"**. Il codice sta già nel
+percorso, e il corpo adesso porta solo il motivo.
+
+**La lezione, che vale più dei due bug.** Stavano tutti e due nella **giuntura
+fra Postgres e n8n**, e lì non arriva nessuno dei nostri strumenti: l'harness
+prova Postgres — 387 asserzioni, tutte verdi anche mentre il giro non cancellava
+niente — e TypeScript non vede dentro un workflow.
+
+E vale la pena scrivere **perché i due ponti questo problema non potevano
+averlo**: loro *ricevono*, e passano un corpo grezzo intero a una funzione che se
+lo guarda da sola. Non c'è nessuna forma su cui accordarsi, quindi non c'è niente
+che possa non combaciare. L'orologio *agisce verso l'esterno*, e il compito che
+consegna è una struttura con dei nomi di campo: cioè **un contratto, e non lo
+verifica niente**. I rami 2, 3 e 4 — silenzio-conferma a 48 ore, promemoria del
+giorno prima, chiusura a 5 giorni dalla consegna — passeranno tutti di lì, e ogni
+campo nuovo sarà un'altra riga di quel contratto. Per questo l'appiattimento sta
+in un punto solo e ha un commento sopra: è il posto in cui si guarda quando un
+campo non arriva.
+
+**La seconda lezione è più sottile, ed è un errore di ragionamento mio.** La
+prova 17 aveva verificato che Cal.com cancella senza chiave, e da quel "funziona"
+avevo dedotto che funzionasse anche la richiesta del workflow. Ma era **una
+richiesta diversa**: stesso endpoint, corpo diverso — il `curl` della verifica
+mandava solo `cancellationReason`, il workflow mandava anche `uid` e
+`allRemainingBookings`. **Avevo verificato l'endpoint, non il corpo**, e la
+verifica di un pezzo si era travestita da verifica del giro. È la stessa forma
+dell'errore su `rescheduleUid`: fra "il contratto dice che c'è" e "funziona sul
+nostro" c'è sempre una distanza, e quella distanza si paga una volta.
+
+**Una cosa che il collaudo ha reso visibile e che resta vera.** Il nodo di
+cancellazione ha `onError: continueRegularOutput` e *Never Error* acceso — giusto,
+perché un braccio rotto non deve fermare l'orologio — con la conseguenza che
+**un'esecuzione tutta verde può non aver fatto niente**. È così che il primo
+difetto è passato liscio al primo giro. Dove si guarda davvero è finito in
+`n8n/LEGGIMI.md`, con le query: `bookings.cancel_attempts` che cresce con lo
+stato ancora `pending_payment` è la firma esatta di un braccio che non riesce, e
+`event_log` porta il codice HTTP e la risposta.
+
+*Riallineamento del repo, lo stesso giorno.* `n8n/orologio.json` contiene le due
+correzioni, quindi una reimportazione non rimette i difetti. Corretta anche una
+nota che dal 18 settembre **mentiva**: diceva che le due forme dell'endpoint
+erano entrambe supportate — «se `{uid}` non compare nel modello, il codice
+viaggia nel corpo» — e non è più vero, perché il corpo porta solo il motivo.
+Tornare al ripiego v1 oggi costa una riga su Studio **e** una modifica al
+workflow, e adesso il file lo dice. Una riga che mente in un file ce l'ha già
+costata una volta, col `client_secret*/` nel `.gitignore`.
+
+*Cosa NON è chiuso.* Il giro del pagamento sì, **la milestone 4 no**: mancano i
+testi che convivono con le mail native, il calendario admin, il percorso "slot
+introvabile", il controllo di vitalità dei 25 webhook e i tre campi del form
+sulla pagina della prenotazione. E la mail a chi perde lo slot resta appesa a
+S-04: oggi quel viaggiatore riceve **solo** l'annullamento nativo di Cal.com.
+
+---
+
+**18 settembre 2026 — l'orologio, e la domanda di chi scrive per primo**
+
+L'ultimo bordo della milestone 4. Da oggi una prenotazione non pagata scade da
+sola e lo slot torna libero sul calendario del designer: `0041_orologio.sql` per
+la parte che decide, `n8n/orologio.json` per il braccio.
+
+**La forma è diversa dai due ponti, e la differenza non è stilistica.** Cal.com e
+Stripe *ricevono*: n8n consegna byte a una funzione Postgres e non guarda dentro,
+quindi tutta la decisione sta nel database. Questo *agisce verso l'esterno* — per
+liberare uno slot bisogna chiamare Cal.com, e Postgres non fa chiamate HTTP.
+Quindi qui n8n fa qualcosa davvero. La domanda era *cosa*, e la risposta è: solo
+il gesto. `clock_tick()` decide chi è scaduto, n8n esegue, `clock_task_done()`
+decide cosa significa l'esito — e il braccio gli passa il **codice HTTP** che
+Cal.com ha risposto, non un giudizio. Anche "questa cancellazione è andata bene"
+è una decisione, e le decisioni stanno tutte da una parte sola.
+
+**La scelta vera era chi scrive lo stato per primo**, e le due strade hanno
+conseguenze opposte. Marcare `cancelled_unpaid` *prima* della chiamata: se
+Cal.com fallisce restano una riga chiusa e uno slot occupato, e **nessuno se ne
+accorgerà mai più**, perché l'orologio non ripassa sulle righe chiuse — un danno
+silenzioso e permanente. Marcare *dopo*: se la chiamata fallisce la riga resta
+`pending_payment`, cioè scaduta e ancora da liberare, e il giro successivo la
+ritrova. Si marca dopo. È la stessa regola che il ponte Cal.com applica da
+settembre a `webhook_events.processed_at`, che sugli errori resta nullo perché il
+ritentativo riprovi: **in questo database un lavoro non riuscito non deve
+somigliare a un lavoro fatto.** Il prezzo è una finestra di qualche secondo in
+cui lo slot è già libero e la riga dice ancora "da pagare"; il prezzo dell'altra
+strada è uno slot perso per sempre. E il ciclo non gira all'infinito:
+`cancel_attempts` conta, e dopo tre tentativi l'orologio smette e chiama una
+persona — un braccio rotto deve diventare un allarme, non un rumore di fondo.
+
+**La trappola che mi ha fatto scrivere un trigger.** Appena il braccio cancella,
+Cal.com manda un `BOOKING_CANCELLED` **al nostro stesso ponte**, che attribuisce
+la cancellazione confrontando `cancelledBy` con `organizer.email`: uguale il
+designer, diverso il viaggiatore. Su una cancellazione fatta via API non sappiamo
+cosa Cal.com metta lì — e se ci mettesse la mail del viaggiatore,
+`booking_status_history` direbbe che ha cancellato lui. Quella riga è **l'unica
+prova di chi ha agito**, perché il designer non ha login: da una riga sbagliata
+discenderebbero un contatore mosso sulla persona sbagliata e un arbitrato deciso
+su un fatto falso. La regola quindi non sta nel ponte, dove varrebbe per una
+porta sola: sta nel database. `bookings_force_system_cancel_actor` attribuisce al
+sistema ogni cancellazione su una riga che porta `cancel_requested_at`, da
+qualunque porta entri — webhook, ack del braccio, o una mano su Studio. Non ho
+riemesso `calcom_webhook()` per cambiarne cinque righe su cinquecento: due copie
+della stessa funzione nel repo sono due copie che divergono. Il limite è scritto
+nella migration — `event_log` conserva l'attore calcolato dal ponte, che in quel
+caso può essere sbagliato; la prova che conta no.
+
+**Una cosa che non torna, e non l'ho aggiustata di nascosto.** La regola del
+Flusso dice che uno slot non pagato resta occupato al massimo 35 minuti, e il
+conto vero è `finestra + grazia + cadenza`: la cadenza entra perché una riga che
+scade subito dopo un giro aspetta un giro intero. Con i valori di oggi fa
+**30 + 0 + 5 = 35 esatti**, cioè siamo *sul* limite e non c'è spazio per la
+grazia — che invece servirebbe, perché la cassa Stripe può restare aperta circa
+un minuto oltre la nostra scadenza (`expires_at` accetta minimo 30 minuti e la
+route taglia al minimo invece di esplodere). Comprarsela vuol dire accorciare la
+finestra a 28 o la cadenza a 2, e sono decisioni di prodotto, non mie:
+`booking_cancel_grace_min` nasce a **zero** ed è in `PIANO.md` come scelta di
+Simone. Nel frattempo `clock_tick()` ricontrolla il conto **a ogni giro** e alza
+un alert se qualcuno lo sfonda — perché quei parametri si cambiano da Studio,
+dove nessun test passa.
+
+**Costruito come un orologio, non come un timer.** Un solo workflow per tutte le
+scadenze, a rami: i lavori che il database sa fare da solo restano dentro la
+funzione, quelli che hanno bisogno del mondo di fuori escono come compiti nella
+forma `(task, entity_type, entity_id, payload)`. Milestone 5 e 6 ne portano altri
+tre — silenzio-conferma a 48 ore, promemoria del giorno prima, chiusura a 5
+giorni dalla consegna — e aggiungerli è aggiungere un ramo, non un secondo
+workflow.
+
+**Quello che l'harness prova e quello che non prova.** Prova la parte che decide,
+che è tutto il punto: 387 asserzioni (erano 349) sui casi storti — scaduta ma
+pagata, scaduta da un secondo, già liberata, tentativi esauriti, e la riga con
+`payment_deadline_at` nullo, che la route della cassa tratta come pagabile senza
+limite e che quindi l'orologio **non deve toccare**. Prova anche il ritorno del
+webhook con `cancelledBy` che dice "viaggiatore", e verifica che la storia dica
+`system`. Non prova il braccio: quella è una chiamata HTTP a un servizio di terzi,
+e le prove sono in `PIANO.md`, dalla 17 alla 22.
+
+⚠️ **E c'è una cosa che non ho potuto verificare, ed è la prima da fare.** Quale
+indirizzo di Cal.com cancella una prenotazione senza chiave. S-05 ha stabilito il
+fatto che conta — *non serve nessuna chiave, basta il codice della prenotazione*
+— ma non ha registrato **quale endpoint**, e `GUIDA_PONTE_CALCOM.md` §9.4 dava la
+domanda per aperta: i due documenti non dicevano la stessa cosa, e il più recente
+vince solo sul fatto, non sul dettaglio che non contiene. Per questo l'indirizzo
+non è nel workflow ma in `app_config.calcom_cancel_url`: se il candidato è
+sbagliato si cambia una riga da Studio, e in `n8n/LEGGIMI.md` c'è il `curl` che
+lo verifica in un minuto, col ripiego da provare per secondo. Se **nessuno** dei
+due funziona senza chiave, S-05 va riaperto e significa 25 chiavi API da
+raccogliere in onboarding: è una decisione di prodotto, non un dettaglio, e va
+fermata lì.
+
+**La mail cortese a chi ha perso lo slot non c'è**, ed è l'unico pezzo di questa
+riga del piano che manca. Il provider di invio non esiste (S-04) e inventarne uno
+qui vorrebbe dire mandare le mail di XPETIS da un dominio non autenticato, cioè
+bruciare la reputazione di invio prima di cominciare. Il posto dove andrà è
+dichiarato nel codice. Intanto una mail il viaggiatore la riceve lo stesso —
+quella nativa di Cal.com, che resta accesa per la deviazione 5, e che porta il
+motivo scritto in `app_config.unpaid_cancel_reason`.
+
+---
+
 **18 settembre 2026 — "Le mie prenotazioni": non una comodità, un'uscita**
 
 La cosa non ovvia di questa pagina è che **non è un'area personale, è la toppa a

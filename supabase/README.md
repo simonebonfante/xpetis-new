@@ -76,6 +76,8 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0037_calcom_webhook.sql` | Il ponte Cal.com → `bookings`: firma, diario, creazione, riprogrammazione, cancellazione |
 | `0038_checkout_consulenza.sql` | Una sola cassa aperta per prenotazione, la scadenza in `my_bookings`, il Payment Link non più richiesto |
 | `0039_stripe_webhook.sql` | Il ponte Stripe → `payments`/`bookings`: firma con tolleranza, diario, conferma con verifica dell'importo |
+| `0040_showcase_cal_link.sql` | `cal_username` e lo slug dell'event type sulla vetrina, per l'embed |
+| `0041_orologio.sql` | L'orologio unico delle scadenze: `clock_tick()`, `clock_task_done()`, e l'attribuzione al sistema della cancellazione che chiediamo noi |
 
 ## La geografia
 
@@ -442,6 +444,77 @@ PaymentIntent non si può confermare via API, e nella versione `2026-07-29.dahli
 nasce addirittura nullo. E **nessuna delle due porta una firma vera**: non sono
 passate da un endpoint webhook. Quello che l'harness verifica è l'algoritmo, e lo
 verifica su tutti i modi in cui può sbagliare.
+
+## L'orologio
+
+`clock_tick(p_limit)` e `clock_task_done(p_task, p_entity_id, p_status, p_detail)`
+sono l'orologio unico delle scadenze (migration 0041). Il workflow che le chiama
+ogni cinque minuti sta in `n8n/orologio.json`.
+
+**La forma è diversa dai due ponti, e il motivo è uno solo.** I ponti
+*ricevono*: n8n consegna byte e tutta la decisione vive in Postgres. Questo
+*agisce verso l'esterno* — per liberare uno slot bisogna chiamare Cal.com, e
+Postgres non fa chiamate HTTP. Quindi n8n qui fa qualcosa davvero, ma solo il
+gesto: `clock_tick()` decide **chi** è scaduto, n8n esegue, `clock_task_done()`
+decide **cosa significa** l'esito. Il braccio passa il codice HTTP che Cal.com ha
+risposto, non un giudizio.
+
+**Si marca `cancelled_unpaid` dopo, mai prima.** Se il database chiudesse la riga
+prima della chiamata e la chiamata fallisse, resterebbero una riga chiusa e uno
+slot occupato che nessuno guarderà mai più, perché l'orologio non ripassa sulle
+righe chiuse. Marcando dopo, una riga scaduta resta `pending_payment` finché la
+cancellazione non riesce, e il giro successivo la ritrova. È la stessa regola di
+`webhook_events.processed_at`, che sugli errori resta nullo perché il ritentativo
+riprovi: **un lavoro non riuscito non deve somigliare a un lavoro fatto.** Il
+ciclo non gira all'infinito — `cancel_attempts` conta, e oltre
+`unpaid_cancel_max_attempts` l'orologio smette e scrive un alert critico.
+
+**Un solo workflow per tutte le scadenze**, non un cron per scadenza. Oggi il
+ramo è uno, ma milestone 5 e 6 ne portano altri (silenzio-conferma a 48 ore,
+promemoria del giorno prima, chiusura a 5 giorni dalla consegna): i lavori che il
+database sa fare da solo restano dentro la funzione, quelli che hanno bisogno del
+mondo di fuori escono come compiti nella forma
+`(task, entity_type, entity_id, payload)`. Aggiungerne uno è aggiungere un ramo.
+
+**La cancellazione che chiediamo noi torna indietro come webhook.** Appena il
+braccio cancella, Cal.com manda un `BOOKING_CANCELLED` al nostro stesso ponte, e
+il ponte attribuisce la cancellazione confrontando `cancelledBy` con
+`organizer.email`. Su una cancellazione fatta via API non sappiamo cosa Cal.com
+scriva in quel campo: se ci mettesse la mail del viaggiatore,
+`booking_status_history` direbbe che ha cancellato lui — e quella riga è l'unica
+prova di chi ha agito. La regola non sta nel ponte ma nel database: il trigger
+`bookings_force_system_cancel_actor` attribuisce al sistema ogni cancellazione su
+una riga che porta `cancel_requested_at`, **da qualunque porta entri**.
+
+**Il conto dei 35 minuti.** La regola del Flusso è che uno slot non pagato resta
+occupato al massimo 35 minuti, e il conto vero è `finestra + grazia + cadenza`:
+la cadenza entra perché una riga che scade subito dopo un giro aspetta un giro
+intero. Con i valori di oggi — 30 + 0 + 5 — fa **esattamente 35**, quindi non c'è
+spazio per nessuna grazia senza accorciare la finestra o la cadenza, e
+`booking_cancel_grace_min` nasce a zero. `clock_tick()` ricontrolla il conto a
+ogni giro e scrive un alert se qualcuno lo sfonda da Studio, perché i parametri
+si cambiano lì, dove nessun test passa.
+
+**Due righe che l'orologio non tocca mai**: quelle con un `payments` già `paid`
+(prendere i soldi e dare via lo slot è il danno peggiore che possa fare) e quelle
+con `payment_deadline_at` nullo, che la route della cassa tratta come pagabili
+senza limite.
+
+**L'indirizzo di cancellazione**, verificato il 20 settembre 2026: l'API v2
+pubblica di Cal.com, che risponde 200 **senza nessuna chiave** — come diceva
+S-05, che però il fatto l'aveva stabilito senza registrare l'endpoint. Sta in
+`app_config.calcom_cancel_url` e non nel workflow, e il codice della prenotazione
+viaggia nel **percorso** (`{uid}`): il corpo della richiesta porta solo il motivo,
+perché la v2 rifiuta con 400 i campi che non conosce. Conseguenza da sapere:
+`payload.cal_booking_uid`, che `clock_tick()` continua a restituire, **non lo
+legge più nessuno** — il codice è già dentro `cancel_url`. Resta nella 0041, che
+è applicata, e toglierlo non ridurrebbe di niente l'esposizione della
+credenziale.
+
+⚠️ **Il collaudo ha trovato due difetti, entrambi fra Postgres e n8n**: il
+payload non appiattito e due campi di troppo nel corpo. Nessuno dei due era
+visibile da qui — l'harness prova Postgres, non la forma del compito una volta
+uscito. Il racconto sta in `n8n/LEGGIMI.md` e in `REGISTRO.md`.
 
 ## La pubblicazione di un profilo
 

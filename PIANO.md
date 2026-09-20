@@ -73,14 +73,19 @@ Con questo **cade il limite dichiarato il 7 settembre**: la fixture del
 mai stato attraversato da un payload Stripe autentico. Ora firma, controllo
 dell'importo e conferma sono stati esercitati su un evento vero.
 
-⚠️ **Il giro è stato costruito dal centro verso i bordi, e i bordi mancano
-entrambi.** Da un lato l'orologio dei 5 minuti: nessuna prenotazione non pagata
-scade, e nessuno slot si libera. Dall'altro l'**imbocco**: il tasto *Prenota la
-call* sulla vetrina è `disabled` per scelta, l'iframe Cal.com non è incorporato,
-e nel sito non esiste nessun bottone per entrare — il login funziona ma si
-raggiunge solo da `/prova`. Il collaudo dell'8 settembre ha saltato l'imbocco
-incollando il codice XPETIS a mano. **Oggi la milestone 4 funziona e non si
-vede.**
+~~⚠️ **Il giro è stato costruito dal centro verso i bordi, e i bordi mancano
+entrambi.**~~ → **entrambi i bordi ci sono, e dal 20 settembre 2026 girano in
+sandbox.** L'imbocco è entrato l'8 settembre (`/accedi`, l'embed Cal.com nella
+vetrina, l'header che riconosce chi è collegato) e l'orologio il 18, collaudato
+il 20: una prenotazione non pagata scade da sola e **lo slot torna libero sul
+calendario del designer**, senza che nessuno guardi.
+
+**Il giro del pagamento è chiuso da bordo a bordo. La milestone 4 no**, ed è una
+distinzione da non perdere: restano i testi che convivono con le mail native di
+Cal.com, il calendario admin degli appuntamenti, il percorso "slot introvabile",
+il controllo di vitalità dei 25 webhook, e i tre campi del form sulla pagina
+della prenotazione (cellulare, domanda di contesto, flag servizi). Sono nella
+lista di milestone 4, non spuntati.
 
 **Aggiornamento dell'8 settembre 2026 — l'imbocco, subito dopo il collaudo.**
 Il bordo che mancava da questo lato è entrato: **`/accedi` esiste**, il tasto
@@ -119,6 +124,36 @@ Tre cose da sapere.
   Secret nuovo generato, incollato in Supabase, login riprovato, **vecchio
   cancellato**: quello che sta in git dal commit `ce5aafa` non funziona più.
   Cronaca e procedura in `ACCESSI.md`.
+- ~~🔴 **Mettere in strada l'orologio**~~ → **fatto il 20 settembre 2026**, e
+  **funziona**: uno slot non pagato si libera davvero su Cal.com. Migration
+  `0041` applicata, righe di `app_config` inserite, workflow importato e attivo,
+  prove 17-22 passate. La **17 ha chiuso la domanda che S-05 aveva lasciato
+  aperta**: l'API v2 pubblica cancella una prenotazione **senza nessuna chiave**,
+  quindi l'onboarding resta senza le 25 chiavi Cal.com e `GUIDA_PONTE_CALCOM.md`
+  §9.4 si può considerare chiusa.
+  ⚠️ **È stato fatto funzionare correggendo il workflow a mano su n8n**, e i due
+  difetti stavano entrambi nella giuntura fra Postgres e n8n — payload non
+  appiattito, e due campi di troppo nel corpo che la v2 rifiuta con 400. Il repo
+  è stato riallineato lo stesso giorno: `n8n/orologio.json` contiene le due
+  correzioni, quindi una reimportazione non rimette i difetti.
+- 🟡 **Una decisione tua: il conto dei 35 minuti non torna già adesso.** La
+  regola del Flusso dice che uno slot non pagato resta occupato al massimo 35
+  minuti, e il conto vero è `finestra + grazia + cadenza` — la cadenza entra
+  perché una riga che scade subito dopo un giro aspetta un giro intero. Con i
+  valori di oggi fa **30 + 0 + 5 = 35 esatti**: siamo *sul* limite, non sotto, e
+  **non c'è spazio per nessun margine di grazia**.
+  Il margine servirebbe: la cassa Stripe può restare aperta circa un minuto oltre
+  la nostra scadenza (`expires_at` di Stripe accetta minimo 30 minuti e la route
+  taglia al minimo invece di esplodere), e un pagamento che atterra lì trova lo
+  slot appena liberato. Oggi quel caso non è ignorato — c'è un alert critico e
+  una persona che rifissa o rimborsa — ma è un caso da **evitare**, non da
+  gestire.
+  Le due strade sono entrambe tue, perché toccano il prodotto e non il codice:
+  **portare la finestra di pagamento a 28 minuti** (il viaggiatore ne ha due in
+  meno) oppure **la cadenza a 2 minuti** (più giri a vuoto su n8n, che è
+  self-hosted e li fa gratis). Poi
+  `update app_config set value = 2 where key = 'booking_cancel_grace_min';`
+  Se non decidi niente resta com'è, e va bene: 35 esatti rispetta la regola.
 - 🔴 **Resta da ruotare la password del database**, che è ancora quella dei primi
   otto commit. Stesso ragionamento: toglierla dal file non l'ha tolta dalla
   storia.
@@ -151,9 +186,10 @@ Tre cose da sapere.
 2. ~~**Il ponte Cal.com → `bookings`**~~ → **fatto il 6 settembre**, e non in
    n8n ma nel database: `0037_calcom_webhook.sql`, con n8n ridotto a quattro
    nodi che non decidono niente. Provato sull'indirizzo di produzione.
-3. **L'orologio unico dei 5 minuti**: è il pezzo che manca perché il giro del
-   pagamento si chiuda da solo — oggi una cassa scaduta lascia lo slot occupato
-   su Cal.com finché non lo guarda qualcuno.
+3. ~~**L'orologio unico dei 5 minuti**~~ → **costruito il 18 settembre 2026 e
+   collaudato il 20**: `0041_orologio.sql` + `n8n/orologio.json`. Uno slot non
+   pagato si libera davvero, e l'endpoint di cancellazione non è più una domanda
+   aperta.
 4. **Il suggeritore destinazioni** sulla tassonomia: è logica, non grafica, e
    funziona indipendentemente da come sarà disegnata la barra di ricerca.
 5. Chiudere la milestone 3 dalla mia parte: ricerca accento-insensibile
@@ -823,9 +859,12 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       `v1` durante una rotazione del segreto; il diario usa l'`evt_` che Stripe
       manda, senza comporre chiavi. Restano da fare le **mail** (serve il
       provider, punto aperto 3) e i due passi di Simone qui sotto
-- [ ] **[S]** Applicare la migration `0040_showcase_cal_link.sql`: senza,
-      l'embed non ha `cal_username` e il tasto *Prenota* mostra la frase di
-      cortesia invece del calendario
+- [x] **[S]** ~~Applicare la migration `0040_showcase_cal_link.sql`~~ →
+      **applicata a mano dal SQL Editor**, e confermata il 20 settembre. La
+      storia delle migration era rimasta indietro sulle `0038`-`0040` (applicate
+      a mano, mai registrate): riparata con `supabase migration repair` dopo aver
+      verificato che gli oggetti ci fossero davvero, come già il 6 settembre per
+      le `0033`-`0036`. Da lì `db push` ha portato la sola `0041`
 - [x] **[S]** ~~Creare l'endpoint webhook su Stripe, `whsec_…` in Vault,
       workflow su n8n~~ → **fatto nel collaudo dell'8 settembre**, con un
       pagamento vero da 60 € che ha attraversato la catena
@@ -881,13 +920,57 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       andranno è segnato con un commento in fondo alla pagina, `my_orders`
       compresa. La **mail resta da fare** e non è un doppione: questa pagina
       copre chi torna sul sito da sé, la mail tutti gli altri
-- [ ] **[C]** Orologio unico ogni 5 minuti: insoluti oltre i 30 minuti (annulla
+- [x] **[C]** Orologio unico ogni 5 minuti: insoluti oltre i 30 minuti (annulla
       su Cal.com col solo codice prenotazione, stato a "non pagata", mail
       cortese) e tutte le altre scadenze dovute. **In produzione la cadenza deve
       restare 5-10 minuti**: con finestra di 30 e controllo ogni 30 il caso
-      peggiore diventa 60 minuti, e la regola dice massimo 35
+      peggiore diventa 60 minuti, e la regola dice massimo 35.
+      **Costruito il 18 settembre 2026** → `0041_orologio.sql` +
+      `n8n/orologio.json`. La **mail cortese non c'è**, ed è l'unico pezzo di
+      questa riga che manca: il provider di invio è S-04 e non esiste. Il posto
+      dove andrà è dichiarato — un ramo `email_*` in `clock_tick()`, accanto a
+      quello che già c'è — e finché non c'è un provider **non si manda niente e
+      non si finge**. Chi perde lo slot riceve intanto la mail nativa di Cal.com,
+      che resta accesa (deviazione 5) e porta il motivo scritto in
+      `app_config.unpaid_cancel_reason`.
+      Cinque cose decise costruendolo:
+      · **la forma è diversa dai due ponti**, e il perché è uno solo: i ponti
+        *ricevono*, questo *agisce verso l'esterno*, e Postgres non fa chiamate
+        HTTP. `clock_tick()` decide chi è scaduto, n8n esegue, `clock_task_done()`
+        decide cosa significa l'esito — e n8n gli passa il **codice HTTP** che
+        Cal.com ha risposto, non un giudizio;
+      · **si marca `cancelled_unpaid` dopo, mai prima.** Chiudere la riga prima e
+        poi fallire la chiamata lascerebbe una riga chiusa e uno slot occupato
+        che nessuno guarderà **mai più**, perché l'orologio non ripassa sulle
+        righe chiuse. Marcando dopo, il giro successivo la ritrova. È la stessa
+        regola di `webhook_events.processed_at`;
+      · **la nostra cancellazione torna indietro come webhook**, e il ponte
+        potrebbe attribuirla al viaggiatore. Il trigger
+        `bookings_force_system_cancel_actor` la attribuisce al sistema da
+        qualunque porta entri: `booking_status_history` è l'unica prova di chi ha
+        agito, e il designer non ha login;
+      · **il conto dei 35 minuti non torna già adesso**: finestra 30 + grazia 0 +
+        cadenza 5 fa esattamente 35, cioè siamo sul limite e la grazia **non ci
+        sta**. `booking_cancel_grace_min` nasce a zero, e allargarla è una
+        decisione tua — sotto, in "cosa resta a te";
+      · **due righe non si toccano mai**: quelle con un incasso già riuscito
+        (prendere i soldi e dare via lo slot è il danno peggiore possibile) e
+        quelle con `payment_deadline_at` nullo, che la cassa tratta come pagabili.
+      Harness a **387 asserzioni** (erano 349), verdi.
+      **Collaudato il 20 settembre 2026, e ha funzionato solo dopo due
+      correzioni al workflow**, entrambe nella giuntura fra Postgres e n8n:
+      il payload non veniva appiattito (`cancel_url`, `api_version` e `reason`
+      stanno dentro `payload`, e il nodo HTTP li cercava al livello alto: trovava
+      `undefined` e il giro era **tutto verde senza cancellare niente**), e il
+      corpo portava `uid` e `allRemainingBookings`, che sono campi della v1 e che
+      la v2 rifiuta con 400. `n8n/orologio.json` nel repo è stato riallineato lo
+      stesso giorno: reimportarlo non rimette i difetti
 - [ ] **[C]** Testi che convivono con le mail native di Cal.com: la nostra dice
-      che lo slot è tenuto 30 minuti e che la conferma vera arriva col pagamento
+      che lo slot è tenuto 30 minuti e che la conferma vera arriva col pagamento.
+      ⚠️ **Dipende da S-04**: senza provider di invio non parte nessuna mail
+      nostra. Dal 20 settembre c'è un caso in più da coprire — chi perde lo slot
+      riceve **solo** l'annullamento nativo di Cal.com, col motivo scritto in
+      `app_config.unpaid_cancel_reason`, e nient'altro da noi
 - [ ] **[C]** Calendario admin degli appuntamenti
 - [ ] **[C]** Percorso "slot introvabile": link WhatsApp, prenotazione creata a
       mano dal team che innesca gli stessi workflow
@@ -940,6 +1023,12 @@ righe di `app_config` e l'endpoint Stripe servono dal punto 4 in poi.
 | ✅ 14 | Da collegato, con prenotazioni in stati diversi. Il modo veloce di averceli: `update bookings set status='completed' where id='<id>';` su righe di prova, uno stato alla volta | **Nessuna riga muta**: tutte e sette gli stati dicono una frase. In cima quella da pagare col conto alla rovescia e il tasto, in fondo le chiuse, dalla più recente. Con `payment_deadline_at` già passata: "Tempo scaduto" e **nessun tasto** | Una riga senza frase o un tasto *Paga* su una scaduta: dimmelo, sono i due difetti che questa pagina esiste per non avere |
 | ✅ 15 | Da collegato, **con un account che non ha prenotato niente** | Non una pagina vuota: "Non hai ancora prenotato niente" e il tasto verso `/ricerca` | — |
 | ✅ 16 | Il link nell'header, **da desktop e da telefono** | Desktop: *"Le mie prenotazioni"* per esteso accanto al saluto. Telefono: la voce per esteso non c'è (non ci sta nella pillola) e **il saluto "Ciao \<nome\>" è il link** | Se da telefono il saluto non porta da nessuna parte, l'unica porta all'area sparisce proprio dove serve di più |
+| ✅ 17 | **Prima di tutte le altre prove dell'orologio**: il `curl` che verifica l'endpoint di cancellazione, su una prenotazione di prova che puoi permetterti di perdere. I due candidati e i comandi stanno in `n8n/LEGGIMI.md` | Uno dei due risponde 2xx **e lo slot sparisce dal calendario**. Poi, da Studio: `update app_config set value_text = '<quello giusto>' where key = 'calcom_cancel_url';` | ⚠️ **Se nessuno dei due funziona senza chiave, fermati e dimmelo.** Vuol dire 25 chiavi API da raccogliere in onboarding, ed è una decisione di prodotto, non un dettaglio tecnico |
+| ✅ 18 | `select * from clock_tick(10);` da Studio **senza nessuna prenotazione scaduta** | Zero righe, nessun errore, nessun alert | Se **solleva**, manca una riga di `app_config`: è voluto che sollevi invece di girare a vuoto in silenzio |
+| ✅ 19 | **Il giro completo, che è la prova vera.** Prenoti una consulenza, **non paghi**, aspetti. Tieni aperto il calendario del designer su Cal.com | Entro ~35 minuti la prenotazione passa a `cancelled_unpaid` e **lo slot ricompare libero su Cal.com**. In `booking_status_history` l'ultima riga dice attore **`system`**, non `traveler` | Slot ancora occupato: guarda `team_alerts` (`kind like 'orologio_%'`) e le esecuzioni n8n. Storia che dice `traveler`: il trigger non ha fatto il suo lavoro, **dimmelo** — quella riga è l'unica prova di chi ha agito |
+| ✅ 20 | Sulla riga della prova 19: `update bookings set status='pending_payment', cancel_requested_at=null, cancel_attempts=0 where id='<id>';` poi *Execute Workflow* a mano | Cal.com rifiuta la seconda cancellazione, **e va bene così**: l'esito è `gia_liberata`, e in n8n non c'è nessuna esecuzione rossa | È la trappola 3: cancellare due volte dev'essere innocuo. La difesa non è nel messaggio d'errore di Cal.com ma nello stato della riga |
+| ✅ 21 | `update bookings set payment_deadline_at = now() - interval '1 minute' where id='<id di una PAGATA>';` e aspetti un giro | **Non succede niente.** Una riga con un incasso riuscito non si tocca, scaduta o no | Se quello slot viene cancellato fermati subito: è il danno peggiore che questo workflow possa fare |
+| ✅ 22 | `update app_config set value = 45 where key = 'booking_payment_window_min';` e aspetti due giri. Poi rimetti 30 | **Un** alert `orologio_fuori_budget` in `team_alerts`, e resta uno solo anche dopo il secondo giro | È il guardiano del conto dei 35 minuti, e serve perché i parametri si cambiano da Studio, dove nessun test passa |
 
 ⚠️ **Le prove 0c e 7 scrivono un alert critico vero** (`calcom_webhook_non_arrivato`):
 è corretto che lo facciano, ma è un falso allarme di collaudo e va tolto, come

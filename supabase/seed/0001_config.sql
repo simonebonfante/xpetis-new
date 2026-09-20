@@ -145,3 +145,79 @@ insert into app_config (key, value, value_text, config_group, label_it, notes) v
    'Numero WhatsApp del team',
    'PROVVISORIO: cellulare personale, non un numero aziendale. Per questo il gruppo è `contacts`, che public_config non espone. Formato internazionale con spazi: chi costruisce un link wa.me toglie spazi e "+".')
 on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- L'orologio dei 5 minuti (migration 0041)
+-- ---------------------------------------------------------------------------
+-- `unpaid_sweep_minutes` (5) esiste già più sopra: è la cadenza. Qui si
+-- aggiungono il margine, il budget e il freno.
+--
+-- ## Il conto che non torna, e per cui la grazia nasce a zero
+--
+-- La regola del Flusso è che uno slot non pagato resta occupato **al massimo 35
+-- minuti**, e il conto vero è `finestra + grazia + cadenza`: la cadenza entra
+-- perché una prenotazione che scade subito dopo un giro aspetta un giro intero.
+-- Con i valori di oggi fa 30 + 0 + 5 = **35 esatti**. Siamo sul limite, quindi
+-- **non c'è spazio per nessuna grazia** senza toccare qualcos'altro.
+--
+-- La grazia servirebbe: la cassa Stripe può restare aperta un minuto oltre la
+-- nostra scadenza, perché `expires_at` di Stripe accetta minimo 30 minuti e la
+-- route taglia al minimo invece di esplodere. Un pagamento che atterra in quel
+-- minuto trova lo slot appena liberato.
+--
+-- Le due strade per comprarsela sono entrambe di Simone, non mie: portare la
+-- finestra a 28 minuti, o la cadenza a 2. `clock_tick` controlla il conto a
+-- ogni giro e scrive un alert se qualcuno lo sfonda da Studio.
+insert into app_config (key, value, config_group, label_it, notes) values
+  ('booking_cancel_grace_min', 0, 'orders', 'Minuti di grazia oltre la scadenza prima di liberare lo slot',
+   'Oggi 0: finestra 30 + grazia + cadenza 5 deve restare sotto i 35 minuti del Flusso, e 30+0+5 fa già 35. Per alzarla va accorciata la finestra o la cadenza.'),
+  ('unpaid_slot_max_min', 35, 'orders', 'Massimo che uno slot non pagato può restare occupato',
+   'La regola del Flusso. clock_tick() la usa come budget e avvisa il team se i parametri la sfondano.'),
+  ('unpaid_cancel_max_attempts', 3, 'orders', 'Tentativi di cancellazione su Cal.com prima di chiamare una persona',
+   'Oltre, l''orologio smette di riprovare e scrive un alert critico: un braccio rotto deve diventare un allarme, non un rumore di fondo.')
+on conflict (key) do nothing;
+
+-- I parametri della chiamata a Cal.com. Gruppo `integrations`, che
+-- `public_config` non espone: al browser non serve, e a maggior ragione qui —
+-- è l'indirizzo con cui si cancella una call conoscendo solo il codice della
+-- prenotazione.
+--
+-- ✅ **Verificato il 20 settembre 2026**, su una prenotazione vera: l'API v2
+-- risponde 200, lo slot torna libero sul calendario e le mail native di
+-- annullamento partono. **Senza nessuna chiave**, come diceva S-05 — che aveva
+-- stabilito il fatto ma non l'indirizzo, lasciato aperto da
+-- `GUIDA_PONTE_CALCOM.md` §9.4.
+--
+-- `{uid}` nel modello viene sostituito col codice della prenotazione: l'endpoint
+-- v2 lo vuole nel **percorso**, e il corpo della richiesta porta soltanto
+-- `cancellationReason`.
+--
+-- ⚠️ **Il ripiego v1 non è più a una riga di distanza, e questa nota diceva il
+-- contrario.** Fino al 20 settembre qui c'era scritto che le due forme erano
+-- entrambe supportate — «se `{uid}` non compare nel modello, il codice viaggia
+-- nel corpo» — e non è più vero: il corpo del nodo *Cancella su Cal.com* è stato
+-- ridotto al solo motivo, perché la v2 rifiuta con **400** tutto quello che non
+-- conosce (*"uid property should not exist, allRemainingBookings property should
+-- not exist"*). Passare a `https://api.cal.com/api/cancel` oggi richiede **due
+-- cose**, non una:
+--
+--   1. la riga da Studio:
+--      update app_config set value_text = 'https://api.cal.com/api/cancel'
+--       where key = 'calcom_cancel_url';
+--   2. e rimettere `uid` e `allRemainingBookings` nel `jsonBody` del nodo
+--      *Cancella su Cal.com* di `n8n/orologio.json`, cioè **modificare e
+--      reimportare il workflow**.
+--
+-- Resta comunque il posto giusto dove tenere l'indirizzo: cambiare endpoint
+-- dentro la stessa famiglia (una v3, un self-hosted) resta una riga da Studio.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('calcom_cancel_url', null, 'https://api.cal.com/v2/bookings/{uid}/cancel', 'integrations',
+   'Indirizzo a cui il braccio chiede la cancellazione di uno slot',
+   'VERIFICATO il 20 settembre 2026 con un curl su una prenotazione vera: 200, slot tornato libero, e le mail native di annullamento partite. Nessuna chiave necessaria, come diceva S-05. {uid} viene sostituito col codice della prenotazione. Ripiego mai servito: https://api.cal.com/api/cancel, che vuole il codice nel corpo.'),
+  ('calcom_api_version', null, '2024-08-13', 'integrations',
+   'Header cal-api-version della API v2 di Cal.com',
+   'L''API v2 vuole la versione dichiarata nell''header. Sull''endpoint v1 di ripiego non serve e viene ignorato.'),
+  ('unpaid_cancel_reason', null, 'Pagamento non completato: lo slot è stato liberato.', 'integrations',
+   'Motivo della cancellazione scritto su Cal.com',
+   'Lo legge il viaggiatore: finisce nella mail nativa di Cal.com, che resta accesa (deviazione 5). Testo segnaposto, lo riscrive Gaia.')
+on conflict (key) do nothing;

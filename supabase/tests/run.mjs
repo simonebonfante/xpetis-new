@@ -2021,5 +2021,272 @@ console.log('\n== Il ponte Stripe ==')
   }
 }
 
+// ===========================================================================
+// L'orologio dei 5 minuti (migration 0041)
+// ===========================================================================
+// Qui l'harness prova **la parte che decide**: quali righe l'orologio sceglie e
+// cosa fa degli esiti. Il braccio — la chiamata vera a Cal.com — non si può
+// provare da qui e non si finge: sta in `n8n/`, e le prove di Simone sono in
+// `PIANO.md`.
+console.log('\n== L\'orologio dei 5 minuti ==')
+{
+  const TD = '11111111-1111-1111-1111-111111111111'
+  const VIAGGIATORE = '69a37b12-b899-47c4-9bdb-31a17d9cb986'
+  const B = (n) => `c10c0000-0000-4000-8000-00000000000${n}`
+
+  // `scadenza` è un'espressione SQL: il punto di queste prove sono i casi
+  // storti, e ognuno è una scadenza messa in un posto diverso del tempo.
+  const crea = async (n, scadenza, stato = 'pending_payment') =>
+    db.query(
+      `insert into bookings (id, traveler_id, td_id, service_type, status, cal_booking_uid,
+                             cal_event_type_slug, starts_at, ends_at, original_starts_at,
+                             price_cents, payment_deadline_at, last_actor)
+       values ($1, $2, $3, 'consultation', $4, 'uid-orologio-' || $5, 'consulenza-xpetis-30',
+               now() + interval '2 days', now() + interval '2 days' + interval '30 minutes',
+               now() + interval '2 days', 6000, ${scadenza}, 'traveler')`,
+      [B(n), VIAGGIATORE, TD, stato, String(n)])
+
+  await crea(1, `now() - interval '1 hour'`)          // scaduta da un'ora
+  await crea(2, `now() - interval '1 second'`)        // scaduta da un secondo
+  await crea(3, `now() - interval '1 hour'`)          // scaduta MA pagata
+  await crea(4, `now() - interval '1 hour'`, 'cancelled_unpaid') // già liberata
+  await crea(5, `null`)                               // senza scadenza
+  await crea(6, `now() + interval '10 minutes'`)      // non ancora scaduta
+  await crea(7, `now() - interval '1 hour'`)          // tentativi esauriti
+  await crea(8, `now() - interval '1 hour'`)          // il webhook di ritorno
+  await crea(9, `now() - interval '1 hour'`)          // pagata nel frattempo
+
+  // La terza ha un incasso riuscito: è la riga che l'orologio non deve toccare
+  // nemmeno se è scaduta da un'ora. Prendere i soldi e dare via lo slot è il
+  // danno peggiore che questo workflow possa fare.
+  await db.query(
+    `insert into payments (booking_id, kind, status, amount_cents, currency,
+                           stripe_account, client_reference_id, paid_at)
+     values ($1, 'consultation', 'paid', 6000, 'EUR', 'xpetis', $2, now())`, [B(3), B(3)])
+  await db.query(`update bookings set cancel_attempts = 3 where id = $1`, [B(7)])
+
+  const tick = async (limite = 100) =>
+    (await db.query('select * from clock_tick($1)', [limite])).rows
+  const stato = async (id) =>
+    (await db.query('select * from bookings where id = $1', [id])).rows[0]
+  const nAlert = async (kind) =>
+    Number((await db.query('select count(*) from team_alerts where kind = $1', [kind])).rows[0].count)
+  const ultimoAttore = async (id) =>
+    (await db.query(
+      `select actor, to_status from booking_status_history
+        where booking_id = $1 order by created_at desc, id desc limit 1`, [id])).rows[0]
+
+  // ------------------------------------------------- chi entra e chi non entra
+  console.log('  -- quali righe sceglie, che è tutto il punto --')
+  const primo = await tick()
+  const scelti = new Set(primo.map(r => r.entity_id))
+
+  for (const [n, atteso, perche] of [
+    [1, true,  'scaduta da un\'ora: si libera'],
+    [2, true,  'scaduta da un secondo: la scadenza è la scadenza'],
+    [3, false, 'scaduta ma PAGATA: non si tocca'],
+    [4, false, 'già cancelled_unpaid: non si ripassa sulle righe chiuse'],
+    [5, false, 'senza scadenza: la cassa la tratta come pagabile, quindi l\'orologio la lascia stare'],
+    [6, false, 'non ancora scaduta'],
+    [7, false, 'tentativi esauriti: si smette di riprovare'],
+  ]) {
+    scelti.has(B(n)) === atteso ? ok(perche) : fail(`${perche} — e invece ${atteso ? 'non c\'è' : 'c\'è'}`)
+  }
+
+  // ------------------------------------------------------------- il compito
+  console.log('  -- la forma del compito consegnato al braccio --')
+  {
+    const c = primo.find(r => r.entity_id === B(1))
+    c && c.task === 'calcom_cancel_unpaid' && c.entity_type === 'booking'
+      ? ok('il compito si chiama calcom_cancel_unpaid e parla di una prenotazione')
+      : fail('compito malformato: ' + JSON.stringify(c))
+    c?.payload?.cal_booking_uid === 'uid-orologio-1'
+      ? ok('porta cal_booking_uid, che esce dal database solo da questa porta')
+      : fail('manca il codice della prenotazione: ' + JSON.stringify(c?.payload))
+    c?.payload?.cancel_url === 'https://api.cal.com/v2/bookings/uid-orologio-1/cancel'
+      ? ok('{uid} nell\'URL è sostituito col codice: il braccio non compone niente')
+      : fail('URL non sostituito: ' + c?.payload?.cancel_url)
+    c?.payload?.attempt === 1
+      ? ok('il compito dice a che tentativo siamo')
+      : fail('tentativo: ' + JSON.stringify(c?.payload?.attempt))
+  }
+  {
+    const b = await stato(B(1))
+    b.cancel_requested_at && b.cancel_attempts === 1
+      ? ok('la riga consegnata è segnata: cancel_requested_at pieno, un tentativo')
+      : fail('riga non segnata: ' + JSON.stringify([b.cancel_requested_at, b.cancel_attempts]))
+  }
+
+  // Il braccio ha in mano il compito: un secondo giro subito dopo non lo
+  // riconsegna a nessuno.
+  {
+    const subito = await tick()
+    subito.some(r => r.entity_id === B(1))
+      ? fail('il giro successivo ha riconsegnato una riga già in lavorazione')
+      : ok('un giro subito dopo non riconsegna le righe già in mano al braccio')
+  }
+
+  // --------------------------------------------------- il braccio riferisce
+  console.log('  -- cosa significano gli esiti --')
+  {
+    const r = (await db.query(`select clock_task_done('calcom_cancel_unpaid', $1, 200, null) as e`, [B(1)])).rows[0].e
+    const b = await stato(B(1))
+    r.esito === 'liberata' && b.status === 'cancelled_unpaid'
+      ? ok('cancellazione riuscita: la riga passa a cancelled_unpaid, e solo adesso')
+      : fail('esito ' + JSON.stringify(r) + ' stato ' + b.status)
+    const h = await ultimoAttore(B(1))
+    h?.actor === 'system' && b.cancelled_by === 'system'
+      ? ok('ha agito il sistema, e booking_status_history lo dice')
+      : fail('attore sbagliato: ' + JSON.stringify(h))
+  }
+  {
+    // TRAPPOLA 3: cancellare due volte deve essere innocuo. Il secondo
+    // tentativo Cal.com lo rifiuta — qui un 400 — e la risposta giusta non si
+    // cerca nel suo messaggio d'errore ma nello stato della riga: lo slot è
+    // libero, e come ci sia arrivato non cambia niente.
+    const r = (await db.query(
+      `select clock_task_done('calcom_cancel_unpaid', $1, 400, 'already cancelled') as e`, [B(1)])).rows[0].e
+    r.esito === 'gia_liberata' && r.ok === true
+      ? ok('secondo tentativo su una riga già chiusa: successo, non guasto — e senza indovinare il testo di Cal.com')
+      : fail('doppio tentativo: ' + JSON.stringify(r))
+  }
+  {
+    // Cal.com non ha risposto: la riga resta scaduta e da liberare.
+    const r = (await db.query(
+      `select clock_task_done('calcom_cancel_unpaid', $1, 503, 'timeout') as e`, [B(2)])).rows[0].e
+    const b = await stato(B(2))
+    r.esito === 'ritentare' && b.status === 'pending_payment'
+      ? ok('cancellazione fallita: la riga resta pending_payment, perché si marca DOPO')
+      : fail('fallimento gestito male: ' + JSON.stringify(r) + ' ' + b.status)
+
+    // ...e il giro successivo la ritrova, che è il senso di tutta la scelta.
+    await db.query(
+      `update bookings set cancel_requested_at = now() - interval '10 minutes' where id = $1`, [B(2)])
+    const dopo = await tick()
+    dopo.some(r2 => r2.entity_id === B(2))
+      ? ok('il giro successivo ritrova la riga che non si era riusciti a cancellare')
+      : fail('la riga fallita non è tornata: lo slot resterebbe occupato per sempre')
+    const b2 = await stato(B(2))
+    b2.cancel_attempts === 2 ? ok('e conta il secondo tentativo') : fail('tentativi: ' + b2.cancel_attempts)
+  }
+
+  // --------------------------------------------- TRAPPOLA 2, accaduta davvero
+  {
+    await db.query(`update bookings set status='confirmed', confirmed_at=now() where id = $1`, [B(9)])
+    const r = (await db.query(`select clock_task_done('calcom_cancel_unpaid', $1, 200, null) as e`, [B(9)])).rows[0].e
+    const b = await stato(B(9))
+    r.esito === 'pagata_nel_frattempo' && b.status === 'confirmed'
+      ? ok('pagamento arrivato mentre si cancellava: lo stato non si tocca')
+      : fail('corsa col pagamento gestita male: ' + JSON.stringify(r) + ' ' + b.status)
+    await nAlert('orologio_ha_liberato_uno_slot_pagato') === 1
+      ? ok('e il team riceve un alert critico: quella call su Cal.com non esiste più')
+      : fail('nessun alert sulla corsa col pagamento')
+  }
+
+  // ------------------------------- TRAPPOLA 1: la nostra cancellazione torna
+  console.log('  -- il webhook che la nostra stessa cancellazione fa tornare indietro --')
+  {
+    const fxDir = path.join(root, 'tests', 'fixtures', 'calcom')
+    const base = JSON.parse(readFileSync(path.join(fxDir, 'booking_cancelled.json'), 'utf8'))
+    const corpo = Object.fromEntries(Object.entries(base).filter(([k]) => !k.startsWith('_')))
+    corpo.createdAt = '2026-09-18T10:00:00.000Z'
+    corpo.payload.uid = 'uid-orologio-8'
+    // Cal.com potrebbe attribuire la cancellazione a chi ha prenotato: è
+    // esattamente il caso che il trigger deve correggere.
+    corpo.payload.cancelledBy = corpo.payload.attendees?.[0]?.email ?? 'viaggiatore@example.com'
+    corpo.payload.cancellationReason = 'Pagamento non completato: lo slot è stato liberato.'
+
+    // La riga 8 è stata consegnata al braccio nel primo giro: `cancel_requested_at`
+    // è pieno, ed è il segno che ha agito il sistema.
+    const prima = await stato(B(8))
+    if (!prima.cancel_requested_at) fail('la riga 8 non era stata consegnata: la prova non vale')
+
+    const raw = JSON.stringify(corpo)
+    const firma = crypto.createHmac('sha256', segretoCalcom.valore).update(raw, 'utf8').digest('hex')
+    const esito = (await db.query('select calcom_webhook($1, $2) as e', [raw, firma])).rows[0].e
+    const b = await stato(B(8))
+    esito.esito === 'cancellata' && b.status === 'cancelled_unpaid'
+      ? ok('il webhook di ritorno chiude la riga, come deve')
+      : fail('ritorno gestito male: ' + JSON.stringify(esito) + ' ' + b.status)
+
+    const h = await ultimoAttore(B(8))
+    h?.actor === 'system'
+      ? ok('e l\'ha fatto il SISTEMA, non il viaggiatore, anche se Cal.com dice il contrario')
+      : fail('attribuzione sbagliata nella sola prova di chi ha agito: ' + JSON.stringify(h))
+    b.cancelled_by === 'system'
+      ? ok('anche cancelled_by dice sistema')
+      : fail('cancelled_by: ' + b.cancelled_by)
+    // Nessun alert **su questa riga**: il conteggio è per entità e non per
+    // tipo, perché il blocco Cal.com più sopra ha già scritto i suoi, legittimi.
+    const spuri = (await db.query(
+      'select kind from team_alerts where entity_id = $1', [B(8)])).rows.map(r => r.kind)
+    spuri.length === 0
+      ? ok('e nessun alert su quella riga: la nostra cancellazione non è un\'eccezione')
+      : fail('alert spuri sulla nostra stessa cancellazione: ' + JSON.stringify(spuri))
+  }
+
+  // ------------------------------------------------- il braccio che non riesce
+  console.log('  -- quando il braccio è rotto --')
+  await nAlert('orologio_cancellazione_calcom_non_riesce') === 1
+    ? ok('tentativi esauriti: un alert critico, una volta sola')
+    : fail('nessun alert sui tentativi esauriti')
+  {
+    await tick()
+    await nAlert('orologio_cancellazione_calcom_non_riesce') === 1
+      ? ok('e il giro dopo non ne scrive un secondo')
+      : fail('alert duplicato a ogni giro')
+  }
+
+  // ------------------------------------------------------ il budget dei 35'
+  console.log('  -- il budget del Flusso, controllato a ogni giro --')
+  {
+    await nAlert('orologio_fuori_budget') === 0
+      ? ok('con 30 + 0 + 5 = 35 nessun allarme: siamo sul limite, non oltre')
+      : fail('allarme di budget con i parametri buoni')
+    await db.query(`update app_config set value = 45 where key = 'booking_payment_window_min'`)
+    await tick()
+    await tick()
+    await nAlert('orologio_fuori_budget') === 1
+      ? ok('finestra allargata da Studio: un allarme, e uno solo')
+      : fail('il budget sfondato non produce esattamente un allarme')
+    await db.query(`update app_config set value = 30 where key = 'booking_payment_window_min'`)
+  }
+
+  // --------------------------------------------- i parametri non si inventano
+  {
+    await db.query(`update app_config set value_text = null, value = 0 where key = 'calcom_cancel_url'`)
+      .then(async () => {
+        try {
+          await db.query('select * from clock_tick(10)')
+          fail('senza URL di cancellazione l\'orologio ha girato lo stesso')
+        } catch {
+          ok('manca un parametro: solleva, invece di girare a vuoto in silenzio')
+        }
+      })
+    await db.query(
+      `update app_config set value_text = 'https://api.cal.com/v2/bookings/{uid}/cancel', value = null
+        where key = 'calcom_cancel_url'`)
+  }
+
+  // ------------------------------------------ la riga senza scadenza, mai
+  {
+    const b = await stato(B(5))
+    b.status === 'pending_payment' && b.cancel_requested_at === null
+      ? ok('dopo tutti i giri, la riga senza scadenza non è stata toccata nemmeno una volta')
+      : fail('la riga senza scadenza è stata toccata: ' + JSON.stringify([b.status, b.cancel_requested_at]))
+  }
+
+  // ------------------------------------------------------------ la superficie
+  console.log('  -- chi può far girare l\'orologio --')
+  for (const f of ['clock_tick(integer)', 'clock_task_done(text,uuid,integer,text)']) {
+    for (const ruolo of ['anon', 'authenticated']) {
+      const v = (await db.query(`select has_function_privilege($1, $2, 'EXECUTE') as v`, [ruolo, f])).rows[0].v
+      v === false ? ok(`${ruolo} non può chiamare ${f.split('(')[0]}`) : fail(`${ruolo} può chiamare ${f}`)
+    }
+    const v = (await db.query(`select has_function_privilege('service_role', $1, 'EXECUTE') as v`, [f])).rows[0].v
+    v === true ? ok(`service_role sì su ${f.split('(')[0]}`) : fail(`service_role non può chiamare ${f}`)
+  }
+}
+
 console.log(failures === 0 ? '\nTutto verde.\n' : `\n${failures} asserzioni fallite.\n`)
 process.exit(failures === 0 ? 0 : 1)
