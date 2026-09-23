@@ -185,6 +185,51 @@ allo stesso momento ma che è una riga a sé di milestone 6. Niente di quello ch
 è entrato oggi li pregiudica: la coda, i testi e l'impalcatura dei token sono
 gli stessi per tutte e tre.
 
+**Aggiornamento del 23 settembre 2026 — la proposta su misura, fino al
+pagamento.** Dopo `requested` il sistema adesso sa cosa succede: il designer
+riceve per mail il link della sua pagina ordine, scrive la proposta, la rilegge,
+la invia; il viaggiatore riceve la mail con il link alla pagina gemella, paga, e
+il webhook Stripe porta l'ordine a `in_progress`. È `0044_proposta_su_misura.sql`
+più tre pagine/route (`/ordine/[token]`, `/proposta/[token]`, la loro cassa) e
+`lib/cassa.ts`, dove la cassa della consulenza e quella della proposta
+condividono le stesse tre difese invece di copiarsele.
+
+Harness a **548 asserzioni** (erano 459), tutte verdi. `npm run build` verde.
+
+Quattro cose da sapere, e la prima è quella che conta.
+
+1. 🔴 **È il primo token che fissa un prezzo, e l'irreversibilità sta nel
+   database.** Il link del designer è permanente e vive in una casella
+   inoltrabile. Chi lo trova può scrivere e mandare una proposta — è il danno
+   massimo, e passa comunque dal gruppo WhatsApp e dallo spot-check — ma **non
+   può cambiare una proposta già partita**: un trigger lo rifiuta a chiunque,
+   Studio compreso. Salvare e inviare sono due gesti, e l'invio ridichiara il
+   prezzo che il designer ha riletto. Una proposta partita si rifà **solo
+   passando dal team**: `update orders set status='in_definition'` da Studio,
+   poi il designer riscrive. Il ragionamento intero è in testa alla migration.
+2. ⚠️ **Il credito consulenza non si calcola, e il codice lo dice dove serve.**
+   Il prezzo che il designer scrive è quello finale; il campo credito è la sua
+   dichiarazione per lo spot-check, che adesso ha una vista:
+   `select * from team_spot_check_proposte;`. Nessuna riga fa `prezzo - credito`.
+3. ⚠️ **Ho corretto una cosa della 0019 che la 0044 rendeva vera.** `my_orders`
+   mostrava al viaggiatore loggato le colonne della proposta in ogni stato: da
+   oggi ci vive la bozza del designer, che si sarebbe letta con gli strumenti di
+   sviluppo aperti. Adesso sono nulle finché la proposta non parte (e anche in
+   `proposal_pending_agency`, per l'All Inclusive: vedi la nota in milestone 7).
+4. ⚠️ **Niente di questo è stato visto in un browser, né contro il database
+   vero.** L'harness prova Postgres; le pagine sono verificate dalla build, non
+   dall'occhio. E non c'è un disegno: il Figma non ha né la pagina del designer
+   né la pagina gemella — domanda aperta più sotto. Le prove 41-56 sono la cosa
+   da fare.
+
+**Cosa NON è stato fatto, di proposito**: consegna, revisione, chiusura a 5
+giorni, i tasti eccezione e tutto l'All Inclusive. Tre scelte di oggi li
+toccano, e sono dette invece che risolte in avanti: il congelamento della
+proposta vale solo per il su misura (l'All Inclusive avrà il suo giro con
+l'agenzia); il ponte Stripe risponde con un alert a un pagamento su un ordine
+All Inclusive invece di indovinare; `my_orders` maschera già
+`proposal_pending_agency`.
+
 
 ### Cosa resta a te
 
@@ -279,6 +324,32 @@ gli stessi per tutte e tre.
   5. **Reimportare `n8n/orologio.json`** — ha due nodi nuovi e due rami — e
      riassegnare le credenziali ai quattro nodi HTTP che le vogliono.
   6. Le prove 27-34.
+- 🔴 **Mettere in strada la 0044** (23 settembre 2026). Va **dopo** la 0043.
+  n8n non si tocca: il ponte Stripe ha la stessa firma e lo stesso endpoint.
+  1. `supabase db push` — la `0044_proposta_su_misura.sql`.
+  2. **Una riga nuova di `app_config`**, a mano dal SQL Editor (il seed gira
+     solo su `db reset`):
+
+     ```sql
+     insert into app_config (key, value, value_text, config_group, label_it, notes) values
+       ('custom_itinerary_stripe_account', null, 'xpetis', 'payments',
+        'Conto Stripe che incassa gli itinerari su misura',
+        'xpetis oppure agency, come consultation_stripe_account. Con agency serve un''agenzia partner attiva.')
+     on conflict (key) do nothing;
+     ```
+
+     Senza, la cassa della proposta non si apre e lo dice («non è configurato
+     su quale conto incassare»).
+  3. **Rieseguire `supabase/seed/0005_testi_mail.sql`** sul progetto vero. È
+     idempotente: aggiunge solo le tre righe nuove (`order_new_td`,
+     `proposal_traveler`, `blocco_whatsapp_proposta`) e non tocca quelle che
+     Gaia ha già corretto. Senza, le mail non si compongono e scrivono un alert.
+  4. Deploy del sito (le route nuove).
+  5. ⚠️ **Da questo momento ogni ordine su misura nuovo manda una mail al
+     designer.** Con `email_enabled = 0` resta in coda; ma prima del gradino 3
+     guarda la coda e cancella le `order_new_td` degli ordini di collaudo: i
+     designer sono persone vere.
+  6. Le prove 41-56.
 - 🟡 **Una chiave Resend separata per XPETIS.** Oggi ce n'è **una sola, condivisa
   con la landing page**: ruotarla per un progetto rompe l'altro, e una fuga da
   uno espone entrambi. Resend permette più chiavi, anche di solo invio. Da fare
@@ -330,10 +401,10 @@ gli stessi per tutte e tre.
 
 1. ~~**Le route server per le pagine token**~~ → **la prima è fatta il 20
    settembre 2026**: i bottoni della mail post-call (`app/servizio/[token]/`),
-   con il resolver a cinque risposte e `lib/token.ts`. Restano la pagina ordine
-   del TD, i tasti eccezione, la conferma dell'agenzia e la pagina recensione —
-   ma adesso poggiano tutte su un'impalcatura provata invece che su una funzione
-   che nessuno aveva mai chiamato.
+   con il resolver a cinque risposte e `lib/token.ts`. **Il 23 settembre
+   2026 la seconda e la terza**: la pagina ordine del designer (parte proposta)
+   e la pagina gemella con la sua cassa. Restano i tasti eccezione, la conferma
+   dell'agenzia e la pagina recensione.
 2. ~~**Il ponte Cal.com → `bookings`**~~ → **fatto il 6 settembre**, e non in
    n8n ma nel database: `0037_calcom_webhook.sql`, con n8n ridotto a quattro
    nodi che non decidono niente. Provato sull'indirizzo di produzione.
@@ -1380,6 +1451,131 @@ mail resta valido e al clic successivo ne creerebbe un altro: se vuoi spegnerlo,
 `update access_tokens set revoked_at = now() where booking_id = '<id>';`
 
 
+### 🔴 Le prove della proposta su misura (23 settembre 2026)
+
+Il giro completo, dalla richiesta al pagamento, con i token presi a mano dal
+SQL Editor. Vale tutto quello che è scritto sopra per la posta, e in più:
+
+#### Come si prova senza mandare posta a nessuno
+
+**È già risolto, e con gli stessi due gradini delle prove 27-40.** Le due mail
+nuove passano dalla stessa coda e dallo stesso ramo di consegna:
+
+- **gradino 1, `email_enabled = 0`** (è il default): la mail al designer e
+  quella al viaggiatore si **compongono e si accodano**, e non parte niente. Si
+  leggono su Studio da `outbound_messages`, e i link che portano — la pagina
+  ordine, la pagina gemella — si prendono da lì o da `access_tokens`. **Per
+  queste prove basta questo gradino**: nessuna delle due pagine ha bisogno che
+  la mail arrivi;
+- **gradino 2, `email_redirect_to` valorizzato**: se vuoi vedere le mail come le
+  vedranno designer e viaggiatore, partono ma arrivano tutte a te, con
+  l'oggetto `[prova → <destinatario vero>]`.
+
+⚠️ I designer sono **persone vere**. Prima del gradino 3, guarda la coda e
+cancella le `order_new_td` degli ordini di collaudo.
+
+Stripe resta in sandbox (`custom_itinerary_stripe_account = 'xpetis'`): carta
+`4242 4242 4242 4242`, qualunque scadenza futura e CVC.
+
+#### Come si prendono i token a mano
+
+```sql
+-- un ordine su misura su una tua prenotazione di prova (se non passi dal
+-- bottone della mail post-call, prova 33). Nasce con il token del designer e
+-- con la sua mail in coda.
+insert into orders (traveler_id, td_id, service_type, source_booking_id, last_actor)
+select b.traveler_id, b.td_id, 'custom_itinerary', b.id, 'team'
+  from bookings b where b.id = '<id della prenotazione>'
+returning id, human_ref;
+
+-- il link del designer
+select '<site_base_url>/ordine/' || token
+  from access_tokens where purpose = 'td_order_page' and order_id = '<id ordine>';
+
+-- il link della pagina gemella (esiste solo dopo l'invio della proposta)
+select '<site_base_url>/proposta/' || token
+  from access_tokens where purpose = 'traveler_public_proposal' and order_id = '<id ordine>';
+
+-- le due mail, come le leggerà chi le riceve
+select message_kind, recipient, status, subject, body_text
+  from outbound_messages
+ where message_kind in ('order_new_td', 'proposal_traveler')
+ order by queued_at desc limit 10;
+```
+
+⚠️ Vale la stessa avvertenza dei token post-call: **un token è una
+credenziale**. Quello del designer, in più, scrive un prezzo.
+
+| # | Cosa fai | Cosa deve succedere | Esito |
+|---|---|---|---|
+| 41 | Applicata la `0044`, inserita la riga di `app_config` e rieseguito il seed dei testi: `select * from payment_account('full');` e `select * from consultation_payment_account();` | Tutte e due `xpetis`, `agency_id` nullo. E `select key from message_templates order by key;` ne elenca nove | Se `payment_account` solleva, manca la riga: il messaggio dice quale |
+| 42 | Crea un ordine (SQL sopra, o bottone della prova 33) | In `outbound_messages` una `order_new_td` **in coda** per la mail del designer, e nel corpo il link `/ordine/<token>` e il prezzo della consulenza | Se non c'è, guarda `team_alerts`: un `email_composizione_fallita` dice cosa manca |
+| 43 | Apri il link del designer **dal telefono** | Intestazione con riferimento, nome del viaggiatore (solo il nome), data della call e «consulenza pagata … da scalare». Sotto, il form | Se compare il cognome, la mail o il telefono del viaggiatore, fermati: quel link vive in una casella inoltrabile |
+| 44 | Scrivi un prezzo che non si legge («abc») e salva | Torni al form con un avviso sul prezzo, e l'ordine resta `requested` | — |
+| 45 | Salva una proposta valida, con un credito di qualche euro | Il riepilogo «Rileggila: … la riceverà così». L'ordine è `in_definition`, e in `order_status_history` l'attore è **`td`**. In `orders` il prezzo è **quello che hai scritto**: il credito non è sottratto | Se il prezzo salvato è diverso da quello scritto, il codice ha «corretto» il credito: è il difetto che non deve esistere |
+| 46 | *Modifica*, cambia il prezzo, salva | Riepilogo col prezzo nuovo; ordine ancora `in_definition` | — |
+| 47 | Apri il riepilogo in **due schede**. Nella seconda modifica il prezzo e salva; nella prima premi *Invia* | «La proposta è cambiata dopo che l'hai riletta». **Non parte niente** | È la difesa contro un prezzo che nessuno ha riletto |
+| 48 | Ricarica la prima scheda e premi *Invia* | «Proposta inviata», con il link e il messaggio pronto da copiare (prova il bottone *Copia* dal telefono). Ordine `proposal_sent`, attore `td`; una riga in `order_proposals`; una `proposal_traveler` in coda con descrizione, prezzo all'italiana e link `/proposta/<token>` — e **nessuna cifra di credito** | — |
+| 49 | Torna indietro col browser e ripremi *Invia* | Sempre «inviata»; **una** riga in `order_proposals` e **una** mail | — |
+| 50 | Da Studio: `update orders set proposal_price_cents = 100 where human_ref = '<XP-…>';` | **Errore**: «la proposta … è già partita» | Se passa, il congelamento non c'è: dimmelo, perché è la cosa su cui poggia tutto il resto |
+| 51 | Apri il link della pagina gemella **in una finestra anonima** | La proposta, il prezzo, il bottone *Paga*. Nessun dato del viaggiatore | — |
+| 52 | Paga con la carta di prova | Su Stripe l'importo è quello della proposta e **la mail non è precompilata**. Al ritorno «Stiamo registrando il pagamento…», poi «Pagata». In `orders` lo stato è `in_progress` con attore **`traveler`**; in `payments` una riga `full`, `paid`, `stripe_account = 'xpetis'`. Riaprendo il link del designer: «Il viaggiatore ha pagato» | Se resta su «Stiamo registrando»: guarda l'esecuzione n8n del webhook Stripe e il campo `esito` della risposta |
+| 53 | **L'ordine annullato che riceve un pagamento.** Un secondo ordine, proposta inviata, apri la cassa e **fermati** sulla pagina Stripe. Da Studio: `update orders set status='cancelled', cancelled_at=now(), last_actor='team' where human_ref='<XP-…>';` Poi paga | L'ordine **resta annullato**; la riga in `payments` è `paid`; in `team_alerts` uno `stripe_pagamento_su_ordine_non_in_attesa` che dice «va rimborsato» | È lo slot già dato via, sugli ordini |
+| 54 | **La proposta riaperta.** Un terzo ordine, proposta inviata, apri la cassa e fermati su Stripe. Da Studio: `update orders set status='in_definition', last_actor='team' where human_ref='<XP-…>';` Il designer cambia il prezzo e reinvia. Dalla pagina gemella premi *Paga* | Una **seconda** mail al viaggiatore, due righe in `order_proposals`, e la nuova cassa Stripe porta **il prezzo nuovo**: la vecchia è stata chiusa. Se paghi nella scheda vecchia, Stripe dice che la sessione è scaduta | Se la cassa riusata porta il prezzo vecchio, il controllo d'importo di `lib/cassa.ts` non sta lavorando: dimmelo |
+| 55 | Da Studio assegna uno di quegli ordini a un altro designer e riapri il link del primo | «Questo link non funziona» | Poi rimettilo com'era |
+| 56 | `select * from team_spot_check_proposte;` | Una riga per proposta partita, con prezzo della call, credito dichiarato e prezzo proposto affiancati | È lo spot-check del Flusso: se è leggibile a colpo d'occhio, va bene |
+
+#### 🔧 Da correggere, emerso durante le prove del 23 settembre
+
+- **[C] Il form della proposta perde la descrizione al primo errore.** Se il
+  designer sbaglia il prezzo alla **prima** stesura, torna al form **vuoto** e
+  deve riscrivere tutta la descrizione; dalla seconda in poi la ritrova, perché
+  a quel punto una bozza esiste. Causa: il form si ripopola leggendo la riga di
+  `orders`, non i valori appena inviati. Va ripopolato da **quello che è stato
+  mandato**, con la riga come ripiego. Non è un dettaglio di comodità: fargli
+  riscrivere tutto per un errore sul prezzo è il modo di fargli sbagliare anche
+  la seconda volta, e la seconda volta sbaglia il **prezzo**.
+- **[C] Gli importi negli alert escono con sedici decimali.** Visto nella prova
+  54: *«Pagamento Stripe di 700.0000000000000000 €»*. La causa è
+  `(cents / 100.0)::text`: in Postgres la divisione `numeric` porta con sé la
+  scala piena. **Non è un messaggio, sono quindici** — `0037`, `0039`, `0041`,
+  `0043`, `0044`. Quindi la correzione non è ritoccare le stringhe ma **una
+  funzione sola** (`euro_it(cents)`), gemella di `euro()` in TypeScript, che
+  formatta all'italiana (`1.400,00 €`) e si usa ovunque: così il prossimo alert
+  la eredita invece di ripetere il difetto. Questi messaggi li legge il team di
+  corsa, e un numero illeggibile in un alert critico è un alert che si salta.
+- **[C] Il tasto *Copia* del messaggio pronto non copia da mobile.** Provato il
+  23 settembre: funziona dal desktop su `localhost`, non dal telefono su
+  `http://192.168.x.x:3000`. **Causa confermata il 23 settembre: contesto non sicuro.**
+  Aprendo lo stesso indirizzo di rete dal **desktop** il tasto fallisce uguale,
+  quindi il telefono non c'entra: `navigator.clipboard` esiste solo su HTTPS o
+  `localhost`. **In produzione il difetto non si presenterà.**
+  ⚠️ **Ma la correzione va fatta comunque, e non è inseguire i browser con
+  `execCommand`**: il messaggio va messo in un **campo selezionabile**, così si
+  copia a mano sempre, e il bottone resta una comodità sopra. Oggi se la copia
+  fallisce il designer resta senza link e non se ne accorge nessuno — e quel
+  testo lo deve incollare nel gruppo WhatsApp col cliente davanti.
+- **[C] Il campo degli importi accetta cose che non dovrebbe.** Massimo due
+  decimali e nessuno zero iniziale (`030`). ⚠️ È una guardia **del campo**, non
+  del calcolo: `euroInCentesimi` è già corretto — gestisce la virgola italiana
+  (`1200,50` → 120050), il punto come migliaia (`1.200` → 120000) e fa
+  aritmetica intera, quindi `19,99` dà **1999** e non 1998. Non toccare quella
+  funzione per "sistemare" il campo: quel centesimo di scarto farebbe rifiutare
+  il pagamento dal ponte Stripe, che confronta l'incassato con il listino.
+
+
+⚠️ **Le prove 41-56 lasciano righe di collaudo.**
+
+```sql
+delete from orders where human_ref in ('<XP-…>', '<XP-…>', '<XP-…>');
+-- order_proposals, access_tokens e payments vanno via per cascata; la coda no:
+delete from outbound_messages where message_kind in ('order_new_td', 'proposal_traveler')
+                               and status = 'queued';
+delete from team_alerts where kind like 'stripe_%' and entity_type = 'order';
+```
+
+I pagamenti di prova restano su Stripe sandbox, dove non costano niente.
+
 ### ❓ Come si accorge il team che c'è un ordine da lavorare (23 settembre 2026)
 
 **Punto aperto, non risolto oggi per scelta.** Oggi `ordine_richiesto` è **una
@@ -1416,6 +1612,19 @@ mail per ogni anomalia è il modo sicuro per insegnare al team a ignorarle.
 Se farlo significa scrivere una `update` a mano su Studio nessuno lo farà, il
 digest ripeterà gli stessi per sempre e in tre giorni sarà rumore. O si anticipa
 una vista operativa minima dalla milestone 9, o questo nasce già morto.
+
+**Deciso in parte il 23 settembre, provando la 52.** Quando il viaggiatore paga
+una proposta, **la mail va sia al designer sia agli amministratori** (Simone,
+Alessandro, Andrea). Oggi il designer lo scopre solo se riapre il suo link per
+caso, e il team non lo scopre affatto.
+
+⚠️ **Da costruire come un meccanismo solo, non come una mail in più.** Se si
+aggiunge "mail agli admin quando si paga", poi servirà per `ordine_richiesto`,
+poi per la disputa, poi per il no-show, e ci si ritrova con quattro notifiche
+scritte in quattro posti. Serve invece: **una lista di destinatari interni** e
+**un elenco di eventi che la usano**, entrambi in `app_config`, così aggiungerne
+uno è una riga e non un deploy. Il Flusso, per il pagamento, chiede il messaggio
+«in pagina e via mail»: in pagina c'è già.
 
 **Decisione che spetta a Simone:** a quale casella. `info@xpetis.it` è il
 mittente verso i viaggiatori, quindi è lì che arrivano le loro risposte;
@@ -1485,12 +1694,29 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
         file
 - [ ] **[C]** Tasti eccezione del TD: no-show e "altro problema" → disputa
 - [ ] **[C]** Chiusura a 48 ore (dentro l'orologio unico)
-- [ ] **[C]** Pagina ordine del TD a stati (uno stato, una azione), con upload su
-      Storage
-- [ ] **[C]** Invio proposta: Checkout Session creata dal server con l'importo
+- [~] **[C]** Pagina ordine del TD a stati (uno stato, una azione), con upload su
+      Storage. **La parte proposta è fatta il 23 settembre 2026** →
+      `app/ordine/[token]/`, `td_order_page()`, `save_proposal_draft()`,
+      `send_proposal()`. Il link arriva al designer per mail alla nascita
+      dell'ordine (trigger, non orologio). **Manca l'upload**, che è la
+      consegna: seconda metà
+- [x] **[C]** Invio proposta: Checkout Session creata dal server con l'importo
       scritto dal TD, pagina pubblica gemella, mail al viaggiatore, messaggio
-      pronto al TD
+      pronto al TD. **Fatto il 23 settembre 2026** → `0044_proposta_su_misura.sql`,
+      `app/proposta/[token]/`, `lib/cassa.ts`. Il ponte Stripe porta l'ordine a
+      `in_progress` e riconosce ordine sconosciuto, annullato, riaperto e doppio
+      incasso. ⚠️ Il messaggio pronto è **in pagina**; il Flusso lo vuole
+      «in pagina e via mail», e la mail al designer non c'è (domanda aperta sotto)
 - [ ] **[C]** Consegna, richiesta di revisione, chiusura a 5 giorni
+
+### ❓ Domande aperte nate dalla proposta su misura (23 settembre 2026)
+
+| Domanda | Perché è aperta | Chi decide |
+|---|---|---|
+| **La pagina ordine del designer e la pagina gemella non hanno un disegno.** Il Flusso le chiede a Chiara («mobile first, uno stato una azione»; la gemella «deve sembrare una pagina XPETIS, non una fattura») e il Figma non le ha. Per il corollario di `CLAUDE.md` l'assenza non è una decisione: oggi usano il guscio delle altre pagine a token, colonna stretta e niente header | Serve un disegno, o un ok a quello che c'è | Chiara |
+| **Una mail al designer quando il viaggiatore paga?** Il Flusso vuole il messaggio pronto «in pagina e via mail», e il designer oggi scopre di essere stato pagato solo riaprendo la sua pagina — o dal gruppo. Il prompt di oggi chiedeva due mail e sono due; la terza è una riga di `message_templates` e un trigger sul passaggio a `in_progress` | È la mail che dice al designer «puoi cominciare»: senza, il tempo di consegna parte senza che lui lo sappia | Simone, testi di Gaia |
+| **Un ordine annullato libera il credito della call?** `orders_one_credit_per_booking` (0009) conta anche gli annullati: se l'ordine col credito viene annullato, un secondo ordine della stessa call non può più dichiararlo, e dalla 0044 il team non può azzerarlo a mano (la proposta di un ordine annullato è congelata). Se la risposta è sì, è una riga: l'indice con `status <> 'cancelled'` | È una regola di prodotto: dipende se l'annullamento è rimborsato | Alessandro, Andrea |
+| **Una proposta a zero euro?** Se il credito copre tutto il prezzo, il designer dovrebbe scrivere 0 — ma Stripe non incassa sotto 0,50 € e senza pagamento l'ordine non arriva a `in_progress`. Oggi il minimo è 0,50 € (è il contratto dell'API, non un parametro). Con i prezzi dei 25 non dovrebbe succedere | Se succede serve un passaggio a mano, o un tasto che salta la cassa | Simone |
 
 ---
 
@@ -1508,6 +1734,28 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
 - [ ] **[C]** Inserimento dei tempi del saldo da parte del team e workflow
       relativo
 - [ ] **[C]** Consegna del file finale
+
+**Cosa la 0044 (proposta su misura, 23 settembre 2026) lascia pronto e cosa
+no**, perché nessuna scelta di là venga scoperta dopo:
+
+- **La pagina ordine e la sua mail nascono solo per il su misura.** Un ordine
+  All Inclusive oggi non riceve né il token `td_order_page` né la mail al
+  designer: la pagina non lo saprebbe trattare. Il trigger
+  `on_custom_order_created()` è il punto da allargare.
+- **Il congelamento della proposta vale solo per il su misura.** L'All
+  Inclusive va all'agenzia e torna in `in_definition` se lei non conferma: le
+  sue regole si scrivono qui, e probabilmente vogliono lo stesso principio
+  (una proposta confermata dall'agenzia non si tocca più).
+- **`payment_account()` solleva su `deposit` e `balance`.** L'agenzia che
+  incassa è quella assegnata all'ordine, non un parametro globale.
+- **Il ponte Stripe risponde a un pagamento su un ordine All Inclusive con un
+  alert critico** (`stripe_pagamento_ordine_non_gestito`) e non tocca l'ordine.
+  Il ramo va scritto accanto a `stripe_checkout_ordine()`, e a quel punto i
+  webhook arriveranno dal conto dell'agenzia.
+- **`my_orders` maschera già la proposta in `proposal_pending_agency`**: il
+  Flusso vuole che una proposta non verificata dall'agenzia non raggiunga il
+  viaggiatore, e la vista della 0019 gliela mostrava. È stato corretto oggi,
+  insieme alle bozze del su misura, perché era lo stesso difetto.
 
 ---
 
@@ -1650,6 +1898,7 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 | Detenere le chiavi Stripe delle agenzie | Alto | Valutare Stripe Connect prima della prima agenzia (S-11) |
 | Le mail finiscono in spam | Alto: il funnel vive di mail. **Ridotto il 20 settembre:** il dominio spedisce da mesi per la landing page, SPF/DKIM/Return-Path sono verificati, e la settimana di riscaldamento non serve più. Resta il rovescio del riuso: la reputazione è **condivisa**, quindi una newsletter da `xpetis.it` trascinerebbe giù anche le transazionali | Spostare le transazionali su un sottodominio (`mail.xpetis.it`) **prima** del primo invio di massa, non dopo. Verificare che DMARC su `_dmarc.xpetis.it` esista, almeno `p=none` |
 | Un giro storto brucia il tetto di 100 mail al giorno, **condiviso con la landing page** | Medio, ma si manifesta in minuti | Tre freni indipendenti: il vincolo di unicità di `outbound_messages` (una mail per tipo, entità e destinatario), `email_max_per_tick`, e `email_enabled` che nasce spento |
+| Il link della pagina ordine del designer è permanente e **fissa un prezzo** | Medio | Chi lo trova può scrivere e mandare una proposta, non cambiarne una partita: il congelamento è un trigger che vale anche per Studio. L'invio ridichiara il prezzo riletto; ogni proposta finisce in `team_spot_check_proposte`; il denaro lo muove il viaggiatore su una cassa che ridichiara l'importo. Se il team riassegna l'ordine, il link del primo designer smette di funzionare |
 | Un token post-call è permanente e vive in una casella inoltrabile | Medio | Chi lo trova non può impegnare denaro: crea una richiesta che una persona lavora. La pagina non mostra dati del viaggiatore, non è indicizzabile e non manda `Referer` a nessuno. Regola per le milestone 6 e 7: **dietro un token permanente non va mai un'azione che muove denaro** |
 | Supabase free non fa backup | Alto se si dimentica il passaggio a Pro | Pro il giorno del primo pagamento vero |
 | Le correzioni a mano dei 25 profili non vengono fatte, o fatte male | Alto: il match gira su dati sbagliati e sembra funzionare | I controlli di plausibilità in `td_publish_readiness` bloccano la pubblicazione, non solo segnalano |

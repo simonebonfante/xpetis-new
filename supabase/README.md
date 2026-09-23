@@ -80,6 +80,7 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0041_orologio.sql` | L'orologio unico delle scadenze: `clock_tick()`, `clock_task_done()`, e l'attribuzione al sistema della cancellazione che chiediamo noi |
 | `0042_firme_rifiutate.sql` | Il contatore delle firme Cal.com rifiutate, e il ramo 2 dell'orologio che ci alza un alert sopra |
 | `0043_posta.sql` | La cerniera del dopo-call: `message_templates`, `outbound_messages` che diventa una coda, la composizione in Postgres, i rami post-call e consegna dell'orologio, il resolver dei token a cinque risposte e `create_order_from_token()` |
+| `0044_proposta_su_misura.sql` | L'ordine su misura fino al pagamento: `payment_account(kind)`, la proposta congelata dopo l'invio, `order_proposals`, le due mail (link al designer, proposta al viaggiatore), le funzioni delle pagine `/ordine` e `/proposta`, il ponte Stripe che riconosce un ordine, `my_orders` che non mostra le bozze |
 
 ## La geografia
 
@@ -419,7 +420,8 @@ noi: su un `expired` lo stesso ripiego chiuderebbe la cassa *nuova* di quella
 prenotazione mentre il viaggiatore ci sta pagando dentro.
 
 **Su quale conto si incassa non sta nel codice.** `consultation_payment_account()`
-legge `app_config.consultation_stripe_account` (oggi `xpetis`, in produzione
+(dalla 0044 un involucro di `payment_account('consultation')`, vedi sotto) legge
+`app_config.consultation_stripe_account` (oggi `xpetis`, in produzione
 `agency` — deviazione 9 del `PIANO.md`) e, quando dice `agency`, restituisce
 l'agenzia partner di default che `payments_agency_required` pretende. Il
 **default della colonna `payments.stripe_account` non si tocca**: il passaggio è
@@ -738,6 +740,118 @@ dice `create_order_from_token()`, che è la stessa funzione che ha risposto alla
 pagina un attimo prima. Due giudici diversi sarebbero due giudici che prima o
 poi dicono cose diverse.
 
+## L'ordine su misura, fino al pagamento
+
+La 0044 porta l'ordine su misura da `requested` a `in_progress`: proposta scritta
+dal designer, pagata dal viaggiatore. Consegna, revisione e chiusura a silenzio
+sono la seconda metà della milestone 6; l'All Inclusive è la milestone 7.
+
+```
+requested ─(bozza)─▶ in_definition ─(Invia)─▶ proposal_sent ─(webhook Stripe)─▶ in_progress
+                          ▲                         │
+                          └─── il team la riapre ───┘
+```
+
+**Il primo token che tocca i soldi.** La pagina del designer (`/ordine/<token>`,
+scopo `td_order_page`) fissa un prezzo che un cliente pagherà. Il token è
+permanente — serve per tutta la vita dell'ordine — quindi il ragionamento è su
+*cosa può fare chi se lo trova*, ed è scritto in testa alla migration. In breve:
+
+| Chi ha il link del designer può… | |
+|---|---|
+| scrivere e correggere la bozza, e inviarla | sì, ed è il danno massimo: la proposta arriva nel gruppo WhatsApp dove si vede, finisce nello spot-check del team, e il denaro lo muove comunque il viaggiatore su una cassa che ridichiara l'importo |
+| cambiare una proposta già partita | **no, e non per la pagina**: `freeze_sent_proposal()` rifiuta la modifica di prezzo, descrizione, giorni e credito fuori da `requested`/`in_definition` **a chiunque**, chiave secret e Studio compresi |
+| usare il token dopo che il team ha riassegnato l'ordine | no: ogni funzione controlla che il designer del token sia quello dell'ordine |
+| toccare pagamenti, rimborsi, altri ordini | no |
+
+**Salvare e inviare sono due gesti.** `save_proposal_draft()` scrive la bozza
+(e al primo salvataggio porta l'ordine in `in_definition`); `send_proposal()`
+la manda e **ridichiara il prezzo** del riepilogo che il designer ha riletto —
+se la bozza è cambiata nel frattempo, rifiuta con `prezzo_cambiato`. Il doppio
+clic risponde `gia_inviata` e non produce una seconda proposta. Una proposta già
+partita si rifà solo passando dal team: stato riportato a `in_definition` da
+Studio (in un `update` a sé: correggere nello stesso colpo non passa), poi il
+designer riscrive e reinvia.
+
+**Il credito consulenza non si calcola.** `proposal_price_cents` è il prezzo
+**finale**; `consultation_credit_cents` è la dichiarazione del designer di
+quanto ha scalato, per il controllo a campione del team. Nessuna funzione fa
+`prezzo - credito`, e i commenti lo dicono nel punto esatto in cui qualcuno
+sarebbe tentato di "correggerlo". I due controlli che ci sono non sono calcoli:
+il credito dichiarato non supera il prezzo della call (è il refuso sui
+centesimi), e si dichiara una volta sola per call (`orders_one_credit_per_booking`,
+0009, che qui diventa la risposta `credito_gia_usato` con il riferimento
+dell'altro ordine). Lo spot-check è la vista **`team_spot_check_proposte`**:
+prezzo della call, credito dichiarato e prezzo proposto affiancati, per ogni
+proposta partita.
+
+**`order_proposals`: una riga per invio, immutabile.** Serve a due cose. È la
+prova di cosa è stato chiesto al viaggiatore, anche dopo che una proposta è
+stata rifatta. Ed è l'**entità della mail**: il vincolo di unicità di
+`outbound_messages` è per (tipo, entità, destinatario), e con l'ordine come
+entità una seconda proposta non potrebbe mai partire.
+
+**Le due mail partono da trigger, non dall'orologio.** La post-call sta
+nell'orologio perché il suo grilletto è il tempo; queste hanno per grilletto un
+evento, e il database lo vede quando accade.
+
+| Evento | Mail | Entità |
+|---|---|---|
+| nasce un ordine su misura | `order_new_td` al designer, col link della sua pagina (il token nasce qui) | `order` |
+| l'ordine passa a `proposal_sent` | `proposal_traveler` al viaggiatore, con il link della pagina gemella (il token nasce qui) | `order_proposal` |
+
+Una mail che non si compone **non ferma niente** — né il clic del viaggiatore
+che crea l'ordine, né l'invio del designer — e scrive un alert critico con la
+funzione da rilanciare (`accoda_mail_ordine_td(id)`, `accoda_mail_proposta(id)`).
+Consegna come tutte le altre: il ramo `clock_ramo_email`, con interruttore e
+dirottamento.
+
+**La pagina gemella** (`/proposta/<token>`, scopo `traveler_public_proposal`) è
+fatta per essere girata nel gruppo: mostra la proposta e niente del viaggiatore.
+`proposal_public_page()` la riduce a cinque facce (`da_pagare`, `pagata`,
+`in_aggiornamento`, `annullata`, `in_verifica`) e in `in_aggiornamento` **non**
+restituisce la bozza nuova. Il pagamento dietro un token permanente non viola la
+regola della 0043: il bottone apre una cassa, e il denaro lo muove chi mette la
+carta.
+
+**La cassa** è una sorella di quella della consulenza: le difese (riga prima
+della sessione, clamp su `expires_at`, adaptive pricing spento) stanno in
+`lib/cassa.ts` e `lib/stripe.ts`, **una volta per tutte e due**. Una in più: una
+cassa aperta si riusa solo se il suo importo è quello di adesso, perché il
+prezzo di una proposta — a differenza di quello di una consulenza — può
+cambiare con una riapertura. Senza una scadenza nostra la cassa dura il minimo
+che Stripe ammette, circa mezz'ora.
+
+**Il conto.** `payment_account(kind)` è la regola, una: `consultation` legge
+`app_config.consultation_stripe_account`, `full` legge
+`custom_itinerary_stripe_account`. `consultation_payment_account()` resta come
+involucro di una riga. `deposit` e `balance` sollevano: l'All Inclusive incassa
+sull'agenzia assegnata all'ordine, non su un parametro globale.
+
+**Il ponte Stripe** smista prima di tutto il resto: se la riga di `payments`
+trovata per sessione punta a un ordine, o se `metadata.order_id` è valorizzato,
+il messaggio va a `stripe_checkout_ordine()`; altrimenti al ramo prenotazioni
+della 0039, che non è stato toccato.
+
+| Cosa arriva, per un ordine | Cosa facciamo |
+|---|---|
+| importo diverso da `orders.proposal_price_cents`, o non EUR | alert critico, ordine fermo, riga `pending` |
+| importo giusto, ordine in `proposal_sent` | riga `paid`, ordine `in_progress`, attore `traveler` |
+| lo stesso incasso raccontato due volte | `gia_pagato`, innocuo |
+| ordine **annullato** | soldi registrati, ordine fermo, alert «va rimborsato» |
+| ordine **riaperto** mentre una cassa vecchia era aperta | soldi registrati, ordine fermo, alert che lo dice |
+| **secondo incasso** su un ordine già pagato | alert «doppio incasso»; la riga resta com'è, perché `payments_one_paid_per_kind` vieta una seconda riga pagata — e segnarla solleverebbe, facendo ritentare Stripe per sempre |
+| ordine sconosciuto | alert critico, come la prenotazione sconosciuta |
+| ordine All Inclusive | alert critico: il ramo non lo tratta (milestone 7) |
+| cassa scaduta | solo la riga di pagamento; la proposta resta pagabile |
+
+**`my_orders` non mostra le bozze.** La vista della 0019 portava le colonne
+della proposta in ogni stato; dalla 0044 ci vive la bozza del designer, e il
+viaggiatore l'avrebbe letta con gli strumenti di sviluppo aperti. Adesso sono
+nulle in `requested`, `in_definition` e `proposal_pending_agency` — quest'ultimo
+perché il Flusso vuole che una proposta All Inclusive non raggiunga il
+viaggiatore prima della conferma dell'agenzia.
+
 ## La pubblicazione di un profilo
 
 `td_publish_blockers(td_id)` restituisce i motivi che impediscono di pubblicare:
@@ -813,7 +927,7 @@ numerico, modificabile a vista da Supabase Studio senza deploy:
 - `booking_rules` — preavviso 12h, orizzonte 30gg, finestra di pagamento 30min, rimborso 24h, limiti di riprogrammazione (5 / 2 / 20 giorni), 15 minuti di attesa in call
 - `orders` — silenzio-conferma 48h, revisione 5 giorni, acconto 30%
 - `reviews` — buon viaggio 3 giorni prima, recensione viaggio 3 giorni dopo, alert sotto le 3 stelle
-- `payments` — su quale conto Stripe incassa una consulenza (`xpetis` oggi, `agency` in produzione)
+- `payments` — su quale conto Stripe incassano una consulenza e un itinerario su misura (`consultation_stripe_account`, `custom_itinerary_stripe_account`: `xpetis` oggi, `agency` in produzione)
 - `showcase` — le stringhe che il sito stampa in pagina: la nota sotto il prezzo degli itinerari
 - `contacts` — i recapiti del team (numero WhatsApp), **fuori** dalla superficie pubblica
 - `integrations` — quello che serve a parlare col mondo: l'indirizzo di cancellazione Cal.com, le soglie dei due contatori (firme rifiutate, token inventati) e tutta la posta (`email_enabled`, `email_from`, `email_redirect_to`, `email_max_per_tick`, `email_max_attempts`, `site_base_url`). **Fuori** dalla superficie pubblica, e a maggior ragione
@@ -867,8 +981,18 @@ paese che il TD non copre.
 
 **Il credito consulenza** si applica una volta sola per call: un indice unico
 parziale su `orders (source_booking_id) where consultation_credit_cents > 0` lo
-garantisce. Il valore lo scrive chi crea l'ordine — resta lo spot-check del
-team sul prezzo della proposta, come previsto dal flusso.
+garantisce. Dalla 0044 il valore lo dichiara il designer nella proposta, e
+**non si sottrae da nessuna parte**: il prezzo della proposta è già al netto.
+Resta lo spot-check del team, sulla vista `team_spot_check_proposte`.
+
+⚠️ **Domanda aperta: l'indice conta anche gli ordini annullati.** Se l'ordine
+su cui il credito era stato dichiarato viene annullato, il credito resta
+"occupato" e il designer di un secondo ordine della stessa call riceve
+`credito_gia_usato`. E dalla 0044 il team non può nemmeno azzerarlo a mano: un
+ordine `cancelled` ha la proposta congelata. Se la risposta di prodotto è «un
+ordine annullato libera il credito», la correzione è una riga — l'indice con
+`and status <> 'cancelled'`, come già fa `orders_one_per_booking_service` — ma
+è una decisione, non un difetto, e sta in `PIANO.md`.
 
 **Le credenziali Stripe delle agenzie non stanno in `agencies`.** La tabella ha
 solo `stripe_account_id` e `stripe_credential_ref`, un puntatore alla
@@ -908,5 +1032,5 @@ import.
    `resolve_access_token_detail()` e su `lib/token.ts`.
 4. ~~Workflow n8n: Cal.com → `bookings`, Stripe → `payments`, insoluti, timer~~
    → fatti, più la posta.
-5. La vita dell'ordine su misura: proposta, pagamento, consegna, revisione
-   (milestone 6).
+5. La vita dell'ordine su misura: ~~proposta, pagamento~~ → **fatti** (0044);
+   restano consegna, revisione e chiusura a silenzio (milestone 6).

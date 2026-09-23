@@ -119,6 +119,19 @@ insert into app_config (key, value, value_text, config_group, label_it, notes) v
    'xpetis oppure agency. Con agency serve un''agenzia partner attiva: payments_agency_required la pretende.')
 on conflict (key) do nothing;
 
+-- La sua gemella per l'itinerario su misura (migration 0044). Stessa risposta
+-- oggi — `xpetis` in sandbox, `agency` in produzione per la deviazione 9 — ma
+-- una riga sua, perché non è detto che l'agenzia cominci a incassare le due
+-- cose lo stesso giorno. La legge `payment_account('full')`, la stessa funzione
+-- che dalla 0044 risponde anche per le consulenze: la regola è una, le righe
+-- sono due. L'All Inclusive non passa di qui: incassa l'agenzia assegnata
+-- all'ordine, milestone 7.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('custom_itinerary_stripe_account', null, 'xpetis', 'payments',
+   'Conto Stripe che incassa gli itinerari su misura',
+   'xpetis oppure agency, come consultation_stripe_account. Con agency serve un''agenzia partner attiva.')
+on conflict (key) do nothing;
+
 -- Il numero WhatsApp del team. È **provvisorio** e va sostituito: sta qui e non
 -- nel codice proprio perché sostituirlo dev'essere una riga da Studio. Lo usa il
 -- percorso "slot introvabile" e ogni pagina che offre di parlare con una

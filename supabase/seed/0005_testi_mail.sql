@@ -116,3 +116,58 @@ E'{{saluto}},\n\navevi scelto un appuntamento con {{designer}} per il {{data_cal
    array['saluto', 'designer', 'data_call', 'link_vetrina', 'firma'],
    'La "mail cortese" del Flusso §4. Parte quando l''orologio ha liberato davvero lo slot su Cal.com, mai prima. CONVIVE con l''annullamento nativo di Cal.com, che arriva quasi insieme e porta il motivo scritto in app_config.unpaid_cancel_reason: questa non ripete l''annuncio, spiega il perché e dice cosa fare adesso.')
 on conflict (key) do nothing;
+
+-- ===========================================================================
+-- L'ORDINE SU MISURA (migration 0044)
+-- ===========================================================================
+
+-- Al designer, alla nascita dell'ordine. È la mail che gli porta **il link
+-- della sua pagina ordine**: il Flusso (§7) vuole che la riceva «a ogni nuovo
+-- ordine», e senza questa mail il designer non ha nessun modo di scrivere la
+-- proposta.
+--
+-- Qui, e solo qui, il credito ha un numero: al designer serve sapere quanto
+-- può scalare, e il Flusso vuole che la sua pagina lo mostri («prezzo pagato
+-- per la consulenza da scalare»). La regola 2 in testa al file riguarda le mail
+-- al viaggiatore, a cui un numero sarebbe una promessa.
+--
+-- ⚠️ Il link è una credenziale permanente, e il testo lo dice al designer con
+-- parole sue: non inoltrarla. Chi la apre scrive la proposta al posto suo.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('order_new_td', 'mail', 'td',
+   'Nuova richiesta {{human_ref}}: itinerario su misura',
+E'{{saluto}},\n\n{{nome_viaggiatore}} ha chiesto l''itinerario su misura dopo la call del {{data_call}}. Il riferimento è {{human_ref}}: usalo nel gruppo WhatsApp che apriamo con voi, così parliamo tutti della stessa richiesta.\n\nQuando avete chiarito cosa serve, la proposta si scrive da qui: descrizione del viaggio, prezzo e giorni di consegna. È la pagina di questo ordine, e da qui seguirai anche i passi dopo.\n\n{{link_ordine}}\n\nPrima di scrivere il prezzo, due cose.\n\nIl prezzo che scrivi è quello che paga il viaggiatore. La consulenza costava {{prezzo_call}} e va già scalata lì, a meno che quel credito non sia stato usato su un altro ordine della stessa call: la pagina te lo dice. Il sistema non toglie niente da solo.\n\nUna volta inviata, la proposta non si modifica più dalla pagina. Prima di inviarla la puoi salvare e correggere quante volte vuoi; dopo, se serve cambiarla, scrivi al team.\n\nQuesto link è personale: non inoltrarlo. Chi lo apre può scrivere la proposta al posto tuo.\n\nPer qualunque dubbio il team è su WhatsApp al {{whatsapp}}.\n\nXPETIS',
+   array['saluto', 'nome_viaggiatore', 'data_call', 'human_ref', 'prezzo_call', 'link_ordine', 'whatsapp'],
+   'Parte alla nascita di ogni ordine su misura, dal trigger della 0044. Porta il link della pagina ordine del designer: senza questa mail il designer non può scrivere la proposta. Il link NON scade ed è una credenziale: il testo deve continuare a dire di non inoltrarlo. Niente aggettivi con il genere: né per il designer né per il viaggiatore.')
+on conflict (key) do nothing;
+
+-- Al viaggiatore, all'invio della proposta. Il Flusso: «è lei che vende», e
+-- porta «tutta la spiegazione del viaggio, il prezzo, le condizioni e il link
+-- di pagamento». Il link è alla pagina gemella, non a Stripe: una cassa Stripe
+-- scade in mezz'ora, una mail no.
+--
+-- Il credito qui **non ha un numero**, per la regola 2: il prezzo è finale e
+-- l'ha scritto il designer. Si dice che se c'era da scalare è stato scalato,
+-- non quanto.
+--
+-- Convive con quello che il viaggiatore ha già ricevuto: la post-call gli ha
+-- detto che la consulenza si scala dal primo servizio. Questa mantiene la
+-- promessa senza ripeterla parola per parola.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('proposal_traveler', 'mail', 'traveler',
+   'La proposta di {{designer}} per il tuo viaggio',
+E'{{saluto}},\n\necco la proposta di {{designer}} per il tuo itinerario su misura ({{human_ref}}).\n\n{{descrizione}}\n\nPrezzo: {{prezzo}}\nConsegna: entro {{giorni_consegna}} dal pagamento\n\nIl prezzo è quello finale, da pagare così com''è: se c''era la consulenza da scalare, {{designer}} l''ha già fatto. Comprende l''itinerario completo e una revisione, se dopo la consegna vuoi cambiare qualcosa.\n\nPer pagare apri la proposta: è la stessa che leggi qui, con il pagamento dentro.\n\n{{link_proposta}}\n\nSe qualcosa non ti torna, dillo nel gruppo WhatsApp prima di pagare: la proposta si può rifare.\n\n{{firma}}',
+   array['saluto', 'designer', 'human_ref', 'descrizione', 'prezzo', 'giorni_consegna', 'link_proposta', 'firma'],
+   'Parte all''invio della proposta, dal trigger della 0044: se il team rimanda una proposta rifatta, ne parte una nuova. {{descrizione}} è il testo del designer, così come l''ha scritto. NON nominare cifre di credito: il prezzo è già al netto per scelta del designer. {{link_proposta}} porta alla pagina gemella, dove sta il pagamento.')
+on conflict (key) do nothing;
+
+-- Il messaggio pronto da copiare nel gruppo WhatsApp. Non è una mail: il
+-- designer lo trova sulla sua pagina ordine dopo l'invio (Flusso §7: «un
+-- messaggio pronto da copiare che riceve al momento dell'invio»). È scritto
+-- **con la voce del designer**, perché è lui a mandarlo.
+insert into message_templates (key, template_kind, audience, body_it, placeholders, notes) values
+  ('blocco_whatsapp_proposta', 'blocco', 'td',
+E'Ecco la proposta per il tuo itinerario su misura ({{human_ref}}): {{link_proposta}}\n\nDentro trovi tutto, il prezzo e i tempi di consegna, e puoi pagare direttamente da lì. Se qualcosa non ti torna scrivilo qui prima di pagare, e la sistemiamo.',
+   array['human_ref', 'link_proposta'],
+   'Il messaggio che il designer copia nel gruppo WhatsApp dopo l''invio della proposta. Lo manda LUI, quindi è in prima persona sua. Si compone in pagina, non parte per mail.')
+on conflict (key) do nothing;

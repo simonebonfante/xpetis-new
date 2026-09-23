@@ -131,6 +131,9 @@ export type CassaStripe = {
   expires_at: number
 }
 
+/** A chi appartiene una cassa: una prenotazione (consulenza) o un ordine (su misura). */
+export type RiferimentoCassa = { booking_id: string } | { order_id: string }
+
 /**
  * Apre una Checkout Session ospitata.
  *
@@ -138,20 +141,25 @@ export type CassaStripe = {
  *
  *  · **`adaptive_pricing` spento.** Acceso — ed è acceso di default — Stripe può
  *    incassare nella valuta del visitatore. Il ponte confronta l'incasso con
- *    `bookings.price_cents` in EUR e alzerebbe un alert critico su un pagamento
+ *    il prezzo del database in EUR e alzerebbe un alert critico su un pagamento
  *    perfettamente buono fatto da chi naviga da fuori area euro.
  *  · **Niente prodotti e niente prezzi a catalogo**: `price_data` inline, con
  *    l'importo che arriva dal database. Il prezzo esiste in un posto solo.
- *  · **`client_reference_id` *e* `metadata`** portano lo stesso id di
- *    prenotazione. È il filo con cui il webhook la ritrova, e due fili identici
- *    costano niente: `client_reference_id` si vede a colpo d'occhio nella
- *    dashboard, `metadata` sopravvive meglio ai cambi di forma dei payload.
+ *  · **`client_reference_id` *e* `metadata`** portano lo stesso id — della
+ *    prenotazione o dell'ordine. È il filo con cui il webhook ritrova la riga,
+ *    e due fili identici costano niente: `client_reference_id` si vede a colpo
+ *    d'occhio nella dashboard, `metadata` sopravvive meglio ai cambi di forma
+ *    dei payload. **Il nome della chiave è lo smistamento**: `metadata.order_id`
+ *    è ciò che fa prendere al ponte (migration 0044) il ramo degli ordini invece
+ *    di quello delle prenotazioni.
  */
 export async function apriCassa(parametri: {
   importoCents: number
   titolo: string
   descrizione?: string
-  prenotazioneId: string
+  riferimento: RiferimentoCassa
+  /** Il `payment_kind` della riga: finisce in `metadata.xpetis`, per chi guarda la dashboard. */
+  tipo: 'consultation' | 'full'
   scadenzaUnix: number
   urlSuccesso: string
   urlAnnullamento: string
@@ -163,11 +171,11 @@ export async function apriCassa(parametri: {
     corpo: {
       mode: 'payment',
       adaptive_pricing: { enabled: false },
-      client_reference_id: parametri.prenotazioneId,
-      metadata: { booking_id: parametri.prenotazioneId, xpetis: 'consultation' },
+      client_reference_id: idDi(parametri.riferimento),
+      metadata: { ...parametri.riferimento, xpetis: parametri.tipo },
       // Anche il PaymentIntent porta l'id: se un giorno si guarda un incasso
       // partendo dai pagamenti invece che dalle sessioni, il filo c'è comunque.
-      payment_intent_data: { metadata: { booking_id: parametri.prenotazioneId } },
+      payment_intent_data: { metadata: { ...parametri.riferimento } },
       customer_email: parametri.emailCliente,
       expires_at: parametri.scadenzaUnix,
       success_url: parametri.urlSuccesso,
@@ -189,6 +197,10 @@ export async function apriCassa(parametri: {
     },
   })
   return dati as unknown as CassaStripe
+}
+
+function idDi(r: RiferimentoCassa): string {
+  return 'booking_id' in r ? r.booking_id : r.order_id
 }
 
 /** Rilegge una sessione: serve a sapere se è ancora aperta prima di riusarla. */

@@ -43,16 +43,19 @@ const nextConfig: NextConfig = {
    * `REGISTRO.md`, 23 settembre 2026.
    */
   async headers() {
-    return [
-      {
-        source: '/servizio/:token*',
-        headers: [
-          { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
-          { key: 'Referrer-Policy', value: 'strict-origin' },
-          { key: 'Cache-Control', value: 'private, no-store' },
-        ],
-      },
+    const pagineToken = [
+      { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+      { key: 'Referrer-Policy', value: 'strict-origin' },
+      { key: 'Cache-Control', value: 'private, no-store' },
     ]
+    // Dalla 0044 le pagine a token sono tre: il bottone post-call, la pagina
+    // ordine del designer e la pagina gemella della proposta. La cassa della
+    // proposta rimanda a Stripe con un 303: senza `strict-origin` il browser
+    // manderebbe a Stripe, come Referer, l'indirizzo con dentro il token.
+    return ['/servizio/:token*', '/ordine/:token*', '/proposta/:token*'].map((source) => ({
+      source,
+      headers: pagineToken,
+    }))
   },
 }
 

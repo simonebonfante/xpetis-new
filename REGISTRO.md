@@ -9,6 +9,94 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**23 settembre 2026 — la proposta su misura, dalla richiesta al pagamento**
+
+Il prompt: portare l'ordine su misura da `requested` a `in_progress`, cioè
+proposta scritta dal designer e pagata dal viaggiatore. Fuori perimetro
+consegna, revisione, chiusura a silenzio e All Inclusive. È
+`0044_proposta_su_misura.sql`, più le pagine `/ordine/[token]` e
+`/proposta/[token]`, la cassa della proposta e `lib/cassa.ts`. Harness da 459 a
+548 asserzioni, build verde. **Niente è stato visto in un browser né applicato
+al database vero**: le prove 41-56 in `PIANO.md` sono la parte che manca.
+
+**La domanda da cui è partito tutto: cosa può fare chi trova il link del
+designer.** È il primo token che fissa un prezzo, ed è permanente — deve
+esserlo, serve per tutta la vita dell'ordine. La risposta costruita: prima
+dell'invio può scrivere e mandare una proposta (il danno massimo, che passa
+comunque dal gruppo WhatsApp, dallo spot-check e da una cassa che ridichiara
+l'importo); dopo, **niente sulla proposta**. L'irreversibilità l'ho messa in un
+trigger (`freeze_sent_proposal`) e non nelle funzioni del token, perché deve
+valere per chiunque: il caso che conta di più è il team che su Studio «sistema
+un refuso» mentre una cassa Stripe è aperta, e il viaggiatore paga un importo
+che la pagina non mostra più. La regola è sullo **stato di partenza**, così un
+`update` che scrive e manda nello stesso colpo passa (lo fa un test vecchio
+dell'harness), mentre riaprire e correggere sono due gesti.
+
+**Salvare e inviare separati, e l'invio ridichiara il prezzo.** La prima idea
+era un form solo con «Invia». Scartata: un refuso da 4.500 € invece di 450 è
+proprio la cosa che un riepilogo fa vedere. Il riepilogo però apriva un buco
+suo — due schede, una ferma sul riepilogo vecchio, l'altra che corregge — e da
+lì il prezzo confermato che la pagina rimanda con l'invio.
+
+**`order_proposals` non era nel piano**, e l'ho aggiunta per una ragione
+tecnica prima che per l'audit: il vincolo di unicità di `outbound_messages` è
+per (tipo, entità, destinatario), e con l'ordine come entità una proposta
+rifatta dal team non avrebbe mai potuto mandare la sua mail. Con la proposta
+come entità, il vincolo continua a dire la verità. Il fatto che resti la prova
+di cosa è stato chiesto al viaggiatore è il guadagno in più.
+
+**Le due mail partono da trigger, non dall'orologio.** Ci ho pensato perché
+contraddice in apparenza la 0043, che mette la post-call in un ramo. Non la
+contraddice: la post-call ha per grilletto il tempo, queste un evento. E un
+trigger ha un vantaggio che il ramo non avrebbe: la mail parte **chiunque**
+faccia il passaggio di stato, anche il team da Studio. E di conseguenza non
+ho dovuto riemettere `clock_tick()`. La mail al designer esiste perché il Flusso
+dice che il link lo riceve «a ogni nuovo ordine»; senza, la pagina non ha
+porta d'ingresso.
+
+**La cassa: estratta, non copiata.** Le tre difese della consulenza (riga
+prima della sessione, clamp, adaptive pricing spento) adesso stanno in
+`lib/cassa.ts` e `lib/stripe.ts`, e la route della consulenza è stata
+riscritta sopra — stesse risposte HTTP di prima. Scrivendola è venuta fuori una
+difesa che la consulenza non aveva bisogno di avere: **una cassa aperta si
+riusa solo se il suo importo è quello di adesso.** Il prezzo di una consulenza
+non cambia mai; quello di una proposta sì, con una riapertura. Senza il
+controllo, il viaggiatore sarebbe finito su una cassa viva col prezzo vecchio.
+
+**Il ponte Stripe: il ramo prenotazioni non è stato toccato.** Il ramo ordini è
+una funzione a sé (`stripe_checkout_ordine`) e `stripe_webhook` guadagna uno
+smistamento prima del codice della 0039. Un caso che il ramo prenotazioni non
+aveva: il **secondo incasso** sullo stesso ordine. `payments_one_paid_per_kind`
+vieta una seconda riga pagata, e segnarla `paid` avrebbe sollevato, riportato
+indietro il blocco del ponte e fatto ritentare Stripe per sempre. Il tentativo
+è protetto, e l'alert dice che l'incasso non è in `payments`.
+
+**Una cosa trovata per strada, fuori dal prompt e corretta lo stesso.**
+`my_orders` (0019) portava le colonne della proposta in ogni stato. Finché
+nessuno le scriveva prima dell'invio era innocuo; dalla 0044 ci vive la bozza,
+e il viaggiatore l'avrebbe letta con gli strumenti di sviluppo aperti — che è
+esattamente la domanda che `CLAUDE.md` chiede di farsi a ogni vista. Ho
+mascherato anche `proposal_pending_agency`, che è All Inclusive: non è
+anticipare la milestone 7, è lo stesso difetto (il Flusso vuole che una
+proposta non verificata dall'agenzia non raggiunga il viaggiatore). Scritto in
+milestone 7 insieme alle altre tre cose che la 0044 lascia a quella milestone.
+
+**Tre cose dette invece che risolte**, tutte in `PIANO.md`: la mail al
+designer quando il viaggiatore paga (il Flusso vuole il messaggio pronto anche
+per mail, il prompt chiedeva due mail e sono due); l'indice del credito che
+conta anche gli ordini annullati — e che adesso, col congelamento, il team non
+può nemmeno aggirare a mano; la proposta a zero euro, che Stripe non sa
+incassare. E le due pagine non hanno un disegno nel Figma.
+
+**Errori miei, trovati dall'harness.** Il primo giro è caduto su due test
+vecchi che creavano a mano il token `td_order_page`: adesso nasce con l'ordine,
+e i test sono stati adattati a leggerlo invece di crearlo (non indeboliti: il
+primo verifica anche che sia legato a ordine e designer giusti). Poi un test
+mio che creava un ordine dentro lo stesso `exec` di un'asserzione che doveva
+fallire — e il fallimento si portava via anche l'ordine.
+
+---
+
 **23 settembre 2026 — due protezioni giuste che si annullavano a vicenda**
 
 Il bottone della pagina del servizio prendeva 403: `POST

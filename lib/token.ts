@@ -40,6 +40,9 @@ export type EsitoToken =
   | 'token_di_altro_tipo'
   | 'prenotazione_sconosciuta'
   | 'irraggiungibile'
+  // Dalla 0044: le pagine dell'ordine su misura (`lib/ordine.ts`).
+  | 'ordine_sconosciuto'
+  | 'servizio_non_gestito'
 
 export type PaginaServizio = {
   esito: EsitoToken
@@ -156,6 +159,20 @@ export const SPIEGAZIONE: Record<Exclude<EsitoToken, 'valido' | 'gia_richiesto'>
   prenotazione_sconosciuta: {
     titolo: 'Questo link non funziona',
     testo: 'Qualcosa non torna da parte nostra. Scrivici e lo sistemiamo.',
+    whatsapp: true,
+  },
+  // Anche questi due non dovrebbero capitare: un ordine cancellato dal
+  // database, o un token della pagina su misura su un ordine All Inclusive, la
+  // cui pagina è milestone 7.
+  ordine_sconosciuto: {
+    titolo: 'Questo link non funziona',
+    testo: 'Qualcosa non torna da parte nostra. Scrivici e lo sistemiamo.',
+    whatsapp: true,
+  },
+  servizio_non_gestito: {
+    titolo: 'Questa pagina non è ancora pronta',
+    testo:
+      'Il link è buono, ma per questo tipo di viaggio la pagina non esiste ancora: per ora se ne occupa il team, a mano. Scrivici e ti diciamo a che punto siamo.',
     whatsapp: true,
   },
   irraggiungibile: {

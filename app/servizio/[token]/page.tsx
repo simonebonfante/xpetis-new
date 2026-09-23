@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { CHIAVI, leggiContatto } from '@/lib/config'
 import { ETICHETTA_SERVIZIO, type TipoServizio } from '@/lib/vetrina'
-import { leggiPaginaServizio, SPIEGAZIONE, type PaginaServizio } from '@/lib/token'
+import { leggiPaginaServizio, type PaginaServizio } from '@/lib/token'
+import { Guscio, ScriviciWhatsApp, Spiegazione } from '@/components/pagina-token'
 
 /**
  * La pagina di un bottone della mail post-call.
@@ -56,28 +57,6 @@ export default async function PaginaServizioToken({
     return <Ricevuta pagina={pagina} whatsapp={whatsapp} />
   }
   return <Spiegazione esito={pagina.esito} whatsapp={whatsapp} />
-}
-
-/** Il guscio di tutte e tre le facce: una colonna stretta, niente header. */
-function Guscio({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-7 p-7">
-      <p className="text-piccolo uppercase tracking-[0.18em] opacity-60">XPETIS</p>
-      {children}
-    </main>
-  )
-}
-
-function ScriviciWhatsApp({ numero }: { numero: string | null }) {
-  if (!numero) return null
-  return (
-    <a
-      href={`https://wa.me/${numero.replace(/[^0-9]/g, '')}`}
-      className="inline-block rounded-full border border-scuro px-5 py-2 text-corpo transition hover:bg-scuro hover:text-neutro"
-    >
-      Scrivici su WhatsApp
-    </a>
-  )
 }
 
 /**
@@ -153,30 +132,6 @@ function Ricevuta({
       <div>
         <ScriviciWhatsApp numero={whatsapp} />
       </div>
-    </Guscio>
-  )
-}
-
-function Spiegazione({
-  esito,
-  whatsapp,
-}: {
-  esito: Exclude<PaginaServizio['esito'], 'valido' | 'gia_richiesto'>
-  whatsapp: string | null
-}) {
-  const s = SPIEGAZIONE[esito]
-
-  return (
-    <Guscio>
-      <header className="space-y-2">
-        <h1 className="font-titoli text-h3">{s.titolo}</h1>
-      </header>
-      <p className="text-corpo-big">{s.testo}</p>
-      {s.whatsapp && (
-        <div>
-          <ScriviciWhatsApp numero={whatsapp} />
-        </div>
-      )}
     </Guscio>
   )
 }
