@@ -17,7 +17,7 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        -160,
+        -260,
         0
       ]
     },
@@ -37,21 +37,47 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        60,
+        -40,
         0
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Un compito per riga, e niente di piu'.\n//\n// `clock_tick()` risponde con un array di compiti — oggi tutti dello stesso\n// tipo, `calcom_cancel_unpaid`, domani anche altri. Questo nodo lo trasforma in\n// un item per compito, che e' la forma su cui n8n sa iterare.\n//\n// NON DECIDE NIENTE. Non guarda le scadenze, non sceglie chi cancellare, non\n// interpreta gli stati: quella parte vive tutta in Postgres (migration 0041), e\n// se un giorno il braccio cambiasse strumento non ci sarebbe niente da portarsi\n// dietro.\n//\n// Se non c'e' niente da fare torna una lista vuota, e n8n si ferma qui: un giro\n// a vuoto ogni cinque minuti deve costare zero e non lasciare rumore.\n//\n// ## Perche' si appiattisce il payload (collaudo del 20 settembre 2026)\n//\n// `clock_tick()` restituisce righe `(task, entity_type, entity_id, payload)`, e\n// `cancel_url`, `api_version` e `reason` stanno DENTRO `payload`. Il nodo\n// `Cancella su Cal.com` li leggeva dal livello alto e trovava `undefined`: il\n// giro sembrava funzionare — nodi tutti verdi — e non cancellava niente.\n//\n// L'appiattimento sta qui e non nei riferimenti del nodo HTTP di proposito: cosi'\n// `task` ed `entity_id` restano al livello alto, dove li legge l'ack, e la forma\n// del compito si accorda in UN posto solo. E' la giuntura fra Postgres e n8n, e\n// non la prova nessuno dei nostri strumenti: l'harness prova Postgres,\n// TypeScript non vede dentro un workflow. Quando arriveranno i rami 2, 3 e 4\n// (silenzio-conferma, promemoria, chiusura consegna) passeranno tutti da questa\n// riga: se un campo nuovo non arriva al nodo che lo usa, e' qui che si guarda.\n//\n// ATTENZIONE, e vale la pena rileggerlo ogni volta che si tocca questo\n// workflow: `cal_booking_uid` e' una CREDENZIALE. Dopo la verifica S-05, su\n// Cal.com per cancellare una prenotazione basta quel codice, senza nessuna\n// chiave. Da qui in avanti viaggia nei dati di esecuzione di n8n, ed e' il\n// motivo per cui lo storico va tenuto corto (pruning, vedi ACCESSI.md) e per\n// cui non deve finire in nessun altro posto: niente log aggiuntivi, niente\n// nodi di comodo, e l'ack all'orologio manda l'id della riga, non il codice.\n//\n// Nota: dal 20 settembre il campo `cal_booking_uid` del payload NON LO LEGGE\n// PIU' NESSUNO — il codice viaggia dentro `cancel_url`, dove l'endpoint v2 lo\n// vuole, e il corpo porta solo il motivo. La 0041 continua a mandarlo e resta\n// com'e': e' gia' applicata, e toglierlo non ridurrebbe di un grammo\n// l'esposizione della credenziale, visto che `cancel_url` la contiene comunque.\n\nconst risposta = $input.first().json\nconst compiti = Array.isArray(risposta) ? risposta : (risposta ? [risposta] : [])\n\nreturn compiti\n  .filter((c) => c && c.task)\n  .map((c) => ({ json: { ...c, ...(c.payload ?? {}) }, pairedItem: 0 }))\n"
+        "jsCode": "// Un compito per riga, e niente di piu'.\n//\n// `clock_tick()` risponde con un array di compiti — dal 20 settembre 2026 di due\n// tipi, `calcom_cancel_unpaid` e `email_send`. Questo nodo lo trasforma in un\n// item per compito, che e' la forma su cui n8n sa iterare. Lo smistamento per\n// tipo lo fanno i due nodi dopo.\n//\n// NON DECIDE NIENTE. Non guarda le scadenze, non sceglie chi cancellare, non\n// interpreta gli stati: quella parte vive tutta in Postgres (migration 0043), e\n// se un giorno il braccio cambiasse strumento non ci sarebbe niente da portarsi\n// dietro.\n//\n// Se non c'e' niente da fare torna una lista vuota, e n8n si ferma qui: un giro\n// a vuoto ogni cinque minuti deve costare zero e non lasciare rumore.\n//\n// ## Perche' si appiattisce il payload (collaudo del 20 settembre 2026)\n//\n// `clock_tick()` restituisce righe `(task, entity_type, entity_id, payload)`, e\n// tutto il resto — `cancel_url`, `api_version`, `reason`, e adesso `to`, `from`,\n// `subject`, `html`, `text` — sta DENTRO `payload`. Il nodo `Cancella su\n// Cal.com` li leggeva dal livello alto e trovava `undefined`: il giro sembrava\n// funzionare — nodi tutti verdi — e non cancellava niente.\n//\n// L'appiattimento sta qui e non nei riferimenti dei nodi HTTP di proposito:\n// cosi' `task` ed `entity_id` restano al livello alto, dove li leggono gli ack,\n// e la forma del compito si accorda in UN posto solo. E' la giuntura fra\n// Postgres e n8n, e non la prova nessuno dei nostri strumenti: l'harness prova\n// Postgres, TypeScript non vede dentro un workflow.\n//\n// ATTENZIONE, e vale la pena rileggerlo ogni volta che si tocca questo\n// workflow: da qui passano due cose che non devono finire da nessun'altra\n// parte. `cal_booking_uid` e' una CREDENZIALE — dopo S-05, su Cal.com per\n// cancellare una prenotazione basta quel codice, senza nessuna chiave — e da\n// oggi ci passano anche i CORPI DELLE MAIL, cioe' il nome di una persona e\n// quello del suo designer. Viaggiano nei dati di esecuzione di n8n, ed e' il\n// motivo per cui lo storico va tenuto corto (pruning a 14 giorni, vedi\n// ACCESSI.md) e per cui non devono finire in nessun log aggiuntivo: gli ack\n// mandano indietro l'id della riga, mai il contenuto.\n\nconst risposta = $input.first().json\nconst compiti = Array.isArray(risposta) ? risposta : (risposta ? [risposta] : [])\n\nreturn compiti\n  .filter((c) => c && c.task)\n  .map((c) => ({ json: { ...c, ...(c.payload ?? {}) }, pairedItem: 0 }))\n"
       },
       "id": "a1000000-0000-4000-8000-000000000003",
       "name": "Un compito per riga",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        280,
+        180,
         0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Solo i compiti di cancellazione, e niente di piu'.\n//\n// Non e' una decisione: e' uno smistamento. Chi e' scaduto, cosa va fatto e\n// cosa significa l'esito lo decide Postgres (`clock_tick`, `clock_task_done`).\n// Qui si guarda il campo `task` e si manda l'item al braccio giusto.\n//\n// PERCHE' UN NODO CODE E NON UNO SWITCH: un Code node e' due righe di\n// JavaScript che sopravvivono a qualunque versione di n8n. Lo Switch ha uno\n// schema di parametri che cambia fra le versioni del nodo, e un workflow\n// reimportato su un'istanza aggiornata puo' arrivare con le condizioni vuote —\n// e un ramo con le condizioni vuote lascia passare tutto, cioe' manderebbe le\n// mail a Cal.com. Un guasto silenzioso in piu', che non vogliamo.\n//\n// ATTENZIONE A `pairedItem`, ed e' l'unica riga delicata di questo nodo.\n// Il nodo di ack risale a `Un compito per riga` per sapere QUALE compito sta\n// riferendo. Il filo si tiene dichiarando, per ogni item che esce, l'indice\n// dell'item da cui viene: se si perde, l'ack riferisce l'esito della mail di\n// Anna sulla riga di Marco.\nconst out = []\n$input.all().forEach((item, i) => {\n  if (item.json.task === 'calcom_cancel_unpaid') out.push({ json: item.json, pairedItem: i })\n})\nreturn out\n"
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Solo le cancellazioni",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Solo i compiti di posta. Gemello del nodo accanto: vedi li' il perche' di un\n// Code invece di uno Switch, e la nota su `pairedItem`.\nconst out = []\n$input.all().forEach((item, i) => {\n  if (item.json.task === 'email_send') out.push({ json: item.json, pairedItem: i })\n})\nreturn out\n"
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Solo le mail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        140
       ]
     },
     {
@@ -85,8 +111,52 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        500,
-        0
+        620,
+        -140
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: $json.from, to: $json.to, subject: $json.subject, html: $json.html, text: $json.text }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 250
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Manda con Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        140
       ],
       "onError": "continueRegularOutput"
     },
@@ -102,12 +172,32 @@
         "options": {}
       },
       "id": "a1000000-0000-4000-8000-000000000005",
-      "name": "clock_task_done()",
+      "name": "clock_task_done() · slot",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        720,
-        0
+        840,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rsgyxbqzsxahsbdfgtbm.supabase.co/rest/v1/rpc/clock_task_done",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_task: $('Un compito per riga').item.json.task, p_entity_id: $('Un compito per riga').item.json.entity_id, p_status: $json.statusCode ?? 0, p_detail: String($json.body ? JSON.stringify($json.body) : ($json.error ?? '')).slice(0, 500) }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "clock_task_done() · mail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        140
       ]
     }
   ],
@@ -138,7 +228,34 @@
       "main": [
         [
           {
+            "node": "Solo le cancellazioni",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Solo le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solo le cancellazioni": {
+      "main": [
+        [
+          {
             "node": "Cancella su Cal.com",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solo le mail": {
+      "main": [
+        [
+          {
+            "node": "Manda con Resend",
             "type": "main",
             "index": 0
           }
@@ -149,7 +266,18 @@
       "main": [
         [
           {
-            "node": "clock_task_done()",
+            "node": "clock_task_done() · slot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manda con Resend": {
+      "main": [
+        [
+          {
+            "node": "clock_task_done() · mail",
             "type": "main",
             "index": 0
           }

@@ -2288,5 +2288,727 @@ console.log('\n== L\'orologio dei 5 minuti ==')
   }
 }
 
+// ===========================================================================
+// Le firme rifiutate (migration 0042)
+// ===========================================================================
+// Il silenzio che questa parte rompe: una parola segreta sbagliata su un account
+// Cal.com produce `firma_non_valida`, che non scrive niente da nessuna parte, e
+// n8n risponde 200. Quel designer smette di arrivarci e nessuno lo sa.
+console.log('\n== Le firme Cal.com rifiutate ==')
+{
+  const NOSTRO = 'marco-rossi-xpetis'   // il cal_username del designer di prova
+
+  // I blocchi precedenti hanno già fatto rifiuti veri — il ponte Cal.com prova
+  // la firma sbagliata. Si azzera il campo per poter contare da zero.
+  await db.query('delete from calcom_signature_rejections')
+  await db.query("delete from team_alerts where kind in ('calcom_firme_rifiutate', 'orologio_ramo_non_configurato')")
+
+  const corpo = (username) => JSON.stringify({
+    triggerEvent: 'BOOKING_CREATED',
+    createdAt: new Date().toISOString(),
+    payload: { uid: 'uid-finto', type: 'consulenza-xpetis-30', organizer: { username } },
+  })
+  const rifiuta = async (c) =>
+    (await db.query('select calcom_webhook($1, $2) as e', [c, 'firma-inventata'])).rows[0].e
+  const conteggi = async () =>
+    (await db.query(`select cal_username_hint, n from calcom_signature_rejections
+                      order by coalesce(cal_username_hint, '')`)).rows
+  const nAlert = async (kind) =>
+    Number((await db.query('select count(*) from team_alerts where kind = $1', [kind])).rows[0].count)
+  const alert = async (kind) =>
+    (await db.query(
+      'select message from team_alerts where kind = $1 order by created_at desc limit 1', [kind])).rows[0]
+  const tick = () => db.query('select * from clock_tick(100)')
+
+  // ------------------------------------------------------------- il conteggio
+  console.log('  -- si conta, e non si scrive un diario --')
+  {
+    const e = await rifiuta(corpo(NOSTRO))
+    e.esito === 'firma_non_valida' ? ok('firma inventata: rifiutata, come prima') : fail(JSON.stringify(e))
+
+    const righe = await conteggi()
+    righe.length === 1 && righe[0].n === 1 && righe[0].cal_username_hint === NOSTRO
+      ? ok('il rifiuto è contato, con l\'indizio di chi lo manda')
+      : fail('conteggio: ' + JSON.stringify(righe))
+  }
+  {
+    await rifiuta(corpo(NOSTRO))
+    await rifiuta(corpo(NOSTRO))
+    const righe = await conteggi()
+    righe.length === 1 && righe[0].n === 3
+      ? ok('tre rifiuti nella stessa ora: UNA riga che conta 3, non tre righe')
+      : fail('la tabella cresce per messaggio: ' + JSON.stringify(righe))
+  }
+  {
+    // È il principio della 0037 che non si annulla: l'indirizzo del webhook è
+    // pubblico, e un corpo non autenticato non entra nel diario.
+    const n = Number((await db.query(
+      "select count(*) from webhook_events where provider='cal' and external_id like '%uid-finto%'")).rows[0].count)
+    n === 0
+      ? ok('e webhook_events resta intatto: un corpo non firmato non ci entra')
+      : fail('il corpo non autenticato è finito nel diario: ' + n)
+  }
+
+  // --------------------------------------------- l'indizio, che è solo nostro
+  console.log('  -- l\'indizio è un indizio, e non è testo arbitrario --')
+  {
+    await rifiuta(corpo('account-che-non-conosciamo'))
+    const righe = await conteggi()
+    const ignoto = righe.find(r => r.cal_username_hint === null)
+    righe.some(r => r.cal_username_hint === 'account-che-non-conosciamo')
+      ? fail('un username inventato è stato salvato: la tabella accetta testo da chiunque')
+      : ok('un username che non è dei nostri non si salva: diventa "non dichiarato"')
+    ignoto && ignoto.n === 1 ? ok('e viene contato lì') : fail('conteggio ignoto: ' + JSON.stringify(righe))
+  }
+  {
+    await rifiuta('questo non è JSON')
+    const righe = await conteggi()
+    const ignoto = righe.find(r => r.cal_username_hint === null)
+    ignoto && ignoto.n === 2
+      ? ok('un corpo che non è nemmeno JSON viene contato senza far esplodere niente')
+      : fail('corpo non JSON: ' + JSON.stringify(righe))
+  }
+
+  // ------------------------------------------------------------ sopra soglia
+  console.log('  -- quando l\'orologio decide che è troppo --')
+  {
+    await tick()
+    await nAlert('calcom_firme_rifiutate') === 1
+      ? ok('cinque rifiuti con soglia 3: un alert')
+      : fail('nessun alert sopra soglia')
+    const m = await alert('calcom_firme_rifiutate')
+    m?.message?.includes(NOSTRO) && m.message.includes('NON VERIFICATO')
+      ? ok('l\'alert dice chi, e dice a chiare lettere che è un indizio non verificato')
+      : fail('testo dell\'alert: ' + (m?.message ?? '(nessuno)'))
+  }
+  {
+    await tick()
+    await tick()
+    await nAlert('calcom_firme_rifiutate') === 1
+      ? ok('e resta uno solo finché non viene risolto, come gli altri alert dell\'orologio')
+      : fail('alert duplicato a ogni giro')
+  }
+  {
+    // Sotto soglia non si disturba nessuno: si risolve l'alert e si riparte da
+    // due soli rifiuti.
+    await db.query("update team_alerts set resolved_at = now() where kind = 'calcom_firme_rifiutate'")
+    await db.query('delete from calcom_signature_rejections')
+    await rifiuta(corpo(NOSTRO))
+    await rifiuta(corpo(NOSTRO))
+    await tick()
+    await nAlert('calcom_firme_rifiutate') === 1
+      ? ok('due rifiuti con soglia 3: nessun alert nuovo')
+      : fail('alert sotto soglia: l\'indirizzo pubblico lo farebbe scattare a ogni scanner di passaggio')
+  }
+
+  // ------------------------------------------------- la finestra e la pulizia
+  console.log('  -- la finestra, e la tabella che non cresce per sempre --')
+  {
+    await db.query(`update calcom_signature_rejections
+                       set bucket_at = now() - interval '40 days',
+                           last_at   = now() - interval '40 days'`)
+    await tick()
+    const righe = await conteggi()
+    righe.length === 0
+      ? ok('i conteggi più vecchi della conservazione vengono cancellati dall\'orologio')
+      : fail('la tabella non si pulisce: ' + JSON.stringify(righe))
+  }
+
+  // ------------------------------------------ un ramo spento non resta zitto
+  console.log('  -- se manca la configurazione, il ramo lo dice --')
+  {
+    await db.query("update app_config set value = null, value_text = 'spento' where key = 'calcom_signature_alert_threshold'")
+    await tick()
+    await nAlert('orologio_ramo_non_configurato') === 1
+      ? ok('senza soglia il ramo è spento, e scrive che è spento')
+      : fail('ramo spento in silenzio: è esattamente il guasto che questa migration chiude')
+    await tick()
+    await nAlert('orologio_ramo_non_configurato') === 1
+      ? ok('e anche questo alert è uno solo')
+      : fail('alert duplicato')
+    await db.query("update app_config set value = 3, value_text = null where key = 'calcom_signature_alert_threshold'")
+  }
+
+  // ------------------------------------------------------------ la superficie
+  console.log('  -- chi può leggere i conteggi --')
+  for (const ruolo of ['anon', 'authenticated']) {
+    const v = (await db.query(
+      `select has_table_privilege($1, 'calcom_signature_rejections', 'SELECT') as v`, [ruolo])).rows[0].v
+    v === false ? ok(`${ruolo} non può leggere calcom_signature_rejections`) : fail(`${ruolo} legge i conteggi`)
+  }
+  {
+    const rls = (await db.query(
+      `select relrowsecurity from pg_class where relname = 'calcom_signature_rejections'`)).rows[0].relrowsecurity
+    rls === true ? ok('RLS accesa, come ogni tabella nuova') : fail('RLS spenta')
+  }
+}
+
+console.log('\n== I testi delle mail ==')
+{
+  const rende = async (chiave, valori = {}, bh = {}, bt = {}) =>
+    (await db.query('select * from render_template($1, $2, $3, $4)',
+      [chiave, JSON.stringify(valori), JSON.stringify(bh), JSON.stringify(bt)])).rows[0]
+
+  const solleva = async (label, fn, atteso) => {
+    try { await fn(); fail(`${label} — non ha sollevato e doveva`) }
+    catch (e) {
+      String(e.message).toLowerCase().includes(atteso.toLowerCase())
+        ? ok(label) : fail(`${label} — errore diverso: ${e.message}`)
+    }
+  }
+
+  // ------------------------------------------------- i vincoli della tabella
+  console.log('  -- cosa la tabella non lascia scrivere --')
+  await expectFail('una mail senza oggetto', `
+    insert into message_templates (key, template_kind, body_it)
+    values ('prova_senza_oggetto', 'mail', 'corpo')`, 'ha_oggetto')
+  await expectFail('un blocco con un oggetto', `
+    insert into message_templates (key, template_kind, subject_it, body_it)
+    values ('prova_blocco_oggetto', 'blocco', 'oggetto', 'corpo')`, 'ha_oggetto')
+  await expectFail('un bottone su una mail intera', `
+    insert into message_templates (key, template_kind, subject_it, body_it, button_label_it)
+    values ('prova_bottone', 'mail', 'oggetto', 'corpo', 'Clicca')`, 'bottone_solo_sui_blocchi')
+
+  // ------------------------------------------------------- la composizione
+  console.log('  -- da prosa a mail --')
+  await solleva('un testo che non esiste solleva invece di comporre il vuoto',
+    () => rende('non_esiste_questo_testo'), 'non trovato')
+
+  await solleva('un segnaposto non fornito solleva: «Ciao ,» lo vedrebbe solo il destinatario',
+    () => rende('postcall_traveler', { designer: 'Marco' }), 'saluto')
+
+  await db.exec(`
+    insert into message_templates (key, template_kind, body_it, button_label_it, placeholders)
+    values ('prova_blocco', 'blocco',
+            'Un paragrafo con {{chi}} dentro.', 'Vai da {{chi}}', array['chi']);
+    insert into message_templates (key, template_kind, subject_it, body_it, placeholders)
+    values ('prova_mail', 'mail', 'Oggetto per {{chi}}',
+            E'Primo paragrafo, con {{chi}}.\\nSeconda riga dello stesso paragrafo.\\n\\n{{inserto}}\\n\\nScrivici qui: https://xpetis.it/aiuto',
+            array['chi', 'inserto']);`)
+
+  {
+    const b = await rende('prova_blocco', { chi: 'Marco' })
+    b.body_html.includes('<p style=') && b.body_html.includes('Un paragrafo con Marco dentro.')
+      ? ok('un paragrafo diventa un <p>') : fail('html del blocco: ' + b.body_html)
+    b.button_label === 'Vai da Marco'
+      ? ok('anche l\'etichetta del bottone accetta i segnaposto') : fail('etichetta: ' + b.button_label)
+  }
+  {
+    const m = await rende('prova_mail', { chi: 'Marco' },
+      { inserto: '<p>BLOCCO</p>' }, { inserto: 'BLOCCO' })
+    m.subject === 'Oggetto per Marco' ? ok('l\'oggetto si compone') : fail('oggetto: ' + m.subject)
+    m.body_html.includes('Primo paragrafo, con Marco.<br>Seconda riga')
+      ? ok('un a capo singolo resta dentro il paragrafo, come <br>')
+      : fail('a capo: ' + m.body_html)
+    // Il blocco esce **senza** involucro: è la regola che impedisce a un
+    // bottone di finire dentro un <p>, dove metà dei client lo stampa storto.
+    !m.body_html.includes('<p style="margin:0 0 18px;font-size:16px;line-height:1.55"><p>BLOCCO')
+      && m.body_html.includes('<p>BLOCCO</p>')
+      ? ok('un blocco da solo sulla sua riga entra senza involucro')
+      : fail('blocco impaginato male: ' + m.body_html)
+    m.body_html.includes('<a href="https://xpetis.it/aiuto"')
+      ? ok('un indirizzo scritto in chiaro diventa un link')
+      : fail('link non riconosciuto: ' + m.body_html)
+    m.body_text.includes('https://xpetis.it/aiuto') && !m.body_text.includes('<')
+      ? ok('e la versione testuale resta testo, senza tag')
+      : fail('testo: ' + m.body_text)
+  }
+  {
+    // Il caso che conta: un nome con dentro caratteri che in HTML significano
+    // qualcosa. Non deve aprire niente.
+    const m = await rende('prova_mail', { chi: 'Rossi & <b>Co</b>' },
+      { inserto: 'x' }, { inserto: 'x' })
+    m.body_html.includes('Rossi &amp; &lt;b&gt;Co&lt;/b&gt;')
+      ? ok('un nome con & e < non apre un tag: si stampa')
+      : fail('escape mancato: ' + m.body_html)
+    m.body_text.includes('Rossi & <b>Co</b>')
+      ? ok('e nella versione testuale resta com\'è scritto') : fail('testo: ' + m.body_text)
+  }
+  {
+    const doc = (await db.query(`select email_document('<p>ciao</p>', 'anteprima') as d`)).rows[0].d
+    doc.startsWith('<!doctype html>') && doc.includes('anteprima') && doc.includes('#F0EEDF')
+      ? ok('il documento ha involucro, anteprima e la palette del Figma')
+      : fail('documento: ' + doc.slice(0, 120))
+  }
+
+  // ------------------------------------------------- i testi veri del seed
+  console.log('  -- i testi seminati --')
+  {
+    const r = (await db.query(
+      `select key, template_kind from message_templates where key not like 'prova_%' order by key`)).rows
+    const attesi = ['blocco_firma', 'blocco_intro_servizi', 'blocco_servizio_all_inclusive',
+                    'blocco_servizio_custom_itinerary', 'postcall_traveler', 'unpaid_cancelled_traveler']
+    JSON.stringify(r.map(x => x.key)) === JSON.stringify(attesi)
+      ? ok('le sei righe del seed ci sono') : fail('righe: ' + JSON.stringify(r.map(x => x.key)))
+  }
+  {
+    // La regola 2 del seed: il credito si promette, non si quantifica. Nessun
+    // testo deve contenere una cifra in euro.
+    const r = (await db.query(
+      `select key from message_templates
+        where body_it ~ '[0-9]+\\s*€' or coalesce(subject_it,'') ~ '[0-9]+\\s*€'`)).rows
+    r.length === 0
+      ? ok('nessun testo nomina una cifra: il credito lo applica il designer, non il codice')
+      : fail('testi con un importo dentro: ' + JSON.stringify(r))
+  }
+  await db.exec(`delete from message_templates where key like 'prova_%'`)
+}
+
+console.log('\n== La cerniera del dopo-call: la coda ==')
+{
+  const TD      = '11111111-1111-1111-1111-111111111111'   // Marco: su misura + All Inclusive
+  const TD2     = '22222222-2222-2222-2222-222222222222'   // Giulia: solo All Inclusive
+  const ANNA    = '44444444-4444-4444-4444-444444444444'
+  const C = (n) => `c0dac0da-0000-4000-8000-00000000000${n}`
+
+  const creaCall = async (n, td, finita, stato = 'confirmed') =>
+    db.query(
+      `insert into bookings (id, traveler_id, td_id, service_type, status, cal_booking_uid,
+                             cal_event_type_slug, starts_at, ends_at, original_starts_at,
+                             price_cents, confirmed_at, last_actor)
+       values ($1, $2, $3, 'consultation', $4, 'uid-postcall-' || $5, 'consulenza-xpetis-30',
+               ${finita} - interval '30 minutes', ${finita}, ${finita} - interval '30 minutes',
+               6000, now(), 'n8n')`,
+      [C(n), ANNA, td, stato, String(n)])
+
+  const tick = async (limite = 100) =>
+    (await db.query('select * from clock_tick($1)', [limite])).rows
+  const coda = async (bookingId) =>
+    (await db.query(
+      `select * from outbound_messages where entity_type='booking' and entity_id=$1
+        order by queued_at`, [bookingId])).rows
+  const nAlert = async (kind) =>
+    Number((await db.query(
+      'select count(*) from team_alerts where kind = $1 and resolved_at is null', [kind])).rows[0].count)
+
+  await db.query(`delete from team_alerts`)
+
+  await creaCall(1, TD,  `now() - interval '10 minutes'`)   // finita da poco: parte
+  await creaCall(2, TD,  `now() + interval '2 hours'`)      // non ancora finita
+  await creaCall(3, TD,  `now() - interval '3 days'`)       // troppo vecchia
+  await creaCall(4, TD,  `now() - interval '20 minutes'`, 'cancelled')  // non si è mai svolta
+
+  // ------------------------------------------------------------- il grilletto
+  console.log('  -- chi riceve la mail, e chi no --')
+  await tick()
+  {
+    const righe = await coda(C(1))
+    righe.length === 1 && righe[0].message_kind === 'postcall_traveler'
+      ? ok('una call finita da poco produce la mail post-call')
+      : fail('coda: ' + JSON.stringify(righe.map(r => r.message_kind)))
+    righe[0]?.status === 'queued' && righe[0]?.sent_at === null
+      ? ok('la riga nasce in coda, e sent_at è nullo: non si dichiara partita senza esserlo')
+      : fail('stato: ' + JSON.stringify([righe[0]?.status, righe[0]?.sent_at]))
+    righe[0]?.recipient === 'viaggiatore@example.com'
+      ? ok('con il destinatario vero') : fail('destinatario: ' + righe[0]?.recipient)
+  }
+  {
+    const n = (await coda(C(2))).length
+    n === 0 ? ok('una call non ancora finita non produce niente') : fail('mail anticipata')
+  }
+  {
+    const n = (await coda(C(4))).length
+    n === 0 ? ok('una call annullata non riceve il "grazie per la call"') : fail('mail su una call annullata')
+  }
+  {
+    const n = (await coda(C(3))).length
+    n === 0 ? ok('una call finita tre giorni fa non riceve più la mail') : fail('mail vecchia partita')
+    await nAlert('postcall_mail_non_partita') === 1
+      ? ok('ma la cosa si dice: un alert, perché saltare in silenzio è il guasto')
+      : fail('la call saltata non ha prodotto nessun alert')
+  }
+
+  // ------------------------------------------------ il vincolo che è un tetto
+  console.log('  -- l\'orologio rigira --')
+  {
+    await tick(); await tick()
+    const n = (await coda(C(1))).length
+    n === 1
+      ? ok('tre giri dell\'orologio, UNA mail: il vincolo di unicità è anche il tetto di spesa')
+      : fail(`l'orologio ha accodato ${n} volte la stessa mail`)
+  }
+
+  // ------------------------------------------------------------- i bottoni
+  console.log('  -- i bottoni, e i token che ci stanno dietro --')
+  {
+    const m = (await coda(C(1)))[0]
+    const token = (await db.query(
+      `select payload->>'service_type' as servizio, token, expires_at, single_use
+         from access_tokens where booking_id = $1 and purpose = 'traveler_service_request'
+        order by 1`, [C(1)])).rows
+
+    token.length === 2
+      ? ok('due servizi attivi, due token: uno per servizio, col servizio nel payload')
+      : fail('token creati: ' + JSON.stringify(token.map(t => t.servizio)))
+    token.every(t => t.expires_at === null)
+      ? ok('e non scadono mai, come vuole il Flusso — è la ragione per cui sono una credenziale permanente')
+      : fail('un token post-call con scadenza')
+    token.every(t => m.body_html.includes('/servizio/' + t.token))
+      ? ok('tutti e due i link sono nel corpo della mail')
+      : fail('link mancanti nel corpo')
+    m.body_html.includes('Chiedi l&#39;itinerario su misura') && m.body_html.includes('Chiedi l&#39;All Inclusive')
+      ? ok('con le etichette dei bottoni dei soli servizi di quel designer')
+      : fail('etichette: ' + m.body_html.slice(0, 400))
+    m.body_text.includes('/servizio/') && !m.body_text.includes('<a ')
+      ? ok('e la versione testuale porta i link in chiaro') : fail('testo: ' + m.body_text)
+  }
+  {
+    // La 0012 ammetteva UN token attivo per scopo su ogni entità: con due
+    // bottoni nella stessa mail quell'assunto non regge più, ed è il motivo per
+    // cui l'indice è stato rifatto.
+    const c = Number((await db.query(
+      `select count(*) from access_tokens where booking_id = $1 and revoked_at is null`, [C(1)])).rows[0].count)
+    c === 2 ? ok('l\'indice rifatto ammette due token attivi perché i servizi sono due') : fail('token attivi: ' + c)
+  }
+  {
+    // Un designer che non vende niente dopo la call: la mail parte lo stesso ed
+    // è un ringraziamento, senza una riga appesa che annunci bottoni assenti.
+    await db.query(`update td_services set is_active = false where td_id = $1`, [TD2])
+    await creaCall(5, TD2, `now() - interval '5 minutes'`)
+    await tick()
+    const m = (await coda(C(5)))[0]
+    m ? ok('un designer senza servizi attivi: la mail parte lo stesso') : fail('nessuna mail')
+    m && !m.body_html.includes('/servizio/')
+      ? ok('e non porta nessun bottone') : fail('bottoni su un designer che non vende niente')
+    m && !m.body_text.includes('ecco cosa potete fare insieme')
+      ? ok('né la frase che li introduce: sta dentro il blocco, quindi sparisce con loro')
+      : fail('frase appesa senza bottoni sotto')
+    await db.query(`update td_services set is_active = true where td_id = $1`, [TD2])
+  }
+
+  // ------------------------------------------------------- l'interruttore
+  console.log('  -- si compone sempre, si consegna solo se acceso --')
+  {
+    const compiti = (await tick()).filter(t => t.task === 'email_send')
+    compiti.length === 0
+      ? ok('con email_enabled a 0 nessuna mail esce: la coda si legge su Studio e basta')
+      : fail('posta consegnata a interruttore spento')
+  }
+  await db.query(`update app_config set value = 1 where key = 'email_enabled'`)
+  {
+    const compiti = (await tick()).filter(t => t.task === 'email_send')
+    compiti.length >= 2 ? ok('acceso, i compiti escono') : fail('compiti: ' + compiti.length)
+    const idAtteso = (await coda(C(1)))[0].id
+    const c = compiti.find(t => t.entity_id === idAtteso)
+    const p = c?.payload ?? {}
+    p.to === 'viaggiatore@example.com' && p.from && p.subject && p.html && p.text
+      ? ok('il compito porta destinatario, mittente, oggetto e le due forme del corpo')
+      : fail('compito: ' + JSON.stringify(Object.keys(p)))
+    p.idempotency_key === c.entity_id
+      ? ok('e la chiave di idempotenza, che impedisce il doppione se l\'ack si perde')
+      : fail('chiave di idempotenza: ' + p.idempotency_key)
+    Object.keys(p).length === 7
+      ? ok('e niente di più: un corpo con un campo di troppo è come il ponte ha già preso un 400')
+      : fail('campi nel payload: ' + JSON.stringify(Object.keys(p)))
+  }
+  {
+    // Un compito appena consegnato non si riconsegna al giro dopo: stessa
+    // regola del braccio che cancella su Cal.com.
+    const compiti = (await tick()).filter(t => t.task === 'email_send')
+    compiti.length === 0 ? ok('un giro subito dopo non riconsegna le mail già in mano al braccio')
+                         : fail('mail riconsegnata mentre il braccio la aveva in mano')
+  }
+
+  // --------------------------------------------------------- il dirottamento
+  console.log('  -- come si prova senza scrivere a nessuno --')
+  {
+    await db.query(`update app_config set value_text = 'prove@xpetis.it' where key = 'email_redirect_to'`)
+    await db.query(`update outbound_messages set last_attempt_at = null, attempts = 0 where status = 'queued'`)
+    // Si guarda una riga precisa: a questo punto in coda ce ne sono anche altre,
+    // nate dalle prenotazioni dei due ponti.
+    const idTest = (await coda(C(5)))[0].id
+    const c = (await tick()).find(t => t.task === 'email_send' && t.entity_id === idTest)
+    c.payload.to === 'prove@xpetis.it'
+      ? ok('con email_redirect_to ogni mail va alla casella di prova') : fail('to: ' + c.payload.to)
+    c.payload.subject.startsWith('[prova → viaggiatore@example.com]')
+      ? ok('e l\'oggetto dice a chi sarebbe andata') : fail('oggetto: ' + c.payload.subject)
+    const riga = (await db.query('select recipient, delivered_to from outbound_messages where id = $1',
+      [idTest])).rows[0]
+    riga.recipient === 'viaggiatore@example.com' && riga.delivered_to === 'prove@xpetis.it'
+      ? ok('recipient resta la persona vera — il vincolo continua a significare quello che significa')
+      : fail('riga: ' + JSON.stringify(riga))
+    await db.query(`update app_config set value_text = '' where key = 'email_redirect_to'`)
+  }
+
+  // ------------------------------------------------------------- gli esiti
+  console.log('  -- cosa significa la risposta di Resend --')
+  const ack = async (id, stato, dettaglio) =>
+    (await db.query('select clock_task_done($1, $2, $3, $4) as e',
+      ['email_send', id, stato, dettaglio ?? null])).rows[0].e
+  const riga = async (id) =>
+    (await db.query('select * from outbound_messages where id = $1', [id])).rows[0]
+
+  {
+    const id = (await coda(C(1)))[0].id
+    const e = await ack(id, 200, '{"id":"49a3999c-0ce1-4ea6-ab68-afcd6dc2e794"}')
+    const r = await riga(id)
+    e.esito === 'inviata' && r.status === 'sent' && r.sent_at !== null
+      ? ok('200: sent_at si valorizza adesso, e non un istante prima')
+      : fail('esito 200: ' + JSON.stringify([e, r.status, r.sent_at]))
+    r.provider_message_id === '49a3999c-0ce1-4ea6-ab68-afcd6dc2e794'
+      ? ok('insieme all\'identificativo che restituisce Resend: è il filo per cercarla nel loro pannello')
+      : fail('id del provider: ' + r.provider_message_id)
+    const e2 = await ack(id, 200, '{"id":"altro"}')
+    e2.esito === 'gia_inviata' && (await riga(id)).provider_message_id === '49a3999c-0ce1-4ea6-ab68-afcd6dc2e794'
+      ? ok('e un secondo ack non la manda una seconda volta né riscrive l\'identificativo')
+      : fail('doppio ack: ' + JSON.stringify(e2))
+  }
+  {
+    const id = (await coda(C(5)))[0].id
+    const e = await ack(id, 429, '{"message":"Too many requests"}')
+    const r = await riga(id)
+    e.esito === 'troppo_in_fretta' && r.status === 'queued'
+      ? ok('429: è il limite di richieste al secondo, non un guasto — la riga resta in coda')
+      : fail('429: ' + JSON.stringify([e, r.status]))
+    await ack(id, 503, 'gateway')
+    ;(await riga(id)).status === 'queued'
+      ? ok('503: il provider non ha risposto, si riprova') : fail('503 ha chiuso la riga')
+    const e4 = await ack(id, 422, '{"message":"Invalid `from` field"}')
+    const r4 = await riga(id)
+    e4.esito === 'rifiutata' && r4.status === 'failed' && r4.sent_at === null
+      ? ok('422: definitivo. Un mittente non verificato non guarisce riprovando')
+      : fail('422: ' + JSON.stringify([e4, r4.status]))
+    await nAlert('email_rifiutata') === 1
+      ? ok('e il team lo sa, con dentro il comando per rimetterla in coda dopo aver corretto')
+      : fail('nessun alert su una mail rifiutata')
+    r4.last_error?.includes('Invalid')
+      ? ok('l\'errore resta scritto sulla riga') : fail('last_error: ' + r4.last_error)
+  }
+  {
+    // Una riga `failed` non torna in coda da sola: ci vuole una mano.
+    const idRifiutata = (await coda(C(5)))[0].id
+    const c = (await tick()).filter(t => t.task === 'email_send')
+    c.some(t => t.entity_id === idRifiutata)
+      ? fail('una mail rifiutata definitivamente è stata riconsegnata al braccio')
+      : ok('una mail rifiutata non si ritenta: resta lì, col suo errore, finché qualcuno guarda')
+  }
+
+  // ------------------------------------------------ la mail che mancava dal 20/9
+  console.log('  -- la mail cortese di chi ha perso lo slot --')
+  {
+    const B = 'c0dac0da-0000-4000-8000-0000000000aa'
+    await db.query(
+      `insert into bookings (id, traveler_id, td_id, service_type, status, cal_booking_uid,
+                             cal_event_type_slug, starts_at, ends_at, original_starts_at,
+                             price_cents, payment_deadline_at, cancel_requested_at, cancel_attempts, last_actor)
+       values ($1, $2, $3, 'consultation', 'pending_payment', 'uid-insoluto-mail',
+               'consulenza-xpetis-30', now() + interval '2 days',
+               now() + interval '2 days' + interval '30 minutes', now() + interval '2 days',
+               6000, now() - interval '1 hour', now(), 1, 'traveler')`,
+      [B, ANNA, TD])
+
+    const e = (await db.query('select clock_task_done($1, $2, $3) as e',
+      ['calcom_cancel_unpaid', B, 200])).rows[0].e
+    e.esito === 'liberata' ? ok('lo slot si libera, come prima') : fail(JSON.stringify(e))
+
+    const m = (await coda(B)).find(r => r.message_kind === 'unpaid_cancelled_traveler')
+    m ? ok('e adesso parte anche la mail cortese, che dal 18 settembre era l\'unico pezzo mancante')
+      : fail('nessuna mail sullo slot liberato')
+    m && !/annullat|cancellat/i.test(m.subject)
+      ? ok('l\'oggetto non ripete l\'annullamento che Cal.com sta già mandando')
+      : fail('oggetto che ripete Cal.com: ' + m?.subject)
+    m && m.body_html.includes('/designer/marco-rossi')
+      ? ok('e porta il calendario del designer, cioè cosa fare adesso')
+      : fail('nessun link alla vetrina')
+  }
+
+  await db.query(`update app_config set value = 0 where key = 'email_enabled'`)
+}
+
+console.log('\n== Le pagine a token ==')
+{
+  const TD   = '11111111-1111-1111-1111-111111111111'
+  const ANNA = '44444444-4444-4444-4444-444444444444'
+  const CALL = 'c0dac0da-0000-4000-8000-000000000001'   // la call di prova già finita
+
+  const risolvi = async (t) =>
+    (await db.query('select * from resolve_access_token_detail($1)', [t])).rows[0]
+  const pagina = async (t) =>
+    (await db.query('select service_request_page($1) as p', [t])).rows[0].p
+  const chiedi = async (t) =>
+    (await db.query('select create_order_from_token($1) as e', [t])).rows[0].e
+
+  const tokenDi = async (servizio) =>
+    (await db.query(
+      `select token from access_tokens where booking_id = $1 and payload->>'service_type' = $2
+         and revoked_at is null`, [CALL, servizio])).rows[0].token
+
+  // ------------------------------------------------------- cinque risposte
+  console.log('  -- cinque risposte, non una --')
+  {
+    const r = await risolvi('token-che-non-esiste-mai')
+    r.esito === 'inesistente' && r.token === null
+      ? ok('inesistente: e non torna niente da cui dedurre qualcosa')
+      : fail('inesistente: ' + JSON.stringify(r))
+    const n = Number((await db.query('select coalesce(sum(n),0) as n from access_token_misses')).rows[0].n)
+    n >= 1 ? ok('e il tentativo a vuoto viene contato: la linea ha un testimone')
+           : fail('il tentativo non è stato contato')
+  }
+  {
+    const r = (await db.query(
+      `insert into access_tokens (purpose, audience, booking_id, td_id, expires_at, payload)
+       values ('traveler_review','traveler',$1,$2, now() - interval '1 day', '{"x":1}')
+       returning token`, [CALL, TD])).rows[0]
+    ;(await risolvi(r.token)).esito === 'scaduto'
+      ? ok('scaduto: chi ha un link vecchio è una persona legittima, e lo sa')
+      : fail('scaduto non riconosciuto')
+    await db.query(`update access_tokens set revoked_at = now() where token = $1`, [r.token])
+    ;(await risolvi(r.token)).esito === 'revocato' ? ok('revocato') : fail('revocato non riconosciuto')
+  }
+  {
+    const r = (await db.query(
+      `insert into access_tokens (purpose, audience, booking_id, td_id, single_use, used_at, payload)
+       values ('traveler_review','traveler',$1,$2, true, now(), '{"y":1}')
+       returning token`, [CALL, TD])).rows[0]
+    ;(await risolvi(r.token)).esito === 'gia_usato'
+      ? ok('monouso già usato') : fail('single_use non riconosciuto')
+  }
+  {
+    const t = await tokenDi('custom_itinerary')
+    const prima = (await db.query('select use_count from access_tokens where token=$1', [t])).rows[0].use_count
+    const r = await risolvi(t)
+    const dopo = (await db.query('select use_count from access_tokens where token=$1', [t])).rows[0].use_count
+    r.esito === 'valido' && r.booking_id === CALL
+      ? ok('valido: e torna il contesto già risolto') : fail('valido: ' + JSON.stringify(r))
+    dopo === prima + 1
+      ? ok('risolvere scrive (use_count, last_seen_at): per questo si chiama una volta per richiesta')
+      : fail('use_count: ' + prima + ' → ' + dopo)
+  }
+
+  // ------------------------------------------------------- chi può chiamare
+  console.log('  -- cosa vede il browser --')
+  for (const ruolo of ['anon', 'authenticated']) {
+    for (const f of ['resolve_access_token(text)', 'resolve_access_token_detail(text)',
+                     'create_order_from_token(text)', 'service_request_page(text)',
+                     'render_template(text,jsonb,jsonb,jsonb)', 'clock_tick(integer)']) {
+      const v = (await db.query(`select has_function_privilege($1, $2, 'EXECUTE') as v`, [ruolo, f])).rows[0].v
+      v === false ? ok(`${ruolo} non può eseguire ${f.split('(')[0]}()`) : fail(`${ruolo} esegue ${f}`)
+    }
+    for (const t of ['access_tokens', 'access_token_misses', 'outbound_messages', 'message_templates']) {
+      const v = (await db.query(`select has_table_privilege($1, $2, 'SELECT') as v`, [ruolo, t])).rows[0].v
+      v === false ? ok(`${ruolo} non può leggere ${t}`) : fail(`${ruolo} legge ${t}`)
+    }
+  }
+  {
+    const r = (await db.query(
+      `select relrowsecurity from pg_class where relname in ('access_token_misses','message_templates')`)).rows
+    r.length === 2 && r.every(x => x.relrowsecurity === true)
+      ? ok('RLS accesa su tutte e due le tabelle nuove') : fail('RLS: ' + JSON.stringify(r))
+  }
+
+  // ------------------------------------------------------------ il clic
+  console.log('  -- un clic, un ordine --')
+  {
+    const t = await tokenDi('custom_itinerary')
+    const p = await pagina(t)
+    p.esito === 'valido' && p.service_type === 'custom_itinerary' && p.td_name === 'Marco Rossi'
+      ? ok('la pagina sa cosa mostrare prima del clic') : fail('pagina: ' + JSON.stringify(p))
+
+    const e = await chiedi(t)
+    e.ok === true && e.esito === 'creato' && /^XP-\d{5}$/.test(e.human_ref)
+      ? ok('il clic crea l\'ordine, con il riferimento leggibile') : fail('clic: ' + JSON.stringify(e))
+
+    const o = (await db.query('select * from orders where id = $1', [e.order_id])).rows[0]
+    o.status === 'requested' && o.service_type === 'custom_itinerary' && o.source_booking_id === CALL
+      ? ok('nasce in `requested`, sul servizio del payload e sulla call del token')
+      : fail('ordine: ' + JSON.stringify([o.status, o.service_type]))
+    o.consultation_credit_cents === 0
+      ? ok('e il credito consulenza resta a zero: lo applica il TD nella proposta, non il codice')
+      : fail('credito calcolato dal codice: ' + o.consultation_credit_cents)
+
+    const h = (await db.query(
+      `select actor, to_status from order_status_history where order_id = $1`, [e.order_id])).rows[0]
+    h.actor === 'traveler'
+      ? ok('l\'attore è `traveler`, e viene dal token: è l\'unica prova di chi ha agito')
+      : fail('attore: ' + h.actor)
+
+    const l = (await db.query(
+      `select payload from event_log where entity_id = $1 and event = 'ordine_richiesto_da_mail_postcall'`,
+      [e.order_id])).rows[0]
+    l?.payload?.token === t ? ok('e il diario dice con quale token') : fail('event_log: ' + JSON.stringify(l))
+
+    const a = (await db.query(
+      `select message from team_alerts where kind = 'ordine_richiesto' and entity_id = $1`,
+      [e.order_id])).rows[0]
+    a?.message?.includes('gruppo WhatsApp')
+      ? ok('il team è avvisato, e l\'alert dice qual è il gesto umano che tocca a lui')
+      : fail('alert: ' + JSON.stringify(a))
+  }
+  {
+    const t = await tokenDi('custom_itinerary')
+    const e = await chiedi(t)
+    e.ok === true && e.esito === 'gia_richiesto'
+      ? ok('cliccare due volte non crea due richieste, e non è un errore da mostrare')
+      : fail('doppio clic: ' + JSON.stringify(e))
+    const n = Number((await db.query(
+      `select count(*) from orders where source_booking_id = $1 and service_type = 'custom_itinerary'`,
+      [CALL])).rows[0].count)
+    n === 1 ? ok('un ordine solo') : fail('ordini: ' + n)
+    ;(await pagina(t)).esito === 'gia_richiesto'
+      ? ok('e la pagina racconta lo stesso, che è la verità') : fail('pagina dopo il clic')
+  }
+  {
+    // Il servizio viene dal payload del token e da nessun'altra parte: due
+    // token della stessa call portano a due ordini diversi, e non c'è nessun
+    // parametro con cui scambiarli.
+    const t = await tokenDi('all_inclusive')
+    const e = await chiedi(t)
+    e.esito === 'creato' && e.service_type === 'all_inclusive'
+      ? ok('l\'altro bottone crea l\'altro servizio: il servizio sta nel token')
+      : fail('all inclusive: ' + JSON.stringify(e))
+  }
+
+  // ------------------------------------------------ l'entità cambiata di stato
+  console.log('  -- token buono, call che non lo è più --')
+  {
+    const CALL2 = 'c0dac0da-0000-4000-8000-000000000005'
+    const t = (await db.query(
+      `select token from access_tokens where booking_id = $1 and revoked_at is null limit 1`, [CALL2])).rows[0]
+    // Su quella call il designer non aveva servizi attivi, quindi non c'è
+    // nessun token: se ne fabbrica uno a mano, come si farebbe dal SQL Editor.
+    const tok = t?.token ?? (await db.query(
+      `insert into access_tokens (purpose, audience, booking_id, td_id, payload)
+       values ('traveler_service_request','traveler',$1,
+               (select td_id from bookings where id = $1),
+               jsonb_build_object('service_type','all_inclusive'))
+       returning token`, [CALL2])).rows[0].token
+
+    await db.query(`update bookings set status = 'disputed', last_actor='team' where id = $1`, [CALL2])
+    const e = await chiedi(tok)
+    e.ok === false && e.esito === 'call_in_stato_non_ammesso'
+      ? ok('un token valido su una call finita in disputa non crea niente, e lo dice')
+      : fail('stato non ammesso: ' + JSON.stringify(e))
+    ;(await pagina(tok)).esito === 'call_in_stato_non_ammesso'
+      ? ok('e la pagina dice la stessa cosa, perché è la stessa funzione a rispondere')
+      : fail('pagina in disaccordo con la funzione')
+
+    // Rimessa in uno stato buono, ma nel frattempo il designer ha spento il
+    // servizio: è il caso che un token permanente rende inevitabile, perché fra
+    // la mail e il clic possono passare mesi.
+    await db.query(`update bookings set status = 'completed', last_actor='team' where id = $1`, [CALL2])
+    await db.query(`update td_services set is_active = false
+                     where td_id = (select td_id from bookings where id = $1)
+                       and service_type = 'all_inclusive'`, [CALL2])
+    const e2 = await chiedi(tok)
+    e2.esito === 'servizio_non_piu_attivo'
+      ? ok('un servizio spento dopo che la mail è partita: il bottone smette di funzionare, e lo spiega')
+      : fail('servizio spento: ' + JSON.stringify(e2))
+    // E la pagina lo dice PRIMA del clic: un bottone che al clic risponde «non è
+    // più disponibile» è un tasto che mente.
+    ;(await pagina(tok)).esito === 'servizio_non_piu_attivo'
+      ? ok('e la pagina non offre nemmeno il bottone')
+      : fail('la pagina offre un bottone che non funzionerebbe')
+  }
+  {
+    // Un token di un altro tipo non apre questa porta, anche se è validissimo.
+    const t = (await db.query(
+      `insert into access_tokens (purpose, audience, order_id, td_id)
+       values ('td_order_page','td', (select id from orders where source_booking_id = $1 limit 1), $2)
+       returning token`, [CALL, TD])).rows[0].token
+    ;(await chiedi(t)).esito === 'token_di_altro_tipo'
+      ? ok('un token di un altro scopo non apre questa porta') : fail('token di altro tipo accettato')
+  }
+}
+
 console.log(failures === 0 ? '\nTutto verde.\n' : `\n${failures} asserzioni fallite.\n`)
 process.exit(failures === 0 ? 0 : 1)

@@ -279,8 +279,8 @@ comincia per `stripe_`.
 ## `orologio.json` — l'orologio unico delle scadenze
 
 Il workflow che ogni cinque minuti chiede al database quali scadenze sono dovute
-e le esegue. Oggi ne esiste una sola: **liberare su Cal.com lo slot di una
-consulenza non pagata**.
+e le esegue. Ne escono **due tipi di compito**: liberare su Cal.com lo slot di
+una consulenza non pagata, e **mandare una mail con Resend**.
 
 | | |
 |---|---|
@@ -288,7 +288,7 @@ consulenza non pagata**.
 | Come parte | Da sé, ogni **5 minuti**. Nessun webhook, nessun indirizzo pubblico |
 | Credenziale usata | *Supabase XPETIS · chiave secret (server)*, tipo **Header Auth**, header `apikey` — la stessa dei due ponti |
 | Fuso | `Europe/Rome`, nelle impostazioni del workflow |
-| Provato in produzione | **20 settembre 2026**: uno slot non pagato si libera davvero su Cal.com. Due difetti trovati e corretti nel collaudo, entrambi nella giuntura fra Postgres e n8n — vedi *Le due cose che il collaudo ha trovato* |
+| Provato in produzione | **20 settembre 2026**: uno slot non pagato si libera davvero su Cal.com. Due difetti trovati e corretti nel collaudo, entrambi nella giuntura fra Postgres e n8n — vedi *Le due cose che il collaudo ha trovato*. **Il ramo della posta è del 20 settembre 2026 e non è ancora stato provato in produzione**: nasce con l'interruttore spento |
 
 ### Perché questo ha una forma diversa dai due ponti
 
@@ -297,22 +297,38 @@ dentro. Questo **agisce verso l'esterno** — deve chiamare Cal.com, e Postgres
 non fa chiamate HTTP. Quindi qui n8n fa qualcosa davvero, ma solo il gesto:
 
 ```
-Ogni 5 minuti → clock_tick() → Un compito per riga → Cancella su Cal.com → clock_task_done()
- (Schedule)     (HTTP)           (Code)                (HTTP)                (HTTP)
+                                    ┌→ Solo le cancellazioni → Cancella su Cal.com → clock_task_done() · slot
+Ogni 5 minuti → clock_tick() → Un compito per riga            (HTTP)                  (HTTP)
+ (Schedule)     (HTTP)           (Code)  └→ Solo le mail ────→ Manda con Resend ────→ clock_task_done() · mail
+                                            (Code)             (HTTP)                  (HTTP)
 ```
 
 - **`clock_tick()`** decide *chi* è scaduto e cosa va fatto. Restituisce una
   lista di compiti nella forma `(task, entity_type, entity_id, payload)`.
-- **`Un compito per riga`** trasforma la lista in item. Non guarda dentro.
-- **`Cancella su Cal.com`** è l'unico nodo che parla col mondo. URL, header e
-  motivo arrivano dal compito: **non c'è un indirizzo scritto in questo
-  workflow**, sta in `app_config.calcom_cancel_url`.
+- **`Un compito per riga`** trasforma la lista in item e appiattisce il payload.
+  Non guarda dentro.
+- **I due nodi `Solo le…`** smistano per `task`. Non è una decisione: è un
+  binario. Sono due nodi Code di tre righe e non uno **Switch** apposta — lo
+  Switch ha uno schema di parametri che cambia fra le versioni del nodo, e un
+  workflow reimportato su un'istanza aggiornata può arrivare con le condizioni
+  vuote. Un ramo con le condizioni vuote **lascia passare tutto**, cioè
+  manderebbe le mail a Cal.com: è un guasto silenzioso in più, e ne abbiamo già
+  abbastanza.
+- **`Cancella su Cal.com`** e **`Manda con Resend`** sono i due nodi che parlano
+  col mondo. URL, header, motivo, destinatario e corpo arrivano dal compito:
+  **non c'è nessun indirizzo e nessun testo scritto in questo workflow**, stanno
+  in `app_config` e in `message_templates`.
 - **`clock_task_done()`** decide *cosa significa* l'esito. Il braccio passa il
-  **codice HTTP** che Cal.com ha risposto, non un giudizio: liberata, già
-  liberata, da ritentare o il caso critico lo dice Postgres.
+  **codice HTTP** che ha ricevuto, non un giudizio.
 
-Il nodo Cal.com ha **`Never Error` e `Full Response`** accesi e *On Error →
-continue*: un 4xx non deve fermare il giro, perché quel codice è
+Gli ack sono **due nodi uguali** invece di uno solo, ed è voluto: leggono
+`$('Un compito per riga').item` per sapere quale compito stanno riferendo, e con
+due rami che confluiscono in un nodo solo quel filo dipenderebbe da come n8n
+appaia gli item di due percorsi diversi. Due nodi costano un rettangolo in più e
+non dipendono da niente.
+
+Entrambi i nodi verso il mondo hanno **`Never Error` e `Full Response`** accesi e
+*On Error → continue*: un 4xx non deve fermare il giro, perché quel codice è
 un'informazione da riferire, non un guasto del workflow.
 
 > ⚠️ **Si marca `cancelled_unpaid` DOPO, mai prima.** Se la chiamata a Cal.com
@@ -428,16 +444,32 @@ e i dati di esecuzione del nodo *Un compito per riga* su n8n.
 ### Come si importa la prima volta
 
 1. n8n → *Workflows* → **Import from File** → `orologio.json`.
-2. I due nodi `clock_tick()` e `clock_task_done()` arrivano **senza
-   credenziale**: aprili e scegli la credenziale **Header Auth** già esistente
-   *Supabase XPETIS · chiave secret (server)*. È la stessa dei due ponti, non se
-   ne crea una terza.
-3. Controlla che le righe di `app_config` esistano (`calcom_cancel_url`,
-   `calcom_api_version`, `unpaid_cancel_reason`, `booking_cancel_grace_min`,
-   `unpaid_slot_max_min`, `unpaid_cancel_max_attempts`): senza una di queste
-   `clock_tick()` **solleva**, invece di girare a vuoto in silenzio. È voluto —
-   una scadenza non trattata è invisibile, un'esecuzione rossa no.
-4. Attiva il workflow.
+2. I tre nodi verso Supabase — `clock_tick()` e i due `clock_task_done()` —
+   arrivano **senza credenziale**: aprili e scegli la credenziale **Header Auth**
+   già esistente *Supabase XPETIS · chiave secret (server)*. È la stessa dei due
+   ponti, non se ne crea una terza.
+3. Il nodo **`Manda con Resend`** vuole una credenziale **diversa**, e va creata
+   la prima volta: **Header Auth**, `Name: Authorization`,
+   `Value: Bearer re_…`. Chiamala *Resend · invio transazionale*. La chiave sta
+   nel password manager — vedi `ACCESSI.md`.
+   ⚠️ **Non è la stessa Header Auth dei nodi Supabase**: quella manda `apikey`,
+   questa manda `Authorization`. Sceglierla sbagliata dà un 401 che sembra una
+   chiave revocata.
+4. Controlla che le righe di `app_config` esistano. Sei sono **indispensabili** e
+   senza una di quelle `clock_tick()` **solleva**, invece di girare a vuoto in
+   silenzio: `booking_payment_window_min`, `booking_cancel_grace_min`,
+   `unpaid_sweep_minutes`, `unpaid_slot_max_min`, `unpaid_cancel_max_attempts`,
+   `calcom_cancel_url`. Le altre spengono un ramo per volta, e la mancanza
+   finisce in un alert `orologio_ramo_non_configurato` che le elenca: sono le
+   righe della posta (`email_enabled`, `email_from`, `email_max_per_tick`,
+   `email_max_attempts`, `postcall_email_max_age_hours`, `site_base_url`,
+   `whatsapp_number`), quelle delle firme e quelle dei token.
+5. Attiva il workflow.
+
+⚠️ **`email_enabled` nasce a 0, e va lasciato a 0 finché la coda non è stata
+letta.** A interruttore spento le mail si compongono e si accodano lo stesso: si
+leggono su Studio esattamente come le leggerà un cliente. Accenderlo è il gesto
+che fa partire posta vera, e va fatto guardando.
 
 ⚠️ **La cadenza non si allunga.** In produzione deve restare fra 5 e 10 minuti:
 il conto è `finestra di pagamento + grazia + cadenza`, e il Flusso ammette al
@@ -484,23 +516,104 @@ select created_at, kind, severity, message from team_alerts
  order by created_at desc;
 ```
 
-I tre `kind` che può scrivere:
+I `kind` che può scrivere:
 
 | `kind` | Cosa dice |
 |---|---|
 | `orologio_fuori_budget` | Finestra + grazia + cadenza superano i 35 minuti del Flusso: qualcuno ha cambiato un parametro da Studio |
 | `orologio_cancellazione_calcom_non_riesce` | Dopo `unpaid_cancel_max_attempts` tentativi lo slot non si libera: quasi sempre l'indirizzo di cancellazione, o Cal.com che risponde diversamente da come credevamo |
 | `orologio_ha_liberato_uno_slot_pagato` | La corsa col pagamento è successa davvero: lo slot è stato cancellato e il pagamento è arrivato lo stesso. **Critico**: serve una persona, la call va rifissata a mano o rimborsata |
+| `orologio_ramo_non_configurato` | Manca una riga di `app_config`: l'alert le elenca tutte, e si aggiorna da solo quando ne sistemi una. Si chiude da solo quando non ne manca più nessuna |
+| `email_non_consegnata` | Delle mail restano in coda dopo tutti i tentativi. Quasi sempre la chiave Resend, il tetto dei 100 al giorno, o il mittente |
+| `email_rifiutata` | Resend ha detto no in modo definitivo. Il messaggio porta dentro il comando per rimetterla in coda dopo aver corretto |
+| `email_composizione_fallita` | Un segnaposto rimasto senza valore dopo una modifica a `message_templates`. La mail **non** è stata accodata |
+| `postcall_mail_non_partita` | Delle call sono finite da più di `postcall_email_max_age_hours` senza mail post-call, e non partirà più. Se l'orologio è stato fermo, quei viaggiatori vanno ripresi a mano |
+| `calcom_firme_rifiutate` | Firme Cal.com non valide sopra soglia: quasi sempre una parola segreta sbagliata su un account |
+| `token_inventati` | Qualcuno apre link con token che non esistono. Nessuna pagina ha rivelato niente, ma vale la pena guardare da dove arrivano |
 
-### Una cosa che questo workflow NON fa: mandare la mail
+### La posta: Resend, e le tre cose da sapere prima
 
-Chi perde lo slot per un pagamento non completato **non riceve niente da noi**.
-Non è una dimenticanza: il provider di invio email non esiste ancora (S-04), e
-inventarne uno qui vorrebbe dire mandare le mail di XPETIS da un dominio non
-autenticato, cioè bruciare la reputazione di invio prima ancora di cominciare.
+Dal 20 settembre 2026 questo workflow manda anche le mail. Il provider è
+**Resend** (S-04 chiuso: account della landing page, `xpetis.it` già verificato,
+mittente `info@xpetis.it`).
 
-Il posto dove andrà è dichiarato: un ramo `email_*` in `clock_tick()`, accanto a
-quello che già c'è. Finché non esiste il provider, **non si manda niente e non si
-finge**. Il viaggiatore intanto una mail la riceve comunque — quella nativa di
-Cal.com, che resta accesa (deviazione 5), e che porta il motivo scritto in
-`app_config.unpaid_cancel_reason`.
+**1. Il limite è 10 richieste al secondo**, per team, e il piano gratuito dà
+**100 mail al giorno condivise con la landing page**. Per questo il nodo *Manda
+con Resend* ha il **batching acceso** — un item per volta, 250 ms di pausa, cioè
+quattro al secondo — e per questo `clock_tick` non consegna più di
+`app_config.email_max_per_tick` mail per giro. Il freno vero però non è nessuno
+di questi due: è il vincolo di unicità di `outbound_messages`, che rende
+impossibile mandare due volte la stessa mail alla stessa persona anche se
+l'orologio rigira.
+
+**2. Il corpo porta cinque campi e non uno di più**: `from`, `to`, `subject`,
+`html`, `text`. È la lezione del 20 settembre sull'endpoint Cal.com — *«uid
+property should not exist»*, 400 — applicata prima di prenderlo di nuovo: la
+forma della richiesta è stata verificata sulla documentazione di Resend, non per
+analogia con un altro nodo.
+
+**3. C'è una `Idempotency-Key`, e vale 24 ore.** È l'id della riga di
+`outbound_messages`. Serve al caso che altrimenti produrrebbe doppioni veri: la
+mail parte, Resend risponde 200, e l'ack a Postgres non arriva perché n8n si è
+fermato in mezzo. Al giro dopo la riga è ancora in coda e si riprova — ma con la
+stessa chiave, quindi Resend riconosce la richiesta e **non manda una seconda
+mail**. Finestra: i nostri tentativi stanno tutti dentro un quarto d'ora, ben
+dentro le 24 ore.
+
+**Cosa significa la risposta**, deciso in `clock_task_done()` e non qui:
+
+| Codice | Cosa vuol dire | Cosa succede |
+|---|---|---|
+| `2xx` | accettata | `sent_at` e l'identificativo Resend sulla riga |
+| `429` | troppe richieste al secondo | resta in coda, riparte al giro dopo |
+| `5xx` o `0` | il provider non ha risposto | resta in coda, si riprova |
+| altro `4xx` | **definitivo** | riga a `failed`, alert `email_rifiutata` |
+
+L'ultima riga è la scelta che conta: un corpo malformato, un mittente non
+verificato o una chiave revocata **non guariscono riprovando**. Ritentarli ogni
+cinque minuti trasformerebbe un difetto in rumore di fondo, che è il modo in cui
+non se ne accorge nessuno.
+
+### Come si prova la posta senza scrivere a nessuno
+
+Tre interruttori, in ordine di sicurezza:
+
+```sql
+-- 1. spenta: si compone e si accoda, non parte niente (è il default)
+update app_config set value = 0 where key = 'email_enabled';
+
+-- 2. dirottata: parte davvero, ma va tutta a una casella tua, e l'oggetto
+--    dice a chi sarebbe andata
+update app_config set value_text = 'tu@example.com' where key = 'email_redirect_to';
+update app_config set value = 1 where key = 'email_enabled';
+
+-- 3. viva: svuota il dirottamento. Da qui in poi scrive a gente vera.
+update app_config set value_text = '' where key = 'email_redirect_to';
+```
+
+E la coda si legge così, che è anche il modo in cui Gaia corregge i testi
+guardando la mail vera invece di un documento:
+
+```sql
+select queued_at, status, message_kind, recipient, delivered_to, subject,
+       attempts, provider_message_id, last_error
+  from outbound_messages
+ order by queued_at desc limit 30;
+
+-- il corpo di una mail, come lo leggerà chi la riceve
+select body_text from outbound_messages where id = '<id>';
+```
+
+Per rimettere in coda una mail rifiutata, dopo aver corretto il testo in
+`message_templates`:
+
+```sql
+update outbound_messages set status = 'queued', attempts = 0, last_error = null
+ where id = '<id>';
+```
+
+⚠️ **Una riga `sent` non si rimette in coda cambiando lo stato**: il vincolo
+`outbound_messages_sent_coerente` pretende che `sent_at` sia nullo su tutto ciò
+che non è `sent`. Se una mail va davvero rimandata, si azzera anche `sent_at` —
+ed è di proposito un gesto che bisogna scrivere per intero, perché rimandare una
+mail a un cliente è una cosa che si fa apposta.

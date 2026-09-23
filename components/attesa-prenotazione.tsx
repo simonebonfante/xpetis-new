@@ -23,7 +23,14 @@ const PAUSE = [700, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500]
 
 type Stato = 'cerco' | 'apro' | 'non_trovata' | 'errore'
 
-export function AttesaPrenotazione({ whatsapp }: { whatsapp: string | null }) {
+export function AttesaPrenotazione({
+  whatsapp,
+  designer,
+}: {
+  whatsapp: string | null
+  /** Lo slug della vetrina da cui si è prenotato: finisce solo nell'alert. */
+  designer: string | null
+}) {
   const router = useRouter()
   const [stato, setStato] = useState<Stato>('cerco')
   const [dettaglio, setDettaglio] = useState<string | null>(null)
@@ -72,7 +79,13 @@ export function AttesaPrenotazione({ whatsapp }: { whatsapp: string | null }) {
       }
 
       // Ultimo colpo: la route riguarda e, se davvero non c'è niente, segnala.
-      const r = await fetch('/attesa/cerca', { method: 'POST' }).catch(() => null)
+      // Lo slug del designer viaggia qui e solo qui: serve all'alert, non alla
+      // ricerca della prenotazione, che si fa per viaggiatore.
+      const r = await fetch('/attesa/cerca', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ designer }),
+      }).catch(() => null)
       if (!vivo) return
       const esito = r?.ok ? ((await r.json()) as { prenotazione: string | null }) : null
       if (esito?.prenotazione) return apri(esito.prenotazione)
@@ -105,7 +118,7 @@ export function AttesaPrenotazione({ whatsapp }: { whatsapp: string | null }) {
     return () => {
       vivo = false
     }
-  }, [router])
+  }, [router, designer])
 
   if (stato === 'cerco' || stato === 'apro') {
     return (

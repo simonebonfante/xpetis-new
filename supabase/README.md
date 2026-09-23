@@ -78,6 +78,8 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0039_stripe_webhook.sql` | Il ponte Stripe → `payments`/`bookings`: firma con tolleranza, diario, conferma con verifica dell'importo |
 | `0040_showcase_cal_link.sql` | `cal_username` e lo slug dell'event type sulla vetrina, per l'embed |
 | `0041_orologio.sql` | L'orologio unico delle scadenze: `clock_tick()`, `clock_task_done()`, e l'attribuzione al sistema della cancellazione che chiediamo noi |
+| `0042_firme_rifiutate.sql` | Il contatore delle firme Cal.com rifiutate, e il ramo 2 dell'orologio che ci alza un alert sopra |
+| `0043_posta.sql` | La cerniera del dopo-call: `message_templates`, `outbound_messages` che diventa una coda, la composizione in Postgres, i rami post-call e consegna dell'orologio, il resolver dei token a cinque risposte e `create_order_from_token()` |
 
 ## La geografia
 
@@ -469,12 +471,30 @@ riprovi: **un lavoro non riuscito non deve somigliare a un lavoro fatto.** Il
 ciclo non gira all'infinito — `cancel_attempts` conta, e oltre
 `unpaid_cancel_max_attempts` l'orologio smette e scrive un alert critico.
 
-**Un solo workflow per tutte le scadenze**, non un cron per scadenza. Oggi il
-ramo è uno, ma milestone 5 e 6 ne portano altri (silenzio-conferma a 48 ore,
-promemoria del giorno prima, chiusura a 5 giorni dalla consegna): i lavori che il
-database sa fare da solo restano dentro la funzione, quelli che hanno bisogno del
+**Un solo workflow per tutte le scadenze**, non un cron per scadenza. I lavori
+che il database sa fare da solo restano dentro, quelli che hanno bisogno del
 mondo di fuori escono come compiti nella forma
-`(task, entity_type, entity_id, payload)`. Aggiungerne uno è aggiungere un ramo.
+`(task, entity_type, entity_id, payload)`.
+
+**Dalla 0043 ogni ramo è una funzione a sé**, e `clock_tick()` è un
+orchestratore di dodici righe. La 0041 dichiarava la struttura a rami; la 0042 la
+mise alla prova e funzionò, ma al prezzo di **riemettere trecento righe per
+aggiungerne trenta** — con il risultato che i due file contenevano due copie
+parola per parola del ramo degli insoluti, che è il modo in cui due copie
+divergono. Al terzo giro la struttura è diventata vera:
+
+| Funzione | Cosa fa | Esce? |
+|---|---|---|
+| `clock_ramo_insoluti(limite)` | Slot non pagati da liberare su Cal.com | compiti `calcom_cancel_unpaid` |
+| `clock_ramo_firme_calcom()` | Conta le firme rifiutate e alza l'alert | no |
+| `clock_ramo_token_inventati()` | Conta i token inesistenti e alza l'alert | no |
+| `clock_ramo_postcall()` | Compone e accoda la mail post-call | no |
+| `clock_ramo_email(limite)` | Consegna quello che è in coda | compiti `email_send` |
+
+Aggiungere una scadenza — il silenzio-conferma a 48 ore, il promemoria del
+giorno prima, la chiusura a 5 giorni — è adesso **scrivere una funzione e
+aggiungere una riga**. E se è una mail, non richiede nemmeno di toccare n8n: il
+ramo della consegna esiste già e non sa cosa consegna.
 
 **La cancellazione che chiediamo noi torna indietro come webhook.** Appena il
 braccio cancella, Cal.com manda un `BOOKING_CANCELLED` al nostro stesso ponte, e
@@ -515,6 +535,208 @@ credenziale.
 payload non appiattito e due campi di troppo nel corpo. Nessuno dei due era
 visibile da qui — l'harness prova Postgres, non la forma del compito una volta
 uscito. Il racconto sta in `n8n/LEGGIMI.md` e in `REGISTRO.md`.
+
+## I due silenzi di Cal.com
+
+Un designer può smettere di arrivarci in due modi, **entrambi senza nessun
+segnale**: la parola segreta del webhook è sbagliata (`calcom_webhook()` risponde
+`firma_non_valida`, non scrive niente, n8n risponde 200 e Cal.com è contento), o
+il webhook non c'è / punta all'indirizzo vecchio (non arriva proprio niente). Con
+25 account configurati a mano, che almeno uno dei due capiti non è un rischio: è
+una previsione.
+
+**Il primo silenzio si conta** (migration 0042). `calcom_signature_ok()` tiene un
+contatore in `calcom_signature_rejections` — **una riga per ora, non una per
+messaggio**, perché il principio della 0037 non si annulla: l'indirizzo del
+webhook è pubblico, e un diario di tutti i corpi non autenticati sarebbe una
+discarica scrivibile da chiunque. Il ramo 2 dell'orologio somma la finestra e
+alza `calcom_firme_rifiutate` sopra `calcom_signature_alert_threshold`.
+
+L'alert **dice anche di chi**, e la decisione va capita: su una firma non valida
+il corpo non è autenticato, quindi `organizer.username` è un dato che chiunque
+può scrivere. Senza però l'alert direbbe "qualcuno manda firme sbagliate" e con
+25 account il team non saprebbe da dove cominciare. Il rischio si riduce **alla
+fonte**: si salva soltanto un username che è già uno dei nostri, tutto il resto
+diventa `null`. Quindi chi scrive corpi finti può al massimo indicare uno dei 25
+designer veri — non inserire testo arbitrario, non far comparire nomi inventati,
+non far crescere la tabella. Resta un indizio: l'alert lo dichiara non
+verificato, nessun automatismo ci agisce sopra, e il controllo che il team fa
+dopo è innocuo anche se il nome era sbagliato. Nel caso più probabile — la
+parola segreta sbagliata in onboarding — il nome è comunque **vero**, perché a
+mandare è davvero Cal.com.
+
+**Il secondo silenzio non si controlla a orologeria**, ed è la parte in cui la
+soluzione che sembra più completa è quella sbagliata. Un ramo che avvisa se un
+designer non manda niente da N giorni ha un difetto strutturale: **in Beta un
+designer senza prenotazioni è indistinguibile da uno col webhook rotto**, perché
+il segnale manca per la stessa ragione per cui manca il traffico. Produrrebbe 25
+alert il primo giorno, il team imparerebbe a ignorarli, e il giorno che uno è
+vero nessuno guarderebbe.
+
+Al suo posto due cose che sono **evidenza invece che inferenza**:
+
+- `calcom_webhook_non_arrivato` (`app/attesa/cerca/route.ts`), che dal 20
+  settembre **dice quale designer**: è la prova diretta che qualcuno ha
+  prenotato e a noi non è arrivato niente. Lo slug della vetrina viaggia fino
+  alla route e serve solo a cercare la riga di `travel_designers`: nell'alert
+  finisce il nome che risponde il database, mai la stringa arrivata da fuori.
+- **La prenotazione di prova per designer in onboarding**, verificata con una
+  query su `bookings` e non guardando le esecuzioni di n8n — che con la parola
+  segreta sbagliata sono verdi lo stesso. È il passo che prende il caso più
+  probabile nel momento in cui costa trenta secondi correggerlo, e
+  `cal_webhook_ok_at` si scrive solo dopo. Sta in `ONBOARDING_CALCOM_TD.md`.
+
+## La posta
+
+Dalla 0043 il database compone le mail e l'orologio le consegna. Tre pezzi, e
+conviene tenerli distinti perché si rompono in modi diversi.
+
+**I testi sono dati.** `message_templates`, una riga per mail o per blocco,
+modificabile da Studio senza deploy. Non stanno in `app_config` perché una mail
+ha oggetto, corpo lungo, etichetta del bottone e segnaposto ammessi — quattro
+campi correlati, cioè una tabella, non un parametro scalare. Non stanno nel
+codice perché li riscrive Gaia, che non apre un editor: un testo dentro un
+`.tsx` è una promessa commerciale che per cambiare richiede un deploy.
+
+Il corpo è **prosa**: righe vuote separano i paragrafi, un indirizzo in chiaro
+diventa un link, e basta. L'impaginazione la mette `testo_in_html()`. È voluto —
+un tag aperto e mai chiuso, scritto per sbaglio da Studio, arriverebbe a un
+cliente vero e nessuno se ne accorgerebbe prima di lui.
+
+**Un segnaposto non fornito fa fallire la composizione**, invece di finire in
+pagina o di sostituirsi col vuoto. «Ciao ,» e «{{designer}}» sono due modi di
+rompersi che vede solo il destinatario: fallire scrive un alert
+`email_composizione_fallita` e non accoda niente.
+
+**`outbound_messages` da registro a coda.** Nasceva (0014) come diario di cosa
+era partito: `sent_at` con default `now()`, nessun corpo. Adesso porta il corpo
+composto, uno stato (`queued` / `sent` / `failed`), i tentativi, l'errore, e
+`sent_at` **senza default**, che si valorizza solo alla consegna riuscita
+insieme all'identificativo che restituisce Resend. Una riga che dichiara di
+essere partita senza esserlo è peggio di una riga assente: è una bugia che
+nessuno va a controllare.
+
+Il corpo si conserva per una ragione operativa precisa: **è l'unico modo perché
+Gaia corregga le mail leggendole come le leggerà un cliente**, su Studio, sul
+vero invece che su un documento.
+
+**Il vincolo di unicità fa due lavori.**
+`(message_kind, entity_type, entity_id, recipient)` c'era già e impediva a un
+timer che rigira di mandare due volte la stessa mail. Da oggi è anche il **tetto
+di spesa**: Resend free dà 100 mail al giorno *condivise con la landing page*, e
+si bruciano in minuti se qualcosa entra in ciclo. Per questo ogni accodamento
+passa da `accoda_messaggio()`, che fa `on conflict do nothing`: il `not exists`
+che si legge nei rami serve solo a non fare lavoro inutile, la difesa è il
+vincolo.
+
+**L'interruttore nasce spento.** `app_config.email_enabled = 0` **non spegne la
+composizione**: le mail si compongono e si accodano lo stesso e si leggono su
+Studio. Ferma la consegna. Nasce a zero perché il primo giro dopo la 0043
+incontra tutte le consulenze già finite, e accenderlo dev'essere un gesto fatto
+guardando la coda. `email_redirect_to` è il gradino intermedio: la posta parte
+davvero ma va tutta a una casella di prova, con l'oggetto che dichiara a chi
+sarebbe andata — e `recipient` resta la persona vera, così il vincolo continua a
+significare quello che significa, mentre `delivered_to` dice dove è finita.
+
+**Le mail vecchie non si mandano, e non si tacciono.**
+`postcall_email_max_age_hours` è la finestra oltre la quale la mail post-call
+non parte più: senza, il primo giro la manderebbe a tutto lo storico, e a regime
+manderebbe «com'è andata la call?» tre giorni dopo perché n8n era fermo. Quello
+che cade fuori produce un alert `postcall_mail_non_partita` — saltare in
+silenzio è il guasto che la 0042 esiste per chiudere.
+
+**Cosa significa la risposta di Resend** lo decide `clock_task_done()`, e la
+distinzione che conta è fra riprovabile (`429` sul limite di dieci richieste al
+secondo, `5xx`, nessuna risposta) e **definitivo** (qualunque altro `4xx`). Un
+corpo malformato o un mittente non verificato non guariscono riprovando:
+ritentarli ogni cinque minuti trasformerebbe un difetto in rumore di fondo.
+
+**Il doppione che l'idempotenza chiude.** Se Resend accetta la mail ma l'ack non
+torna a Postgres — n8n che si ferma in mezzo — la riga resta in coda e al giro
+dopo si riprova. La `Idempotency-Key` che n8n manda è l'id della riga, quindi
+Resend riconosce la richiesta e non manda una seconda mail. Vale 24 ore, e i
+nostri tentativi stanno dentro un quarto d'ora.
+
+## Le pagine a token
+
+`resolve_access_token_detail(token)` è il resolver delle pagine token, e dice
+anche **perché** un token non va bene: `inesistente`, `scaduto`, `revocato`,
+`gia_usato`, `valido`. `resolve_access_token()` della 0012 resta, ma dalla 0043 è
+un involucro sottile sopra di lui: due copie della stessa regola sono il modo in
+cui due copie divergono.
+
+**Dove passa la linea fra onestà e oracolo.** Un token che **non esiste** riceve
+una risposta generica; un token che **esiste** riceve la risposta onesta. Per
+leggere una risposta onesta bisogna già possedere un token vero, cioè aver avuto
+il link: a chi prova stringhe a caso la pagina dice sempre la stessa cosa, non
+distingue «quasi giusto» da «sbagliatissimo» e non conferma mai l'esistenza di
+niente. In cambio, chi ha davvero in mano un link vecchio sa cosa è successo.
+
+I tentativi a vuoto **si contano** in `access_token_misses` — stessa forma di
+`calcom_signature_rejections`, una riga per ora e nessun diario, perché
+l'indirizzo è pubblico e conservare i token presentati significherebbe
+conservare tentativi di indovinare una credenziale. Il ramo
+`clock_ramo_token_inventati()` alza un alert sopra soglia. La soglia è alta di
+proposito: un link spezzato da un client di posta produce rumore normale, e un
+alert che scatta sul rumore è un alert che si impara a ignorare.
+
+⚠️ **Risolvere un token scrive** (`use_count`, `last_seen_at`): era già così
+nella 0012. Quindi si chiama **una volta per richiesta** — `lib/token.ts` fa
+esattamente una chiamata per funzione — e il conteggio è telemetria, non un
+limite: nessun automatismo decide niente su quel numero.
+
+**I token post-call non scadono mai**, e va guardato in faccia. È una decisione
+di prodotto del Flusso: il viaggiatore deve poter cliccare a mesi di distanza.
+Quel link vive per sempre in una casella inoltrabile, sincronizzata su tre
+dispositivi.
+
+*Cosa può fare chi se lo trova:* creare un ordine `requested` a nome di quel
+viaggiatore. Non impegna un euro — nessun pagamento parte, nessun prezzo esiste
+ancora — e dall'altra parte c'è una persona del team che apre un gruppo
+WhatsApp. Il danno massimo è far lavorare a vuoto il team una volta, e l'ordine
+porta `traveler` come attore con il token annotato in `event_log`, quindi si
+riconosce e si cancella.
+
+*Quello che vale di più non è l'ordine: è quello che la pagina racconta.* Chi ha
+il link sa che quella persona ha fatto una consulenza con quel designer. Per
+questo `service_request_page()` restituisce il minimo che serve a decidere — il
+designer, il servizio — e la pagina non stampa il nome del viaggiatore, il suo
+telefono, la domanda di contesto né il profilo quiz.
+
+**La regola che ne discende, e che vale per le milestone 6 e 7:** un bottone che
+crea una richiesta da lavorare e uno che impegna dei soldi non meritano la
+stessa fiducia. Dietro un token permanente non va **mai** un'azione che muove
+denaro o consegna un file. Il pagamento di una proposta passa da una cassa che
+ridichiara l'importo; la conferma dell'agenzia, che sblocca una cascata,
+nascerà `single_use` e con una scadenza.
+
+**Il clic è un POST, non un GET.** I link delle mail vengono aperti da macchine:
+antivirus aziendali che li visitano per controllarli, Outlook che li riscrive
+con SafeLinks, client che precaricano. Un indirizzo che crea un ordine appena lo
+si apre produrrebbe richieste che nessuno ha mai chiesto. Quindi il link
+**mostra** (`/servizio/<token>`) e un bottone **fa**
+(`POST /servizio/<token>/richiedi`), con un form HTML che funziona senza una riga
+di JavaScript — chi arriva qui a volte arriva dal browser dentro un'app di posta.
+
+**Un token, un servizio.** La 0012 ammetteva un token attivo per scopo su ogni
+entità; la mail post-call porta un bottone per ogni servizio attivo di quel
+designer, e il servizio sta nel **payload del token** e non in un parametro
+della richiesta — altrimenti chi ha il link del servizio da 200 € potrebbe
+chiederne uno da 2.000. L'indice è stato rifatto su
+`(purpose, entità, payload->>'service_type')`; sui token che non portano un
+servizio il comportamento non cambia.
+
+**Cliccare due volte è innocuo.** `orders_one_per_booking_service` (unico su
+`(source_booking_id, service_type)` fra gli ordini non cancellati) ferma il
+secondo inserimento, e `create_order_from_token()` lo racconta con
+`gia_richiesto` invece che con un errore. Gli annullati restano fuori
+dall'indice, così un bottone torna a funzionare dopo una cancellazione.
+
+**La pagina non decide.** Se la call è in uno stato che non ammette l'azione, se
+il designer ha spento il servizio, se il bottone era già stato cliccato — lo
+dice `create_order_from_token()`, che è la stessa funzione che ha risposto alla
+pagina un attimo prima. Due giudici diversi sarebbero due giudici che prima o
+poi dicono cose diverse.
 
 ## La pubblicazione di un profilo
 
@@ -594,6 +816,7 @@ numerico, modificabile a vista da Supabase Studio senza deploy:
 - `payments` — su quale conto Stripe incassa una consulenza (`xpetis` oggi, `agency` in produzione)
 - `showcase` — le stringhe che il sito stampa in pagina: la nota sotto il prezzo degli itinerari
 - `contacts` — i recapiti del team (numero WhatsApp), **fuori** dalla superficie pubblica
+- `integrations` — quello che serve a parlare col mondo: l'indirizzo di cancellazione Cal.com, le soglie dei due contatori (firme rifiutate, token inventati) e tutta la posta (`email_enabled`, `email_from`, `email_redirect_to`, `email_max_per_tick`, `email_max_attempts`, `site_base_url`). **Fuori** dalla superficie pubblica, e a maggior ragione
 
 Il sito legge dalla vista `public_config` i gruppi `booking_rules` e `showcase`;
 `matching` è chiuso dalla 0018 (il match è lato server) e i parametri operativi
@@ -622,8 +845,15 @@ chiave secret. Il giorno del numero aziendale dedicato può tornare in `showcase
 ⚠️ **Un database già seminato non le ha.** Il seed si applica a `db reset`, e i
 parametri nuovi arrivano da lì: su un progetto vivo si rigira
 `seed/0001_config.sql`, che è idempotente (`on conflict (key) do nothing`), o si
-inseriscono le due righe a mano. Senza `consultation_stripe_account` la cassa non
+inseriscono le righe a mano. Senza `consultation_stripe_account` la cassa non
 si apre e lo dice con una frase leggibile, invece di indovinare un conto.
+
+Dalla 0043 la stessa mancanza, sui rami dell'orologio, **si dichiara da sola**:
+`clock_tick()` scrive un alert `orologio_ramo_non_configurato` che elenca le
+righe mancanti una per una, lo **aggiorna** man mano che ne sistemi qualcuna e
+lo **chiude da solo** quando non ne manca più nessuna. Non fa invece sollevare
+la funzione, perché fermare tutto l'orologio per la configurazione di una
+scadenza spegnerebbe anche quella che sta già funzionando da giorni.
 
 ## Note sul modello dati
 
@@ -670,7 +900,13 @@ import.
 
 ## Ordine di lavoro suggerito
 
-1. Import della tassonomia geografica (appena arriva il file).
-2. Algoritmo di matching sopra `public_td_profiles` e `public_config`.
-3. Route server-side delle pagine token (`resolve_access_token` è già pronta).
-4. Workflow n8n: Cal.com → `bookings`, Stripe → `payments`, insoluti, timer.
+1. ~~Import della tassonomia geografica~~ → fatto.
+2. ~~Algoritmo di matching sopra `public_td_profiles` e `public_config`~~ → fatto.
+3. ~~Route server-side delle pagine token~~ → **fatta la prima** (i bottoni
+   post-call, 0043). Restano la pagina ordine del TD, i tasti eccezione, la
+   pagina di conferma dell'agenzia e la pagina recensione: tutte poggiano su
+   `resolve_access_token_detail()` e su `lib/token.ts`.
+4. ~~Workflow n8n: Cal.com → `bookings`, Stripe → `payments`, insoluti, timer~~
+   → fatti, più la posta.
+5. La vita dell'ordine su misura: proposta, pagamento, consegna, revisione
+   (milestone 6).

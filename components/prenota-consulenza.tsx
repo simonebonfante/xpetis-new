@@ -37,6 +37,7 @@ export function PrenotaConsulenza({
   utente,
   percorsoVetrina,
   nomeDesigner,
+  slugDesigner,
 }: {
   /** `<cal_username>/<cal_event_type_slug>`, composto dal server. */
   calLink: string
@@ -44,6 +45,14 @@ export function PrenotaConsulenza({
   /** Dove tornare dopo il login: questa vetrina, col servizio scelto. */
   percorsoVetrina: string
   nomeDesigner: string
+  /**
+   * Lo slug della vetrina da cui si sta prenotando, che viaggia fino a
+   * `/attesa`. Serve **solo** al caso in cui il webhook non arriva: senza,
+   * l'alert al team dice "un webhook non è arrivato" e con 25 designer nessuno
+   * sa su quale account guardare. Non è una credenziale e non apre niente — lo
+   * slug è già nell'indirizzo della pagina da cui si arriva.
+   */
+  slugDesigner: string
 }) {
   const router = useRouter()
   const [aperto, setAperto] = useState(false)
@@ -74,10 +83,10 @@ export function PrenotaConsulenza({
       quandoPrenotato: () => {
         if (inViaggio.current) return
         inViaggio.current = true
-        router.push('/attesa')
+        router.push(`/attesa?td=${encodeURIComponent(slugDesigner)}`)
       },
     })
-  }, [aperto, utente, calLink, idContenitore, router])
+  }, [aperto, utente, calLink, idContenitore, router, slugDesigner])
 
   // ------------------------------------------------------------- non collegato
   if (!utente) {
@@ -141,7 +150,10 @@ export function PrenotaConsulenza({
       */}
       <p className="mt-3 text-center text-piccolo">
         Hai finito di prenotare e la pagina non è cambiata?{' '}
-        <Link href="/attesa" className="underline hover:text-primario">
+        <Link
+          href={`/attesa?td=${encodeURIComponent(slugDesigner)}`}
+          className="underline hover:text-primario"
+        >
           Vai al pagamento
         </Link>
       </p>

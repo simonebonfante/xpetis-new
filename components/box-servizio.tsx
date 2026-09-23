@@ -233,6 +233,7 @@ export function BoxServizio({
               utente={utente}
               percorsoVetrina={percorsoVetrina}
               nomeDesigner={nomeDesigner}
+              slugDesigner={slug}
             />
           ) : (
             /* Nessun calendario collegato: la stessa scelta di prima, per la

@@ -81,6 +81,7 @@ sql_paths = [
   "./seed/0002_geo.sql",
   "./seed/0003_demo.sql",
   "./seed/0004_foto_finte.sql",
+  "./seed/0005_testi_mail.sql",
 ]
 
 [db.network_restrictions]

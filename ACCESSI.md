@@ -36,7 +36,7 @@ Aggiornato all'8 settembre 2026. Se cambia qualcosa, si aggiorna qui.
 | **Stripe** | Pagamenti | sandbox | 🟡 test mode, **attivazione bloccata** |
 | **Figma** | Design | — | ✅ file condiviso |
 | **Dominio `xpetis.it`** | Sito e mail | — | 🟡 landing page attiva, DNS non toccato |
-| **Provider email** | Le 15 mail del funnel | — | ⚪ **da creare** (rimandato) |
+| **Provider email** | Le 15 mail del funnel | Resend, Free | ✅ **esiste già** — account della landing page, `xpetis.it` verificato |
 | **WhatsApp** | Canale umano | — | 🟡 numero provvisorio, da sostituire |
 | **Stripe agenzia** | Incassi All Inclusive | — | ⚪ quando ci sarà un'agenzia |
 
@@ -228,7 +228,14 @@ solo il riferimento.
 - ✅ *Supabase XPETIS · chiave secret (server)* — tipo **Header Auth**, header
   `apikey`, valore la chiave `sb_secret_…`. Creata il 6 settembre 2026, la usa
   il ponte Cal.com per chiamare `calcom_webhook()` via PostgREST.
-- ⚪ da creare quando serviranno: Stripe, provider email.
+- ✅ *Resend · invio transazionale* — tipo **Header Auth**, header
+  `Authorization`, valore `Bearer re_…`. La usa il nodo *Manda con Resend*
+  dell'orologio (20 settembre 2026).
+  ⚠️ **Non è la stessa Header Auth di Supabase**: quella manda `apikey`, questa
+  manda `Authorization`. Sceglierla sbagliata su un nodo dà un 401 che sembra
+  una chiave revocata, e si perde mezz'ora a guardare nel posto sbagliato.
+- ⚪ da creare quando servirà: Stripe (oggi il ponte Stripe non chiama Stripe,
+  riceve e basta).
 
 Configurazione: fuso `Europe/Rome` (le pianificazioni si leggono in quel fuso),
 potatura dello storico esecuzioni a 14 giorni, dati binari in memoria — perché
@@ -342,13 +349,53 @@ Gli asset esportati si riscaricano con `bash scripts/scarica-asset-figma.sh`.
 **`xpetis.it`** è nostro e ospita una landing page su Railway. **Il DNS non si
 tocca** per ora: in sviluppo si usa l'URL provvisorio di Vercel.
 
-**Provider email: da creare.** Deciso Resend (3.000 mail/mese gratis, che a
-volume Beta bastano). Servirà autenticare il dominio con SPF, DKIM e DMARC —
-partendo da `p=none` e stringendo dopo. ⚠️ Di record SPF **ne esiste uno solo per
-dominio**: se ce n'è già uno, va fuso, non aggiunto.
+**Provider email: ✅ esiste già — Resend, dal 20 settembre 2026.** Non è stato
+creato adesso: l'account Resend è **quello del progetto della landing page**, il
+dominio `xpetis.it` è già verificato (SPF, DKIM, Return-Path) e il giro funziona
+in produzione con `RESEND_FROM = info@xpetis.it`.
 
-Fra dominio autenticato e primo viaggiatore vero va lasciata **almeno una
-settimana**: la reputazione di invio si scalda in giorni.
+Questo **chiude S-04**, che era la coda più lunga del piano, e cancella
+l'attesa della settimana di riscaldamento: il dominio spedisce già.
+
+Piano gratuito: **3.000 mail/mese e 100 al giorno**, 3 domini verificati, e
+**10 richieste al secondo** per team — verificato sulla documentazione il 20
+settembre 2026. Il limite al secondo è quello che si incontra per primo se
+l'orologio ha più mail in coda nello stesso giro: per questo il nodo n8n manda
+un item per volta con 250 ms di pausa, e `app_config.email_max_per_tick` limita
+quante ne escono per giro.
+
+**In uso dal 20 settembre 2026**, dal workflow *Orologio · scadenze XPETIS*
+(`n8n/orologio.json`, nodo *Manda con Resend*). L'interruttore è
+`app_config.email_enabled` e **nasce spento**: a interruttore spento le mail si
+compongono e si accodano lo stesso in `outbound_messages`, dove si leggono su
+Studio esattamente come le leggerà un cliente. Accenderlo è il gesto che fa
+partire posta vera.
+
+⚠️ Tre conseguenze del riuso, da non perdere di vista:
+
+- **Il tetto giornaliero è condiviso con la landing page.** 100 al giorno si
+  bruciano in minuti se un workflow entra in ciclo. La difesa è il vincolo di
+  unicità di `outbound_messages` su `(message_kind, entity_type, entity_id,
+  recipient)`: una mail per tipo, entità e destinatario, anche se l'orologio
+  rigira. Da oggi quella riga vale anche come tetto di spesa.
+- **Chiave API separata per XPETIS.** Oggi ce n'è una sola, usata da due
+  progetti: ruotarla per uno rompe l'altro, e una fuga da uno espone entrambi.
+  Resend permette più chiavi, anche con permesso di solo invio. Da fare prima
+  che il secondo progetto vada in produzione.
+- **La reputazione è condivisa con la landing page.** Oggi è innocuo — quella
+  manda notifiche al team, non marketing a sconosciuti. Diventa un problema il
+  giorno che da `xpetis.it` parte una newsletter: allora le transazionali vanno
+  spostate su un sottodominio (`mail.xpetis.it`), che è la separazione che
+  Resend stesso consiglia. Deciderlo prima, non dopo il primo invio di massa.
+
+**Da decidere, e non è tecnico:** `info@xpetis.it` è l'indirizzo mittente, quindi
+**è lì che arrivano le risposte** — "posso spostare la call?", "il link non
+funziona". Il Flusso manda il canale umano su WhatsApp e non dice niente di
+quella casella. Chi la legge, e con che tempi?
+
+DMARC su `_dmarc.xpetis.it` partendo da `p=none` resta da verificare se c'è.
+⚠️ Di record SPF **ne esiste uno solo per dominio**: se ce n'è già uno, va fuso,
+non aggiunto.
 
 **WhatsApp:** **+39 347 891 1018**, deciso il 6 settembre 2026. È un numero
 **provvisorio e personale**, prestato al progetto per non tenere fermo lo
@@ -375,7 +422,8 @@ I gruppi si creano a mano: le API non permettono di crearli.
 [ ] Stripe · chiave sk_test_
 [ ] Stripe · webhook signing secret whsec_     (quando l'endpoint esisterà)
                                     ← anche in Supabase Vault: stripe_webhook_secret
-[ ] Provider email · API key                   (quando esisterà)
+[ ] Resend · API key                           ← condivisa con la landing page: servirne una per XPETIS
+                                    ← anche dentro n8n: credenziale Header Auth "Resend · invio transazionale"
 [ ] Stripe dell'agenzia · credenziali          (quando esisterà — e vedi sotto)
 ```
 
@@ -398,5 +446,6 @@ Vale la pena saperlo prima, non dopo.
 | Chiave `sk_test_` di Stripe | **Sì**, si ruota |
 | Signing secret del webhook Stripe | **Sì**, si rigenera dall'endpoint — poi va riscritto in Vault |
 | Parola segreta del webhook Cal.com | **Sì**, ma va riscritta su tutti i 25 account a mano |
+| Chiave API di Resend | **Sì**, si rigenera — ma finché è **una sola condivisa con la landing page**, ruotarla per un progetto rompe l'altro. È la ragione per cui serve una chiave separata prima della produzione |
 | Account proprietario di n8n | **Sì**, con accesso al database di n8n |
 | **`N8N_ENCRYPTION_KEY`** | 🔴 **No.** Le credenziali dentro n8n diventano illeggibili e si rifanno una per una |

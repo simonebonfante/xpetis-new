@@ -15,8 +15,9 @@ Tieni davanti tre cose per ogni designer:
 
 | Cosa | Dove si trova | A cosa serve |
 |---|---|---|
-| **Slug della vetrina** | `travel_designers.slug` su Supabase | diventa lo username di Cal.com |
+| **Slug della vetrina** | la lista condivisa, poi `travel_designers.slug` | diventa lo username di Cal.com |
 | **Email del designer** | `travel_designers.email` | è l'indirizzo dell'account |
+| **Durata della consulenza** | la lista condivisa | decide quale event type creare |
 | **La parola segreta del webhook** | password manager, **una sola per tutti** | firma i messaggi verso di noi |
 
 E una cosa da dire al designer prima di iniziare: **se si registra con Google, il
@@ -25,13 +26,71 @@ consulenze nel proprio calendario — ma è giusto che lo sappia prima, non dopo
 
 ---
 
+## 0. Come si calcolano slug e username
+
+**Si decidono prima di creare l'account, e si scrivono nella lista condivisa.**
+Il form della vetrina non produce lo slug: lo sceglie il team. Se lo inventa chi
+fa l'onboarding e poi l'import ne scrive un altro, il ponte risponde
+`designer_sconosciuto` e le prenotazioni di quella persona non si agganciano a
+nessuno.
+
+### La regola
+
+**Slug = `nome-cognome`**, tutto minuscolo, solo caratteri ASCII, spazi in
+trattino singolo, apostrofi e punti eliminati.
+
+**Username Cal.com = slug + `-xpetis`.**
+
+| Nome in vetrina | Slug | Username Cal.com |
+|---|---|---|
+| Marco Rossi | `marco-rossi` | `marco-rossi-xpetis` |
+| Frenky Morelli | `frenky-morelli` | `frenky-morelli-xpetis` |
+| Niccolò D'Amico | `niccolo-damico` | `niccolo-damico-xpetis` |
+
+### Le quattro regole, in ordine di quanto costa sbagliarle
+
+**1. Lo slug non si cambia mai.** È l'indirizzo pubblico della vetrina
+(`/designer/frenky-morelli`) e diventerà il link di attribuzione personale del
+designer. Chi cambia cognome **tiene il suo slug**: è il tipo di cosa che sei
+mesi dopo si "sistema" volentieri, rompendo ogni link già in circolazione.
+
+**2. Si usa il nome che andrà in vetrina, non quello dei documenti.** Se si fa
+chiamare Frenky, lo slug è `frenky-morelli`; se in vetrina sarà Francesco, è
+`francesco-morelli`. **Chiediglielo prima di creare l'account**, non dopo.
+
+**3. Omonimi: si numera.** Il secondo Marco Rossi è `marco-rossi-2`. Non
+l'iniziale del secondo nome — sembra un refuso — e non la città, perché la gente
+si trasferisce. Un numero è brutto e stabile.
+
+**4. Accenti e lettere strane: si tolgono a mano, e una volta sola.**
+`Niccolò` → `niccolo`, `Müller` → `muller`, `Kowalczyk-Łódź` → `kowalczyk-lodz`.
+⚠️ Non calcolarlo con uno strumento automatico e non farlo due volte in due
+posti diversi: **browser e database normalizzano gli accenti in modo diverso**, e
+su lettere come `ø`, `ł`, `ş` danno risultati diversi. Ci è già successo con i
+nomi delle città. Si decide con la testa, si scrive in lista, e quella è la
+verità.
+
+### L'eccezione, quando lo username è già preso
+
+Gli username di Cal.com sono **globali**: `frenky-morelli-xpetis` potrebbe
+essere già di uno sconosciuto. In quel caso:
+
+- **lo slug resta il nostro e non cambia** — è nostro, non di Cal.com
+- si sceglie un altro username libero e lo si **scrive in
+  `travel_designers.cal_username`**, che è una colonna apposta
+
+Non è un caso da temere: la prenotazione di prova a fine procedura intercetta
+comunque qualunque disallineamento fra i due.
+
+---
+
 ## 1. L'account
 
 1. `https://cal.com` → registrazione. **Piano gratuito**, è sufficiente.
 2. Cal.com assegna uno username con una sigla casuale attaccata, tipo
    `mario-rossi-s68gyf`. **Va cambiato** dalle impostazioni del profilo.
-3. Lo username deve essere **esattamente lo slug della vetrina** più il suffisso
-   concordato — per esempio `marco-rossi-xpetis`.
+3. Lo username è **lo slug della vetrina più `-xpetis`** — vedi il punto 0, dove
+   c'è anche cosa fare se quello username risulta già occupato.
 
 > **Perché conta.** Lo username è la chiave con cui riconosciamo di chi è la
 > prenotazione, perché tutti e venticinque avranno lo stesso event type. Se non
@@ -50,12 +109,26 @@ da solo: ha già un URL suo e si finisce per litigarci.
 
 ### Impostazione evento
 
+⚠️ **Prima guarda in lista quanto dura la consulenza di questo designer.** Non
+sono tutti uguali: alcuni la fanno da 30 minuti, altri da 60. **Crea solo quello
+che è scritto in lista**, e usa la riga corrispondente:
+
+| Durata | Titolo | **URL** (scritto a mano) |
+|---|---|---|
+| **30 minuti** | `Consulenza XPETIS · 30 min` | `consulenza-xpetis-30` |
+| **60 minuti** | `Consulenza XPETIS · 60 min` | `consulenza-xpetis-60` |
+
+Gli altri campi sono uguali per entrambi:
+
 | Campo | Valore |
 |---|---|
-| Titolo | `Consulenza XPETIS · 30 min` |
-| **URL** | `consulenza-xpetis-30` |
-| Durata | 30 minuti |
+| Durata | quella della riga scelta: **30** oppure **60** minuti |
 | Luogo | **Cal Video** |
+
+> **La durata dev'essere la stessa in tre posti:** la lista, il titolo, e il
+> campo *Durata* di Cal.com. Se il titolo dice 60 e la durata è 30, il
+> viaggiatore paga un'ora e ne riceve mezza — e ce ne accorgiamo da un reclamo,
+> non da un errore.
 
 > ⚠️ **L'errore più facile di tutta la procedura.** In Cal.com titolo e URL sono
 > due campi separati, e Cal.com genera l'URL dal titolo in modo imprevedibile: lo
@@ -212,10 +285,15 @@ Sul profilo del designer, in Supabase:
 | Colonna | Valore |
 |---|---|
 | `cal_username` | lo username scelto al punto 1 |
-| `cal_webhook_ok_at` | data e ora di adesso |
+| `cal_webhook_ok_at` | data e ora di adesso — **ma solo dopo il punto 5 della prova qui sotto** |
 
 La seconda serve alla checklist di pubblicazione: un designer senza account
 Cal.com collegato **non si può pubblicare**, e il database lo impedisce.
+
+⚠️ Quella colonna deve voler dire **"provato"**, non "configurato": scriverla
+prima della prenotazione di prova la trasforma in una dichiarazione di
+intenzioni, e il giorno che quel webhook non funziona nessuno avrà motivo di
+sospettarlo.
 
 ---
 
@@ -229,21 +307,67 @@ Non fidarti della configurazione: falla parlare. Cinque minuti.
    precompilato e **non modificabile**.
 3. Controlla che **non ci siano slot prima di 12 ore da adesso**.
 4. Prenota uno slot qualsiasi.
-5. Su n8n → Executions: deve essere arrivato un messaggio con
-   `organizer.username` uguale allo username di quel designer.
-6. Cancella la prenotazione di prova.
+5. ⚠️ **Verifica sul NOSTRO database, non su n8n.** Questo è il passo che
+   intercetta il guasto più probabile di tutta la procedura, ed è il motivo per
+   cui la prenotazione di prova esiste. Dal SQL Editor:
 
-Se il punto 5 non arriva, nell'ordine: il workflow n8n è attivo? l'URL del
-webhook è scritto giusto? gli eventi sono spuntati?
+   ```sql
+   select b.id, b.status, b.starts_at, td.display_name
+     from bookings b join travel_designers td on td.id = b.td_id
+    where td.cal_username = '<username del designer>'
+    order by b.created_at desc limit 3;
+   ```
+
+   **Deve esserci una riga**, in `pending_payment`, con l'orario che hai
+   prenotato.
+
+6. Cancella la prenotazione di prova, e **solo adesso** scrivi
+   `cal_webhook_ok_at` sul profilo (vedi sopra): quella colonna deve voler dire
+   "provato", non "configurato".
+
+### Perché non basta guardare n8n
+
+Guardare le Executions di n8n dice che **un messaggio è arrivato**, non che è
+diventato una prenotazione. Con la parola segreta sbagliata — una lettera in
+meno incollata dieci minuti fa — succede questo: Cal.com manda, n8n riceve,
+n8n risponde **200**, l'esecuzione è **verde**, e il ponte ha risposto
+`firma_non_valida` senza scrivere niente da nessuna parte. A colpo d'occhio
+sembra che funzioni.
+
+È il guasto peggiore di tutta la configurazione, perché è **silenzioso**: quel
+designer smette di arrivarci e nessuno lo sa finché un viaggiatore vero non resta
+con uno slot occupato e nessuna prenotazione. E in onboarding costa trenta
+secondi correggerlo.
+
+Se al punto 5 la riga non c'è, nell'ordine:
+
+1. **Guarda il corpo della risposta** nell'ultima esecuzione n8n — non solo il
+   codice 200. Se dice `firma_non_valida`, è la parola segreta: rigenerala su
+   Cal.com e rimettila identica nel Vault di Supabase
+   (`calcom_webhook_secret`). Se dice `designer_sconosciuto`, `cal_username` su
+   Supabase non combacia con lo username Cal.com. Se dice
+   `event_type_non_nostro`, l'URL dell'event type non è quello del modello.
+2. **Nessuna esecuzione affatto**: il workflow n8n è attivo? l'indirizzo del
+   webhook è scritto giusto? i tre eventi sono spuntati?
+3. E dal database, il contatore che tiene traccia dei rifiuti anche quando non
+   li vede nessuno:
+
+   ```sql
+   select bucket_at, cal_username_hint, n
+     from calcom_signature_rejections
+    order by last_at desc limit 10;
+   ```
 
 ---
 
 ## Checklist rapida, una riga per designer
 
 ```
-[ ] username = slug vetrina
+[ ] slug preso DALLA LISTA, non inventato
+[ ] username = slug + -xpetis  (o, se occupato, scritto in cal_username)
 [ ] disponibilità impostata dal designer
-[ ] event type: titolo, URL scritto a mano, 30 min, Cal Video
+[ ] durata controllata in lista: 30 oppure 60
+[ ] event type: titolo, URL scritto a mano, durata giusta, Cal Video
 [ ] buffer 10 min dopo · preavviso 12 ore · orizzonte 30 giorni
 [ ] disable rescheduling: attivo, 720 minuti, host and attendee
 [ ] disable cancelling: spento
@@ -254,7 +378,7 @@ webhook è scritto giusto? gli eventi sono spuntati?
 [ ] webhook verso n8n, 3 eventi, secret condiviso
 [ ] event type di fabbrica spenti
 [ ] cal_username e cal_webhook_ok_at scritti su Supabase
-[ ] prenotazione di prova arrivata su n8n, poi cancellata
+[ ] prenotazione di prova arrivata IN `bookings` (non solo su n8n), poi cancellata
 ```
 
 ---

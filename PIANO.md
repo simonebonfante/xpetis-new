@@ -81,11 +81,13 @@ il 20: una prenotazione non pagata scade da sola e **lo slot torna libero sul
 calendario del designer**, senza che nessuno guardi.
 
 **Il giro del pagamento è chiuso da bordo a bordo. La milestone 4 no**, ed è una
-distinzione da non perdere: restano i testi che convivono con le mail native di
-Cal.com, il calendario admin degli appuntamenti, il percorso "slot introvabile",
-il controllo di vitalità dei 25 webhook, e i tre campi del form sulla pagina
-della prenotazione (cellulare, domanda di contesto, flag servizi). Sono nella
-lista di milestone 4, non spuntati.
+distinzione da non perdere: restano le **due mail di conferma** (al viaggiatore e
+al designer — l'impalcatura c'è dal 20 settembre, mancano i testi e il ramo), il
+calendario admin degli appuntamenti, il percorso "slot introvabile", e i tre
+campi del form sulla pagina della prenotazione (cellulare, domanda di contesto,
+flag servizi). Sono nella lista di milestone 4, non spuntati. Il controllo di
+vitalità dei webhook è invece **chiuso**, e non con un controllo periodico:
+vedi là.
 
 **Aggiornamento dell'8 settembre 2026 — l'imbocco, subito dopo il collaudo.**
 Il bordo che mancava da questo lato è entrato: **`/accedi` esiste**, il tasto
@@ -109,6 +111,80 @@ Tre cose da sapere.
    scartato il redirect su prova documentale; **non ho visto l'evento scattare.**
    L'elenco preciso di cosa provare e in che ordine è in milestone 4, sotto
    **"Le prove che devi fare tu"**.
+
+**Aggiornamento del 20 settembre 2026 — la cerniera del dopo-call.** La call
+finisce, la mail si compone, il viaggiatore clicca, nasce l'ordine. È il primo
+pezzo che attraversa tutte e quattro le parti del sistema nello stesso giro —
+orologio, Postgres, n8n, una pagina a token — e apre la milestone 6.
+
+Quattro cose sono entrate, e una quinta è uscita di scena.
+
+1. **I testi delle mail sono diventati dati.** `message_templates`, una riga per
+   mail, modificabile da Studio senza deploy: li riscrive Gaia, che non apre un
+   editor di codice. Il corpo è **prosa** — righe vuote fra i paragrafi, un
+   indirizzo in chiaro diventa link — perché un tag aperto e mai chiuso, scritto
+   per sbaglio, arriverebbe a un cliente vero.
+2. **`outbound_messages` è diventata una coda**: porta il corpo composto, e
+   `sent_at` si valorizza solo alla consegna riuscita, insieme
+   all'identificativo di Resend. Il corpo si conserva per una ragione
+   operativa: **è così che Gaia corregge le mail sul vero e non su un
+   documento.** Si leggono su Studio come le leggerà un cliente.
+3. **L'orologio è diventato davvero a rami.** La 0041 lo dichiarava, la 0042 lo
+   provò riemettendo trecento righe per aggiungerne trenta — e il risultato era
+   che i due file contenevano due copie parola per parola dello stesso ramo.
+   Adesso ogni ramo è una funzione e `clock_tick()` è un orchestratore di dodici
+   righe: aggiungere una scadenza è scrivere una funzione e aggiungere una riga.
+   Se è una mail, non richiede nemmeno di toccare n8n.
+4. **Le pagine a token, ferme dalla 0012, sono in strada.** Un resolver che dice
+   *perché* un token non va bene, il contatore dei token inventati, e la prima
+   pagina vera: i bottoni della mail post-call, che creano l'ordine in
+   `requested` e avvisano il team.
+
+E **S-04 esce di scena**: il provider di invio esiste (Resend, account della
+landing page, `xpetis.it` già verificato). Con lui cade la riga della 0041 che
+diceva «i rami usciranno come compiti `email_*` il giorno che esiste un
+provider», e cade anche l'ultimo pezzo mancante dell'orologio — **la mail
+cortese di chi perde lo slot**, che dal 18 settembre era l'unica cosa non fatta
+di quella riga di milestone 4.
+
+Harness a **458 asserzioni** (erano 387), tutte verdi.
+
+Quattro cose da sapere, e la prima è quella che conta.
+
+1. 🔴 **La posta nasce spenta, ed è voluto.** `app_config.email_enabled = 0`
+   **non spegne la composizione**: le mail si compongono e si accodano lo
+   stesso. Ferma la consegna. Nasce a zero perché il primo giro dopo la 0043
+   incontra tutte le consulenze già finite — le prove di collaudo comprese, a
+   gente vera — e accenderlo dev'essere un gesto fatto guardando la coda. Come
+   si prova senza scrivere a nessuno è nella tabella delle prove, punti 27-30.
+2. ⚠️ **Queste mail contengono token permanenti**, e non è una svista: il Flusso
+   vuole che i bottoni post-call funzionino a mesi. Quel link vive per sempre in
+   una casella inoltrabile. Chi se lo trova **non può impegnare un euro** — crea
+   una richiesta che una persona del team lavora — ma **può leggere**: sa che
+   quella persona ha fatto una consulenza con quel designer. Per questo la
+   pagina mostra il designer e il servizio, e **non** il nome del viaggiatore,
+   il telefono, la domanda di contesto o il profilo quiz. Da qui discende una
+   regola per le milestone 6 e 7: *dietro un token permanente non va mai
+   un'azione che muove denaro o consegna un file.*
+3. ⚠️ **Il clic è un POST, non un GET**, e non è pedanteria: i link delle mail
+   vengono aperti da macchine — antivirus aziendali, SafeLinks di Outlook,
+   client che precaricano. Un indirizzo che crea un ordine appena lo si apre
+   produrrebbe richieste che nessuno ha mai chiesto, e il team aprirebbe gruppi
+   WhatsApp per nessuno.
+4. ⚠️ **Il ramo della posta non è mai stato provato in produzione.** L'harness
+   prova Postgres; la giuntura fra Postgres e n8n è esattamente il punto che ci
+   ha ingannato tre giorni fa, due volte. La forma della richiesta a Resend è
+   stata verificata **sulla loro documentazione** (cinque campi e non uno di
+   più, `Idempotency-Key`, 10 richieste al secondo), non per analogia col nodo
+   accanto — ma verificare non è vedere. Le prove 27-34 sono la cosa da fare.
+
+**Cosa NON è stato fatto, di proposito**: la vita dell'ordine su misura
+(proposta, revisione, consegna), l'All Inclusive, le recensioni, e **la mail al
+TD con i tasti eccezione** (no-show, «altro problema»), che il Flusso fa partire
+allo stesso momento ma che è una riga a sé di milestone 6. Niente di quello che
+è entrato oggi li pregiudica: la coda, i testi e l'impalcatura dei token sono
+gli stessi per tutte e tre.
+
 
 ### Cosa resta a te
 
@@ -154,6 +230,78 @@ Tre cose da sapere.
   self-hosted e li fa gratis). Poi
   `update app_config set value = 2 where key = 'booking_cancel_grace_min';`
   Se non decidi niente resta com'è, e va bene: 35 esatti rispetta la regola.
+- 🔴 **Mettere in strada la 0042** (20 settembre 2026), prima dell'onboarding
+  dei 25, perché è il momento in cui il problema si manifesta:
+  1. `supabase db push` — la `0042_firme_rifiutate.sql`.
+  2. **Inserire su Studio le tre righe nuove di `app_config`** (in coda a
+     `supabase/seed/0001_config.sql`). Senza, il ramo resta spento — ma lo dice:
+     scrive un alert `orologio_ramo_non_configurato`, perché un ramo spento in
+     silenzio è esattamente il guasto che la 0042 esiste per chiudere.
+  3. **Correggere due `notes` che mentono su Studio.** Il commento nel file non
+     lo legge nessuno da lì: `notes` è l'unica cosa che una persona vede, e il
+     seed ha `on conflict do nothing`, quindi modificare il file **non cambia
+     niente nel database**. Vanno eseguiti a mano:
+
+     ```sql
+     -- il ripiego v1 non è più a una riga di distanza: vuole anche il workflow
+     update app_config set value_text = value_text, notes =
+       'VERIFICATO il 20 settembre 2026 con un curl su una prenotazione vera: 200, slot tornato libero, mail native di annullamento partite, nessuna chiave necessaria (come diceva S-05). {uid} viene sostituito col codice della prenotazione: la v2 lo vuole nel PERCORSO, e il corpo porta solo cancellationReason. ATTENZIONE: passare al ripiego v1 (https://api.cal.com/api/cancel) NON basta cambiare questa riga — la v1 vuole uid e allRemainingBookings nel corpo, che la v2 rifiuta con 400, quindi va anche modificato il jsonBody del nodo Cancella su Cal.com in n8n/orologio.json.'
+      where key = 'calcom_cancel_url';
+
+     -- questo numero non lo fa rispettare nessuno, e la nota diceva di sì
+     update app_config set notes =
+       'ATTENZIONE: oggi non lo controlla NESSUNO. Cal.com non lo impone e il controllo di n8n è milestone 5: questo numero è una regola scritta, non un limite attivo.'
+      where key = 'reschedule_max_traveler';
+     ```
+  4. Le prove 23-26.
+- 🔴 **Mettere in strada la 0043** (20 settembre 2026). Va **dopo** la 0042, ed
+  è il primo pezzo che manda posta vera: si fa in quest'ordine e non in un
+  altro.
+  1. `supabase db push` — la `0043_posta.sql`.
+  2. **Inserire su Studio le dieci righe nuove di `app_config`** (in coda a
+     `supabase/seed/0001_config.sql`). Il seed ha `on conflict do nothing` e
+     gira solo su `db reset`: sul progetto vero vanno eseguite a mano. Se ne
+     manca una, l'orologio scrive un alert `orologio_ramo_non_configurato` che
+     **le elenca una per una**, lo aggiorna man mano che ne sistemi qualcuna e
+     lo chiude da solo quando non ne manca più nessuna.
+     ⚠️ **`site_base_url` va messa giusta**: la compongono le mail, e Postgres
+     non ha modo di sapere a che indirizzo risponde il sito. Su un database di
+     sviluppo `http://localhost:3000`; su quello vero l'indirizzo vero. Un link
+     a localhost dentro una mail vera è un vicolo cieco.
+     ⚠️ **`email_enabled` si lascia a 0** finché non hai letto la coda.
+  3. **Eseguire `supabase/seed/0005_testi_mail.sql`** sul progetto vero: sono le
+     sei righe di `message_templates`. Senza, la composizione fallisce e scrive
+     un alert invece di mandare una mail vuota.
+  4. **Creare la credenziale Resend dentro n8n**: Header Auth,
+     `Name: Authorization`, `Value: Bearer re_…`, nome *Resend · invio
+     transazionale*. ⚠️ **Non è la stessa Header Auth di Supabase**, che manda
+     `apikey`: sceglierla sbagliata dà un 401 che sembra una chiave revocata.
+  5. **Reimportare `n8n/orologio.json`** — ha due nodi nuovi e due rami — e
+     riassegnare le credenziali ai quattro nodi HTTP che le vogliono.
+  6. Le prove 27-34.
+- 🟡 **Una chiave Resend separata per XPETIS.** Oggi ce n'è **una sola, condivisa
+  con la landing page**: ruotarla per un progetto rompe l'altro, e una fuga da
+  uno espone entrambi. Resend permette più chiavi, anche di solo invio. Da fare
+  prima che il secondo progetto vada in produzione — e prima della Beta, perché
+  da quel momento quella chiave manda posta a clienti.
+- 🟡 **Il tetto giornaliero è condiviso: 100 mail al giorno, con la landing
+  page.** Non è un problema in Beta (una consulenza produce una mail), ma è la
+  ragione per cui `email_max_per_tick` esiste e per cui il vincolo di unicità di
+  `outbound_messages` non si tocca: sono le due cose che impediscono a un giro
+  storto di bruciare la giornata di entrambi i progetti.
+- 🟡 **Una domanda che non è tecnica: chi legge `info@xpetis.it`?** È il mittente
+  di tutte le mail, ed è **una casella vera**: i testi sono scritti sapendolo e
+  nessuno dice «non rispondere a questo indirizzo», perché non sarebbe vero. Il
+  Flusso manda il canale umano su WhatsApp e di quella casella non dice niente.
+  Serve sapere chi la presidia e con che tempi, altrimenti le risposte dei
+  viaggiatori cadono in un posto che nessuno apre.
+- 🟡 **I testi li riscrive Gaia, e adesso ha dove.** Le sei righe del seed sono
+  una prima stesura che dice le cose giuste nel posto giusto, non il testo
+  definitivo. Si correggono con un `update` su `message_templates` da Studio —
+  nessun deploy — e le tre regole da non rompere sono scritte in testa a
+  `supabase/seed/0005_testi_mail.sql`: niente aggettivi con il genere riferiti
+  al designer, il credito si promette e non si quantifica, e i nostri testi
+  convivono con le mail native di Cal.com invece di ripeterle.
 - 🔴 **Resta da ruotare la password del database**, che è ancora quella dei primi
   otto commit. Stesso ragionamento: toglierla dal file non l'ha tolta dalla
   storia.
@@ -180,9 +328,12 @@ Tre cose da sapere.
 
 ### Cosa posso fare io, in ordine di utilità
 
-1. **Le route server per le pagine token** (`resolve_access_token` è già pronta
-   nel database). Non dipende dal design né da nulla di tuo, ed è l'impalcatura
-   su cui poggiano milestone 5, 6 e 7.
+1. ~~**Le route server per le pagine token**~~ → **la prima è fatta il 20
+   settembre 2026**: i bottoni della mail post-call (`app/servizio/[token]/`),
+   con il resolver a cinque risposte e `lib/token.ts`. Restano la pagina ordine
+   del TD, i tasti eccezione, la conferma dell'agenzia e la pagina recensione —
+   ma adesso poggiano tutte su un'impalcatura provata invece che su una funzione
+   che nessuno aveva mai chiamato.
 2. ~~**Il ponte Cal.com → `bookings`**~~ → **fatto il 6 settembre**, e non in
    n8n ma nel database: `0037_calcom_webhook.sql`, con n8n ridotto a quattro
    nodi che non decidono niente. Provato sull'indirizzo di produzione.
@@ -208,7 +359,7 @@ Tre cose da sapere.
 | JSON delle 25 vetrine compilate | Import profili TD | ⏳ da produrre dal form HTML |
 | `Vetrina TD (2).html` | È il form che produce quel JSON | ✅ in cartella |
 | `XPETIS_CONFRONTO_PIANI.md` | Merge dei due piani | ✅ in cartella, lavorato |
-| Testi delle mail transazionali | Milestone 4 in poi | ✅ deciso: si costruisce con segnaposto e si sostituisce dopo |
+| Testi delle mail transazionali | Milestone 4 in poi | ✅ **hanno una casa dal 20 settembre 2026**: `message_templates`, una riga per mail, modificabile da Studio senza deploy. Sei righe seminate come prima stesura, le riscrive Gaia |
 
 ---
 
@@ -230,6 +381,7 @@ tassonomia geografica.
 | 7 | *(deviazione dalla tassonomia)* Le 20 regioni italiane sono dichiarate selezionabili | **Non filtrano.** Nessun quinto livello di filtro: come trattarle si deciderà | Il dato della tassonomia non si perde: `is_selectable` conserva la sua intenzione, `is_filterable` dice cosa filtra oggi. Sono le uniche 20 righe su cui i due valori differiscono, e l'harness lo verifica | 8 ago |
 | 8 | "Colore brand: verde `#1b5e24`" (§0) | La palette è **crema `#F0EEDF`, nero `#1C1C1A`, primario `#E53619`**, con Merriweather Bold sui titoli e Ronzino Regular sul testo | Sono i token del Figma, e concordano con il form Vetrina TD, che usa le stesse due tinte. Il verde non compare in nessuno dei due: è un dato più vecchio del design | 9 ago |
 | 9 | Consulenze e itinerario su misura incassano sul conto XPETIS; solo l'All Inclusive sul conto dell'agenzia (§4) | **Incassa l'agenzia affiliata su tutto.** È lei ad avere ragione sociale e partita IVA; XPETIS come entità legale non esiste e non esisterà nel primo periodo | Senza partita IVA Stripe non attiva i pagamenti veri, e costituire una società non è nei tempi. Conseguenza operativa: **il tasto "rimborsa" è in mano all'agenzia**, quindi rimborsi, no-show e arbitrati diventano richieste a qualcun altro, con i suoi tempi | 6 set |
+| 10 | La consulenza dura **30 minuti** (§3) | **30 oppure 60, a scelta del designer.** `consultation` è la consulenza base *qualunque sia la sua durata*; `consultation_deep` resta la *seconda* consulenza offerta in aggiunta, e nemmeno lei ha una durata fissa | Richiesta arrivata dai designer in fase di onboarding, 21 settembre 2026. Lo schema lo reggeva già (`td_services.duration_minutes` è per designer e per servizio) e la vetrina legge quel numero. ⚠️ Ma **il form della vetrina dice «Consulenza singola (30 min)» ed è bloccato**: i 25 hanno scritto il loro prezzo pensando a mezz'ora. Chi passa a 60 va **richiamato sul prezzo**, non solo sulla durata. Durata e prezzo rivisto vivono nella lista condivisa, non nel JSON | 21 set |
 
 **Conseguenza della 5, da non perdere di vista.** Le mail native di Cal.com
 contengono i link *cancella* e *riprogramma*, e cancellare su Cal.com richiede
@@ -268,9 +420,9 @@ vedere. Da chiarire con l'agenzia, non con il codice.
 | 1 | Import dei dati reali | 🟡 **a metà** — geografia dentro; le 25 vetrine per ultime, per scelta | 2-3 sessioni | 8-12 h |
 | 2 | Infrastruttura e accessi | 🟡 **in corso** | 2 sessioni | 7-9 h |
 | 3 | Sito pubblico: ricerca, quiz, match, vetrina | 🟡 **le quattro pagine disegnate ci sono**; restano tre task miei e le domande per Chiara | 1-2 sessioni | — |
-| 4 | Prenotazione e pagamento consulenza | 🟡 **a metà** — i due ponti (Cal.com e Stripe) sono dentro, e con loro il giro del pagamento. Restano l'orologio dei 5 minuti, le mail e il form | 3-4 sessioni | 3-4 h |
-| 5 | Prima della call: riprogrammazioni e reminder | ⚪ | 2-3 sessioni | — |
-| 6 | Post-call e Itinerario su misura | ⚪ | 5-6 sessioni | — |
+| 4 | Prenotazione e pagamento consulenza | 🟡 **quasi chiusa** — i due ponti, il giro del pagamento e l'orologio sono dentro e provati. Restano le due mail di conferma (impalcatura pronta), il form della prenotazione, il calendario admin e il percorso "slot introvabile" | 2-3 sessioni | 3-4 h |
+| 5 | Prima della call: riprogrammazioni e reminder | ⚪ — ma le due mail che le servono adesso sono un ramo e una riga di seed | 2-3 sessioni | — |
+| 6 | Post-call e Itinerario su misura | 🟡 **aperta** — la cerniera del dopo-call è costruita: mail post-call, bottoni, ordine in `requested`, alert al team. Resta la vita dell'ordine | 4-5 sessioni | — |
 | 7 | All Inclusive | ⚪ | 4-5 sessioni | 4-6 h |
 | 8 | Recensioni e chiusura del ciclo | ⚪ | 2-3 sessioni | — |
 | 9 | Operatività e validazione Beta | ⚪ | 3-4 sessioni | 12-18 h |
@@ -376,7 +528,7 @@ Chiuse il 2 agosto 2026, dopo verifica dei prezzi correnti.
 | **n8n** | **Self-hosted su Railway** | ~$5-14/mese | Il Cloud Starter (€24/mese) dà 2.500 esecuzioni: il solo workflow insoluti ogni 5 minuti ne fa ~8.640. Self-hosted sono illimitate. Railway anziché VPS perché il vincolo del progetto è il tempo di Simone, non €5 |
 | **Cal.com** | Free, un account per TD | €0 | Si paga solo per gestire più profili da un account: guidiamo i TD a crearsi il proprio |
 | **Vercel** | **Pro, obbligatorio** | $20/mese | Il piano Hobby è solo per uso non commerciale: qualunque deployment che incassa pagamenti richiede Pro |
-| **Provider email** | Da scegliere (S-04) | €0-20/mese | — |
+| **Provider email** | **Resend**, free | €0 → $20/mese | ✅ S-04 chiuso il 20 settembre 2026: account della landing page, `xpetis.it` già verificato. 3.000 mail/mese, 100 al giorno e 10 richieste al secondo — le 100 sono **condivise con la landing page** |
 
 ### Recap dei costi
 
@@ -489,12 +641,17 @@ subito, anche se serviranno dopo.
 - [x] **[S]** Progetto Supabase → **S-01 fatto l'8 agosto.** Ref
       `rsgyxbqzsxahsbdfgtbm`, 31 migration e i tre seed applicati, le query di
       verifica rispondono
-- [ ] **[S]** ~~Dominio, provider email, record DNS~~ → **S-04 rimandato l'8
-      agosto.** Su `xpetis.it` c'è una landing page attiva e non si tocca il DNS
-      ora. In sviluppo si usa l'URL provvisorio di Vercel e la modalità di prova
-      di Resend. *Conseguenza:* la reputazione di invio si scalderà solo alla
-      fine, quindi fra dominio autenticato e Beta va lasciata **almeno una
-      settimana** di margine
+- [x] **[S]** Dominio, provider email, record DNS → **S-04 chiuso il 20
+      settembre 2026, e meglio di come era stato stimato.** Non è stato creato
+      niente: l'account Resend è **quello della landing page**, e su `xpetis.it`
+      SPF, DKIM e Return-Path erano **già verificati** perché quel dominio
+      spedisce da mesi. Cade con questo l'attesa della settimana di
+      riscaldamento, che era la coda più lunga del piano.
+      ⚠️ Restano tre conseguenze del riuso, tutte in `ACCESSI.md`: il **tetto di
+      100 mail al giorno è condiviso** con la landing page, la **chiave API è
+      una sola** per due progetti (ruotarla per uno rompe l'altro), e la
+      **reputazione è condivisa** — il giorno che da `xpetis.it` parte una
+      newsletter, le transazionali vanno spostate su un sottodominio
 - [~] **[S]** Account Stripe → **S-06 parziale l'8 agosto.** Sandbox creata, si
       sviluppa in test mode. **L'attivazione è bloccata: non esiste un'entità
       legale** e non esisterà nel primo periodo. Vedi i rischi
@@ -926,13 +1083,12 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       restare 5-10 minuti**: con finestra di 30 e controllo ogni 30 il caso
       peggiore diventa 60 minuti, e la regola dice massimo 35.
       **Costruito il 18 settembre 2026** → `0041_orologio.sql` +
-      `n8n/orologio.json`. La **mail cortese non c'è**, ed è l'unico pezzo di
-      questa riga che manca: il provider di invio è S-04 e non esiste. Il posto
-      dove andrà è dichiarato — un ramo `email_*` in `clock_tick()`, accanto a
-      quello che già c'è — e finché non c'è un provider **non si manda niente e
-      non si finge**. Chi perde lo slot riceve intanto la mail nativa di Cal.com,
-      che resta accesa (deviazione 5) e porta il motivo scritto in
-      `app_config.unpaid_cancel_reason`.
+      `n8n/orologio.json`. ~~La mail cortese non c'è~~ → **c'è dal 20 settembre
+      2026** (`0043_posta.sql`): si accoda nel momento in cui `clock_task_done()`
+      sa che lo slot è stato liberato davvero, mai prima. Convive con
+      l'annullamento nativo di Cal.com, che resta acceso (deviazione 5) e porta
+      il motivo scritto in `app_config.unpaid_cancel_reason`: la nostra non
+      ripete l'annuncio, spiega il perché e dice cosa fare adesso.
       Cinque cose decise costruendolo:
       · **la forma è diversa dai due ponti**, e il perché è uno solo: i ponti
         *ricevono*, questo *agisce verso l'esterno*, e Postgres non fa chiamate
@@ -965,16 +1121,68 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       corpo portava `uid` e `allRemainingBookings`, che sono campi della v1 e che
       la v2 rifiuta con 400. `n8n/orologio.json` nel repo è stato riallineato lo
       stesso giorno: reimportarlo non rimette i difetti
-- [ ] **[C]** Testi che convivono con le mail native di Cal.com: la nostra dice
-      che lo slot è tenuto 30 minuti e che la conferma vera arriva col pagamento.
-      ⚠️ **Dipende da S-04**: senza provider di invio non parte nessuna mail
-      nostra. Dal 20 settembre c'è un caso in più da coprire — chi perde lo slot
-      riceve **solo** l'annullamento nativo di Cal.com, col motivo scritto in
-      `app_config.unpaid_cancel_reason`, e nient'altro da noi
+- [~] **[C]** Testi che convivono con le mail native di Cal.com. ~~Dipende da
+      S-04~~ → **S-04 è chiuso, e l'impalcatura c'è tutta** (0043): i testi sono
+      righe di `message_templates`, la coda è `outbound_messages`, la consegna è
+      un ramo dell'orologio. **Di questa riga è stata scritta una mail su tre**:
+      quella di chi perde lo slot, che il 20 settembre era l'unico pezzo
+      mancante dell'orologio.
+      Restano le due della conferma, che sono milestone 4 e non sono state
+      anticipate: **la conferma al viaggiatore** (data, ora, link video, regole
+      in chiaro — e deve dire che lo slot è tenuto 30 minuti e che la conferma
+      vera arriva col pagamento) e **la mail al designer** col contesto scritto
+      dal viaggiatore, il flag sui servizi e il profilo quiz. Adesso sono due
+      righe di seed e un ramo, non un progetto
 - [ ] **[C]** Calendario admin degli appuntamenti
 - [ ] **[C]** Percorso "slot introvabile": link WhatsApp, prenotazione creata a
       mano dal team che innesca gli stessi workflow
-- [ ] **[C]** Controllo periodico di vitalità dei 25 webhook Cal.com
+- [x] **[C]** **Le firme Cal.com rifiutate.** Non era in nessuna milestone, e
+      non è un pezzo dimenticato: è il **primo** dei due modi in cui un designer
+      smette di arrivarci senza nessun segnale. Parola segreta sbagliata →
+      `calcom_webhook()` risponde `firma_non_valida`, **non scrive niente da
+      nessuna parte**, n8n risponde 200 e Cal.com è contento. Con 25 account
+      configurati a mano non è un rischio, è una previsione.
+      **Fatto il 20 settembre 2026** → `0042_firme_rifiutate.sql`. Un
+      **contatore**, non un diario: una riga per ora in
+      `calcom_signature_rejections`, perché il "non si scrive" della 0037 non si
+      annulla — l'indirizzo del webhook è pubblico, e una riga per ogni corpo
+      arbitrario ne farebbe una discarica scrivibile da chiunque. Il ramo 2
+      dell'orologio somma la finestra e alza `calcom_firme_rifiutate` sopra
+      soglia, una volta finché non è risolto.
+      **L'alert dice anche di chi**, ed è la decisione difficile: su una firma
+      non valida il corpo non è autenticato, quindi `organizer.username` è un
+      dato che chiunque può scrivere. Senza però l'alert direbbe "qualcuno manda
+      firme sbagliate", che con 25 account è decorativo. Il rischio si riduce
+      **alla fonte**: si salva solo un username che è già uno dei nostri, tutto
+      il resto diventa `null` — quindi il peggio che può fare chi scrive corpi
+      finti è indicare al team uno dei 25 veri, non inserire testo arbitrario.
+      L'alert lo dichiara non verificato e nessun automatismo ci agisce sopra
+- [x] **[C]** ~~Controllo periodico di vitalità dei 25 webhook Cal.com~~ →
+      **chiuso il 20 settembre 2026, e NON con un controllo periodico.**
+      La tentazione era un ramo dell'orologio che avvisa se un designer non manda
+      niente da N giorni, e ha un difetto strutturale: **in Beta un designer
+      senza prenotazioni è indistinguibile da uno col webhook rotto**, perché il
+      segnale manca per la stessa ragione per cui manca il traffico. Avrebbe
+      prodotto 25 alert il primo giorno, il team avrebbe imparato a ignorarli, e
+      il giorno che uno è vero nessuno guarda. **Qui la soluzione che sembra più
+      completa è quella sbagliata.**
+      Al suo posto due cose che sono **evidenza invece che inferenza**:
+      · `calcom_webhook_non_arrivato` adesso **dice quale designer**
+        (`app/attesa/cerca/route.ts`): è la prova diretta che qualcuno ha
+        prenotato e a noi non è arrivato niente. Lo slug della vetrina arriva
+        fino alla route e serve solo a cercare la riga di `travel_designers` —
+        nell'alert finisce il nome che risponde il database, mai la stringa
+        arrivata da fuori;
+      · **la prenotazione di prova per designer in onboarding**, verificata con
+        una query su `bookings` e non guardando le esecuzioni di n8n — che con la
+        parola segreta sbagliata sono **verdi lo stesso**, ed è esattamente
+        l'errore che il vecchio passo 5 induceva a fare.
+        `cal_webhook_ok_at` si scrive **solo dopo** quella verifica: deve voler
+        dire "provato", non "configurato". In `ONBOARDING_CALCOM_TD.md`.
+      Scartato anche il **ping sintetico** (interrogare periodicamente Cal.com
+      per verificare che il webhook sia configurato): sarebbe evidenza vera, ma
+      leggere la configurazione di un account richiede una chiave API per
+      account — cioè le 25 chiavi che S-05 ci ha appena risparmiato
 
 ### ✅ Le prove nel browser — tutte passate il 18 settembre 2026
 
@@ -1029,6 +1237,10 @@ righe di `app_config` e l'endpoint Stripe servono dal punto 4 in poi.
 | ✅ 20 | Sulla riga della prova 19: `update bookings set status='pending_payment', cancel_requested_at=null, cancel_attempts=0 where id='<id>';` poi *Execute Workflow* a mano | Cal.com rifiuta la seconda cancellazione, **e va bene così**: l'esito è `gia_liberata`, e in n8n non c'è nessuna esecuzione rossa | È la trappola 3: cancellare due volte dev'essere innocuo. La difesa non è nel messaggio d'errore di Cal.com ma nello stato della riga |
 | ✅ 21 | `update bookings set payment_deadline_at = now() - interval '1 minute' where id='<id di una PAGATA>';` e aspetti un giro | **Non succede niente.** Una riga con un incasso riuscito non si tocca, scaduta o no | Se quello slot viene cancellato fermati subito: è il danno peggiore che questo workflow possa fare |
 | ✅ 22 | `update app_config set value = 45 where key = 'booking_payment_window_min';` e aspetti due giri. Poi rimetti 30 | **Un** alert `orologio_fuori_budget` in `team_alerts`, e resta uno solo anche dopo il secondo giro | È il guardiano del conto dei 35 minuti, e serve perché i parametri si cambiano da Studio, dove nessun test passa |
+| 23 | Manda un corpo qualsiasi all'indirizzo del webhook Cal.com **con una firma inventata**: `curl -X POST "$N8N_PUBLIC_URL/webhook/calcom-consulenze" -H 'Content-Type: application/json' -H 'x-cal-signature-256: inventata' -d '{"triggerEvent":"BOOKING_CREATED","createdAt":"2026-09-20T10:00:00.000Z","payload":{"uid":"prova","type":"consulenza-xpetis-30","organizer":{"username":"<username di un designer vero>"}}}'`. Tre volte | n8n risponde **200** (giusto), l'esito è `firma_non_valida`, **niente in `webhook_events`**, e in `calcom_signature_rejections` **una riga** con `n = 3` e l'username | Se compaiono tre righe invece di una, il raggruppamento per ora non funziona e la tabella crescerebbe per messaggio |
+| 24 | Aspetti un giro dell'orologio | Un alert `calcom_firme_rifiutate` in `team_alerts`, che **dice l'username** e dice a chiare lettere che è un indizio non verificato. Dopo altri giri resta **uno solo** | — |
+| 25 | Ripeti la 23 mettendo `"username":"non-esiste-questo"` | Nella tabella la riga nuova ha `cal_username_hint` **nullo**, non la stringa inventata | Se ci finisce la stringa, l'indirizzo pubblico può scrivere testo arbitrario in un alert del team: fermati e dimmelo |
+| 26 | **La prova che conta per l'onboarding.** Su un designer di prova, cambia di proposito la parola segreta del webhook su Cal.com (una lettera in meno), poi prenota uno slot | In n8n l'esecuzione è **verde**, 200 — e in `bookings` **non c'è nessuna riga nuova**. È il guasto silenzioso, visto una volta di proposito, e il motivo per cui il punto 5 dell'onboarding adesso si verifica sul database e non su n8n. Poi rimetti la parola segreta giusta e rifai la prova | Se invece la riga compare, la parola segreta non era davvero sbagliata: ricontrolla di aver cambiato quella su Cal.com e non quella nel Vault |
 
 ⚠️ **Le prove 0c e 7 scrivono un alert critico vero** (`calcom_webhook_non_arrivato`):
 è corretto che lo facciano, ma è un falso allarme di collaudo e va tolto, come
@@ -1061,6 +1273,156 @@ Non è pubblicato (gruppo `contacts`, che `public_config` non espone) ma resta
 visibile a chi apre quella pagina: fai quella prova su localhost, non su un
 indirizzo Vercel condiviso.
 
+
+### 🔴 Le prove della posta e delle pagine a token (20 settembre 2026)
+
+**Da qui in poi le prove mandano posta vera.** Non è una formula di prudenza: il
+primo giro dell'orologio dopo la 0043 incontra **tutte** le consulenze già
+finite, comprese quelle fabbricate durante i collaudi, e i loro viaggiatori sono
+indirizzi veri. Per questo `email_enabled` nasce a **0**, e per questo le prove
+27-29 si fanno **prima** di accenderlo.
+
+#### I tre gradini, in ordine
+
+```sql
+-- gradino 1 — SPENTA (è il default). Si compone e si accoda, non parte niente.
+update app_config set value = 0 where key = 'email_enabled';
+
+-- gradino 2 — DIROTTATA. Parte davvero, ma va tutta a una casella tua, e
+-- l'oggetto dice a chi sarebbe andata.
+update app_config set value_text = 'tu@example.com' where key = 'email_redirect_to';
+update app_config set value = 1 where key = 'email_enabled';
+
+-- gradino 3 — VIVA. Da qui in poi scrive a gente vera.
+update app_config set value_text = '' where key = 'email_redirect_to';
+```
+
+Il dirottamento cambia **il destinatario della consegna**, non la riga:
+`recipient` resta la persona vera — quindi il vincolo «una mail per tipo, entità
+e destinatario» continua a significare quello che significa — e `delivered_to`
+dice dove è finita davvero.
+
+#### Come si legge la coda su Studio
+
+È anche il modo in cui Gaia corregge i testi: sul vero, non su un documento.
+
+```sql
+-- la coda, dall'ultima
+select queued_at, status, message_kind, recipient, delivered_to, subject,
+       attempts, provider_message_id, last_error
+  from outbound_messages
+ order by queued_at desc limit 30;
+
+-- una mail, come la leggerà chi la riceve
+select body_text from outbound_messages where id = '<id>';
+```
+
+Per vederla **impaginata**: copia `body_html` in un file `.html` e aprilo nel
+browser. È la versione che arriva davvero.
+
+Per correggere un testo: `update message_templates set body_it = '…' where key =
+'postcall_traveler';` — nessun deploy. Le righe già in coda **non** si
+ricompongono: portano il testo di quando sono nate, ed è voluto (una mail è un
+fatto, non una vista). Per rifarne una, si cancella la riga e si lascia che
+l'orologio la ricomponga al giro dopo.
+
+#### Come si crea un token a mano
+
+Serve per provare le pagine senza aspettare una mail.
+
+```sql
+-- un bottone post-call su una prenotazione che esiste
+insert into access_tokens (purpose, audience, booking_id, td_id, payload)
+select 'traveler_service_request', 'traveler', b.id, b.td_id,
+       jsonb_build_object('service_type', 'custom_itinerary')
+  from bookings b
+ where b.id = '<id della prenotazione>'
+returning token;
+```
+
+L'indirizzo è `<site_base_url>/servizio/<token>`. Per fabbricarne uno **scaduto**
+si aggiunge `expires_at => now() - interval '1 day'`; per uno **revocato** si
+fa `update access_tokens set revoked_at = now() where token = '…'`.
+
+⚠️ Un token è una credenziale: chi ce l'ha è dentro. Non incollarlo in una chat,
+in un ticket o in un messaggio a qualcuno «per far vedere».
+
+| # | Cosa fai | Cosa deve succedere | Esito |
+|---|---|---|---|
+| 27 | Applicata la `0043` e inserite le righe di `app_config`, da Studio: `select * from clock_tick(10);` | Nessun errore. E in `team_alerts` **nessun** `orologio_ramo_non_configurato` | Se c'è, leggilo: il messaggio elenca esattamente le righe che mancano. Sistemale e al giro dopo si chiude da solo |
+| 28 | **Ancora con `email_enabled = 0`.** Fabbrica una call finita: `update bookings set status='confirmed', ends_at = now() - interval '5 minutes', starts_at = now() - interval '35 minutes' where id='<id di una tua prenotazione di prova>';` poi `select * from clock_tick(10);` | In `outbound_messages` **una** riga `postcall_traveler`, `status='queued'`, **`sent_at` nullo**, e `body_html` pieno. E `clock_tick` **non** restituisce nessun compito `email_send` | Se torna un compito `email_send`, l'interruttore è già acceso: spegnilo prima di continuare |
+| 29 | Leggi quella riga: `body_text` a schermo, `body_html` copiato in un file e aperto nel browser | Si legge come una mail vera. I bottoni sono **solo** dei servizi attivi di quel designer, e i link puntano a `<site_base_url>/servizio/<token>` | È il momento in cui Gaia guarda. Correggere un testo è un `update` su `message_templates` |
+| 30 | Rigira l'orologio due o tre volte | La riga resta **una**. `queued_at` non cambia | Se ne compaiono due, il vincolo di unicità non sta lavorando: fermati e dimmelo, perché è anche il tetto di spesa sulle 100 mail al giorno |
+| 31 | **Gradino 2**: dirotta su una casella tua e accendi. Poi *Execute Workflow* a mano su n8n | La mail **arriva a te**, con l'oggetto che comincia per `[prova → <indirizzo vero>]`. In `outbound_messages`: `status='sent'`, `sent_at` pieno, `provider_message_id` pieno, `delivered_to` la casella tua e `recipient` **ancora quella vera** | Se prende 401: hai scelto sul nodo Resend la credenziale di Supabase (`apikey`) invece di quella nuova (`Authorization`). Se prende 422: guarda `last_error`, di solito è il mittente |
+| 32 | Nella mail arrivata, clicca un bottone | Si apre una pagina che dice il servizio e il designer, spiega che **non stai comprando niente**, e ha un bottone. **L'ordine non esiste ancora** | Se l'ordine è già stato creato dall'apertura, il clic è diventato un GET: fermati e dimmelo. È il caso che farebbe creare ordini agli antivirus aziendali |
+| 33 | Premi il bottone | «L'abbiamo ricevuta», con il riferimento `XP-…`. In `orders` una riga `requested`; in `order_status_history` l'attore è **`traveler`**; in `team_alerts` un `ordine_richiesto` che dice quale gruppo WhatsApp aprire | Se l'attore dice `system`, l'attribuzione non viene dal token: dimmelo, perché il TD non ha login e quella riga è l'unica prova di chi ha agito |
+| 34 | Ricarica la pagina, e ripremi il bottone dall'altra scheda | Sempre «l'abbiamo ricevuta», e in `orders` **una riga sola** | — |
+| 35 | Apri `<site_base_url>/servizio/questo-token-non-esiste` | Una pagina che dice che il link non funziona e offre WhatsApp, **senza dire altro**. E in `access_token_misses` il contatore sale | Se la pagina dice qualcosa di più — che il token non esiste *nel database*, o su quale prenotazione punterebbe — è diventata un oracolo: dimmelo |
+| 36 | Fabbrica un token **scaduto** e uno **revocato** (vedi sopra) e aprili | Due pagine **diverse fra loro** e diverse da quella del punto 35: chi ha un link vecchio è una persona legittima e merita di sapere cosa fare | È la linea: un token che *esiste* riceve la risposta onesta, uno inventato no |
+| 37 | Su una prenotazione che ha già un bottone cliccato, da Studio: `update bookings set status='disputed' where id='<id>';` poi riapri il link dell'**altro** servizio | «Su questa consulenza non possiamo partire da qui». Nessun ordine nuovo | È la quinta risposta: token valido, entità cambiata di stato. Poi rimetti `confirmed` |
+| 38 | Rigioca la **prova 19** (lo slot non pagato che si libera) con la posta accesa | Oltre allo slot che torna libero su Cal.com, arriva **anche la nostra mail cortese**, che non ripete l'annullamento nativo di Cal.com ma dice cosa fare adesso | È il pezzo che dal 18 settembre mancava a quella riga di milestone 4 |
+| 39 | Guarda le esecuzioni di n8n del giro con la posta | Due rami, e ognuno porta **solo** i suoi item: nessun compito `email_send` è passato dal nodo Cal.com | È la ragione per cui lo smistamento è un nodo Code e non uno Switch: uno Switch reimportato con le condizioni vuote lascerebbe passare tutto |
+| 40 | **Solo quando le altre sono passate**: gradino 3, svuota `email_redirect_to` | Da qui in poi le mail vanno ai destinatari veri | Prima di farlo, `delete from outbound_messages where status = 'queued';` se in coda sono rimaste mail di collaudo indirizzate a gente vera |
+
+⚠️ **Le prove 27-39 lasciano righe di collaudo.** Prima di considerare chiuso il
+giro:
+
+```sql
+delete from team_alerts where kind in ('ordine_richiesto', 'postcall_mail_non_partita',
+                                       'email_rifiutata', 'email_composizione_fallita',
+                                       'token_inventati');
+delete from orders where human_ref = '<il XP-… della prova 33>';
+delete from outbound_messages where status = 'queued';
+```
+
+⚠️ **Cancellare un ordine di prova non cancella il suo token.** Il bottone della
+mail resta valido e al clic successivo ne creerebbe un altro: se vuoi spegnerlo,
+`update access_tokens set revoked_at = now() where booking_id = '<id>';`
+
+
+### ❓ Come si accorge il team che c'è un ordine da lavorare (23 settembre 2026)
+
+**Punto aperto, non risolto oggi per scelta.** Oggi `ordine_richiesto` è **una
+riga in `team_alerts`**, cioè una tabella che qualcuno deve aprire su Studio.
+Nessuna notifica, da nessuna parte. Il piano prevede una vista operativa in
+**milestone 9**, cioè dopo — e per quasi tutti gli alert va bene.
+
+**Per questo no, e la ragione è che non è un alert come gli altri.** Gli altri
+sono anomalie: qualcosa è configurato male, va sistemato, il mondo aspetta.
+`ordine_richiesto` è **un cliente che ha detto sì**, nel momento di massima
+intenzione, e ogni ora che passa lo raffredda. La pagina gli promette *«adesso
+tocca a noi: apriamo il gruppo WhatsApp»* — non promette tempi, il testo è
+onesto, ma se qualcuno clicca sabato sera e il team guarda Studio martedì quella
+frase è falsa di fatto.
+
+Ne esce un limite del modello da tenere a mente: **`severity` confonde "quanto è
+grave" con "quanto è urgente".** `ordine_richiesto` è registrato `warning` come
+una firma rifiutata, ma è una buona notizia urgente e su quella scala non ha una
+casella. Smistare le notifiche per severità quindi non basta: servirà un elenco
+di `kind` che meritano l'immediato, in `app_config`.
+
+*Cosa si può e cosa no.* **WhatsApp no**: le API non creano gruppi e per mandare
+servirebbe WhatsApp Business API, mentre S-08 è ancora un numero personale.
+**Email sì e costa poco**, perché la macchina esiste già — Resend, la coda
+`outbound_messages`, `render_template`, il ramo di consegna dell'orologio.
+
+*La forma probabile, quando si farà:* due canali, non uno. **Immediato** per gli
+alert che significano "c'è una persona che aspetta" (oggi `ordine_richiesto`,
+domani disputa e no-show); **digest giornaliero** per l'igiene operativa. Una
+mail per ogni anomalia è il modo sicuro per insegnare al team a ignorarle.
+
+⚠️ E una dipendenza da non scoprire dopo: il digest si regge su
+`resolved_at is null`, quindi **qualcuno deve marcare gli alert come risolti**.
+Se farlo significa scrivere una `update` a mano su Studio nessuno lo farà, il
+digest ripeterà gli stessi per sempre e in tre giorni sarà rumore. O si anticipa
+una vista operativa minima dalla milestone 9, o questo nasce già morto.
+
+**Decisione che spetta a Simone:** a quale casella. `info@xpetis.it` è il
+mittente verso i viaggiatori, quindi è lì che arrivano le loro risposte;
+mescolarci gli alert interni significa perdere entrambi. È la stessa domanda
+rimasta aperta chiudendo S-04, che adesso ha una conseguenza concreta.
+
+---
 
 ### ❓ Domande aperte nate dall'imbocco (8 settembre 2026)
 
@@ -1101,9 +1463,26 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
 
 ## Milestone 6 — Post-call e Itinerario su misura
 
-- [ ] **[C]** Workflow mail post-call a fine call, con i bottoni dei soli servizi
-      attivi di quel TD
-- [ ] **[C]** Bottoni a token permanente che creano l'ordine e notificano il team
+- [x] **[C]** Workflow mail post-call a fine call, con i bottoni dei soli servizi
+      attivi di quel TD. **Fatto il 20 settembre 2026** → `0043_posta.sql`, ramo
+      `clock_ramo_postcall()`. Non è un workflow nuovo: è un ramo dell'orologio,
+      perché il grilletto è una prenotazione `confirmed` con `ends_at` passato.
+      Se il designer non vende niente dopo la call la mail parte lo stesso, come
+      ringraziamento, e la frase che introduce i bottoni sparisce con loro —
+      sta dentro il blocco, non nel corpo
+- [x] **[C]** Bottoni a token permanente che creano l'ordine e notificano il team.
+      **Fatto il 20 settembre 2026** → `app/servizio/[token]/`,
+      `create_order_from_token()`. Tre cose decise costruendolo:
+      · **il clic è un POST**, perché i link delle mail li aprono anche le
+        macchine (antivirus aziendali, SafeLinks, client che precaricano) e un
+        GET che crea un ordine farebbe aprire gruppi WhatsApp per nessuno;
+      · **il servizio sta nel payload del token**, non in un parametro della
+        richiesta, e l'indice della 0012 è stato rifatto per ammettere un token
+        per servizio sulla stessa call;
+      · **cosa può fare chi trova il link** è scritto in testa alla 0043 parte D,
+        e da lì discende la regola per le due milestone che seguono: dietro un
+        token permanente non va mai un'azione che muove denaro o consegna un
+        file
 - [ ] **[C]** Tasti eccezione del TD: no-show e "altro problema" → disputa
 - [ ] **[C]** Chiusura a 48 ore (dentro l'orologio unico)
 - [ ] **[C]** Pagina ordine del TD a stati (uno stato, una azione), con upload su
@@ -1196,11 +1575,10 @@ quelle di test.
 Repo privato, progetto Vercel collegato, dominio puntato, variabili d'ambiente.
 Serve il piano **Pro** ($20/mese): l'Hobby è riservato all'uso non commerciale.
 
-**S-04 · Provider di invio email e autenticazione del dominio** (2 h)
-Senza di lui n8n non manda nessuna delle quindici mail del funnel. Un provider
-transazionale (Resend, Postmark, SendGrid) e i record SPF/DKIM/DMARC su
-`xpetis.it`. Presto: la reputazione di invio si scalda in giorni, non in ore.
-*Blocca:* milestone 4 in poi.
+~~**S-04 · Provider di invio email e autenticazione del dominio**~~ →
+**chiuso il 20 settembre 2026**, e senza creare niente: l'account Resend della
+landing page, con `xpetis.it` già autenticato. Non blocca più niente. Resta
+aperta solo la chiave API separata per XPETIS, che è in "cosa resta a te".
 
 ### P1 — seconde due settimane
 
@@ -1270,7 +1648,9 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 | Il verso di un asse è girato: un designer *wild* risulta amante del comfort, prende la frase sbagliata e finisce nel posto sbagliato | Alto, e **nessuna prova tecnica lo intercetta** | Confronto a vista foglio-database su 3-4 designer all'import (milestone 1). È già successo nel lavoro di Alessandro: due assi su sei erano invertiti |
 | **Non esiste un'entità legale XPETIS, e non esisterà nel primo periodo** (8 ago) | **Alto: è il nuovo percorso critico.** Senza partita IVA non si incassa, quindi la Beta con soldi veri non dipende più dalla tecnica. Blocca anche S-14, perché non si scrivono condizioni generali senza sapere chi è la controparte | Lo sviluppo prosegue in test mode senza differenze. La decisione "chi è il venditore" va portata ad Alessandro e Andrea subito: costituire una ditta individuale, far incassare l'agenzia partner anche su consulenze e su misura, oppure far incassare i designer con XPETIS che fattura una commissione. **La terza cambia l'architettura**: il denaro andrebbe verso 25 destinatari e servirebbe Stripe Connect molto prima |
 | Detenere le chiavi Stripe delle agenzie | Alto | Valutare Stripe Connect prima della prima agenzia (S-11) |
-| Le mail finiscono in spam | Alto: il funnel vive di mail. **Aumentato l'8 agosto:** S-04 è stato rimandato alla fine, quindi la reputazione di invio resterà non provata fino a ridosso della Beta | Lasciare almeno una settimana fra l'autenticazione del dominio e il primo viaggiatore vero |
+| Le mail finiscono in spam | Alto: il funnel vive di mail. **Ridotto il 20 settembre:** il dominio spedisce da mesi per la landing page, SPF/DKIM/Return-Path sono verificati, e la settimana di riscaldamento non serve più. Resta il rovescio del riuso: la reputazione è **condivisa**, quindi una newsletter da `xpetis.it` trascinerebbe giù anche le transazionali | Spostare le transazionali su un sottodominio (`mail.xpetis.it`) **prima** del primo invio di massa, non dopo. Verificare che DMARC su `_dmarc.xpetis.it` esista, almeno `p=none` |
+| Un giro storto brucia il tetto di 100 mail al giorno, **condiviso con la landing page** | Medio, ma si manifesta in minuti | Tre freni indipendenti: il vincolo di unicità di `outbound_messages` (una mail per tipo, entità e destinatario), `email_max_per_tick`, e `email_enabled` che nasce spento |
+| Un token post-call è permanente e vive in una casella inoltrabile | Medio | Chi lo trova non può impegnare denaro: crea una richiesta che una persona lavora. La pagina non mostra dati del viaggiatore, non è indicizzabile e non manda `Referer` a nessuno. Regola per le milestone 6 e 7: **dietro un token permanente non va mai un'azione che muove denaro** |
 | Supabase free non fa backup | Alto se si dimentica il passaggio a Pro | Pro il giorno del primo pagamento vero |
 | Le correzioni a mano dei 25 profili non vengono fatte, o fatte male | Alto: il match gira su dati sbagliati e sembra funzionare | I controlli di plausibilità in `td_publish_readiness` bloccano la pubblicazione, non solo segnalano |
 | Chiunque conosca il codice di una prenotazione Cal.com la può cancellare, e le mail native di Cal.com lo consegnano al viaggiatore | Medio | Le regole di rimborso si applicano sul webhook, non sull'accesso al link. `cal_booking_uid` non esce mai verso il browser |

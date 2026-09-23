@@ -68,8 +68,29 @@ export async function GET() {
  *
  * Il viaggiatore intanto riceve un messaggio onesto e un modo di parlare con una
  * persona: è il principio "l'umano entra sull'eccezione".
+ *
+ * ## Perché questo alert vale più di un controllo periodico (20 settembre 2026)
+ *
+ * La tentazione, con 25 account Cal.com configurati a mano, è un ramo
+ * dell'orologio che avvisa se un designer non manda niente da N giorni. Il
+ * difetto è strutturale: **in Beta un designer senza prenotazioni è
+ * indistinguibile da uno col webhook rotto**, perché il segnale manca per la
+ * stessa ragione per cui manca il traffico.
+ *
+ * Questa riga invece è **evidenza e non inferenza**: qualcuno ha davvero
+ * prenotato, e a noi non è arrivato niente. Da qui la sola cosa che mancava era
+ * saper dire **su quale account guardare**, e adesso lo dice.
+ *
+ * Lo slug arriva dal corpo della richiesta, cioè da fuori, e si tratta di
+ * conseguenza: **si usa solo per cercare una riga di `travel_designers`**, e
+ * quello che finisce nell'alert è il nome che il nostro database restituisce,
+ * mai la stringa arrivata. Uno slug inventato non inserisce niente nel testo —
+ * torna semplicemente un alert senza designer, come prima. Il peggio che può
+ * fare un viaggiatore che lo modifica è indicare al team uno dei designer veri,
+ * e il controllo che il team fa dopo (guardare il webhook di quell'account) è
+ * innocuo comunque.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -77,6 +98,12 @@ export async function POST() {
   if (!user) {
     return NextResponse.json({ motivo: 'nessuna sessione' }, { status: 401 })
   }
+
+  // Un corpo assente o malformato non è un errore: l'alert si scrive lo stesso,
+  // solo senza sapere di chi. Questa route esiste per segnalare un guasto, e
+  // sarebbe assurdo che un dettaglio mancante le impedisse di farlo.
+  const corpo = (await request.json().catch(() => null)) as { designer?: unknown } | null
+  const slug = typeof corpo?.designer === 'string' ? corpo.designer.trim() : null
 
   const admin = createAdminClient()
 
@@ -96,16 +123,36 @@ export async function POST() {
     return NextResponse.json({ prenotazione: arrivata[0].id })
   }
 
+  // Lo slug non finisce nell'alert: ci finisce quello che il database risponde.
+  const { data: designer } = slug
+    ? await admin
+        .from('travel_designers')
+        .select('id, display_name, cal_username')
+        .eq('slug', slug)
+        .maybeSingle()
+    : { data: null }
+
   await admin.from('team_alerts').insert({
     kind: 'calcom_webhook_non_arrivato',
     severity: 'critical',
-    entity_type: 'traveler',
-    entity_id: user.id,
+    // L'entità è il **designer** quando lo sappiamo: è su di lui che si va a
+    // guardare, ed è così che due segnalazioni sullo stesso account si vedono
+    // vicine su Studio. Il viaggiatore resta nel messaggio, dove serve a
+    // ritrovare lo slot e a scrivergli.
+    entity_type: designer ? 'travel_designer' : 'traveler',
+    entity_id: designer?.id ?? user.id,
     message:
       'Un viaggiatore ha finito di prenotare nell\'embed Cal.com e dopo l\'attesa la '
       + 'prenotazione non è comparsa: il webhook non è arrivato. Probabile slot occupato '
       + 'sul calendario di un designer senza nessuna riga in `bookings`, che nessun '
-      + `orologio libererà. Viaggiatore: ${user.email ?? user.id}.`,
+      + 'orologio libererà. '
+      + (designer
+          ? `Designer: ${designer.display_name} (account Cal.com \`${designer.cal_username ?? 'non impostato'}\`) — `
+            + 'controlla il webhook di quell\'account: indirizzo giusto, parola segreta giusta, '
+            + 'i tre eventi iscritti. '
+          : 'Designer: **non sappiamo quale** — la vetrina di partenza non è arrivata fino '
+            + 'a qui. Cerca lo slot fra i calendari dei 25. ')
+      + `Viaggiatore: ${user.email ?? user.id}.`,
   })
 
   return NextResponse.json({ prenotazione: null, segnalato: true })

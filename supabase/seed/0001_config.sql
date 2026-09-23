@@ -74,7 +74,7 @@ insert into app_config (key, value, config_group, label_it, notes) values
   ('booking_payment_window_min', 30, 'booking_rules', 'Minuti per pagare la consulenza', 'Oltre, il workflow insoluti libera lo slot'),
   ('cancel_full_refund_hours',   24, 'booking_rules', 'Rimborso pieno fino a N ore prima', null),
   ('reschedule_min_hours',       12, 'booking_rules', 'Riprogrammabile fino a N ore prima', null),
-  ('reschedule_max_traveler',     5, 'booking_rules', 'Riprogrammazioni max del viaggiatore', 'Limite osservato da n8n, non imposto da Cal.com'),
+  ('reschedule_max_traveler',     5, 'booking_rules', 'Riprogrammazioni max del viaggiatore', 'ATTENZIONE: oggi non lo controlla NESSUNO. Cal.com non lo impone e il controllo di n8n e'' milestone 5: questo numero e'' una regola scritta, non un limite attivo.'),
   ('reschedule_max_td',           2, 'booking_rules', 'Riprogrammazioni max del TD',          'Il TD non può cancellare una consulenza pagata'),
   ('reschedule_max_days_shift',  20, 'booking_rules', 'Giorni max dalla data originaria',     null),
   ('td_wait_minutes_in_call',    15, 'booking_rules', 'Minuti di attesa del TD in call',      'Oltre, no-show: quota non rimborsata'),
@@ -213,11 +213,111 @@ on conflict (key) do nothing;
 insert into app_config (key, value, value_text, config_group, label_it, notes) values
   ('calcom_cancel_url', null, 'https://api.cal.com/v2/bookings/{uid}/cancel', 'integrations',
    'Indirizzo a cui il braccio chiede la cancellazione di uno slot',
-   'VERIFICATO il 20 settembre 2026 con un curl su una prenotazione vera: 200, slot tornato libero, e le mail native di annullamento partite. Nessuna chiave necessaria, come diceva S-05. {uid} viene sostituito col codice della prenotazione. Ripiego mai servito: https://api.cal.com/api/cancel, che vuole il codice nel corpo.'),
+   'VERIFICATO il 20 settembre 2026 con un curl su una prenotazione vera: 200, slot tornato libero, mail native di annullamento partite, nessuna chiave necessaria (come diceva S-05). {uid} viene sostituito col codice della prenotazione: la v2 lo vuole nel PERCORSO, e il corpo porta solo cancellationReason. ATTENZIONE: passare al ripiego v1 (https://api.cal.com/api/cancel) NON basta cambiare questa riga — la v1 vuole uid e allRemainingBookings nel corpo, che la v2 rifiuta con 400, quindi va anche modificato il jsonBody del nodo Cancella su Cal.com in n8n/orologio.json.'),
   ('calcom_api_version', null, '2024-08-13', 'integrations',
    'Header cal-api-version della API v2 di Cal.com',
    'L''API v2 vuole la versione dichiarata nell''header. Sull''endpoint v1 di ripiego non serve e viene ignorato.'),
   ('unpaid_cancel_reason', null, 'Pagamento non completato: lo slot è stato liberato.', 'integrations',
    'Motivo della cancellazione scritto su Cal.com',
    'Lo legge il viaggiatore: finisce nella mail nativa di Cal.com, che resta accesa (deviazione 5). Testo segnaposto, lo riscrive Gaia.')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Le firme Cal.com rifiutate (migration 0042)
+-- ---------------------------------------------------------------------------
+-- La soglia non è 1 di proposito: l'indirizzo del webhook è **pubblico**, quindi
+-- un singolo corpo arbitrario da uno scanner di passaggio non è una notizia. Tre
+-- in un'ora lo sono — e una parola segreta sbagliata su un account attivo ne
+-- produce molte di più, perché Cal.com ritenta.
+--
+-- Senza queste righe il ramo dell'orologio resta **spento**, e lo dice: scrive
+-- un alert `orologio_ramo_non_configurato`.
+insert into app_config (key, value, config_group, label_it, notes) values
+  ('calcom_signature_alert_threshold', 3, 'integrations',
+   'Firme Cal.com rifiutate prima di avvisare il team',
+   'Non 1: l''indirizzo del webhook è pubblico e un corpo arbitrario di passaggio non è una notizia. Una parola segreta sbagliata su un account attivo ne produce molte di più, perché Cal.com ritenta.'),
+  ('calcom_signature_alert_window_min', 60, 'integrations',
+   'Finestra su cui si contano le firme rifiutate',
+   'Minuti. Il conteggio è per ora piena (calcom_signature_rejections), la finestra somma le ore che ci stanno dentro.'),
+  ('calcom_signature_keep_days', 30, 'integrations',
+   'Per quanto si tengono i conteggi delle firme rifiutate',
+   'Oltre, l''orologio li cancella: le finestre vecchie non servono più a nessuno e la tabella non deve crescere per sempre.')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- La posta (migration 0043)
+-- ---------------------------------------------------------------------------
+-- ⚠️ **Questo file ha `on conflict do nothing` e gira solo su `db reset`.** Sul
+-- progetto vero queste righe vanno inserite a mano dal SQL Editor: finché
+-- mancano, l'orologio scrive un alert `orologio_ramo_non_configurato` che le
+-- elenca una per una. È voluto — un ramo spento in silenzio è il guasto che
+-- questa impalcatura esiste per non avere.
+--
+-- ## L'interruttore nasce spento, e non è prudenza generica
+--
+-- `email_enabled = 0` **non spegne la composizione**: le mail si compongono e si
+-- accodano lo stesso, e si leggono su Studio esattamente come le leggerà un
+-- cliente. È la condizione perché Gaia le corregga sul vero invece che su un
+-- documento. Quello che l'interruttore ferma è la consegna.
+--
+-- Nasce a zero perché il primo giro dopo l'applicazione della 0043 incontra
+-- tutte le consulenze già finite, e accenderlo dev'essere un gesto fatto
+-- guardando la coda, non una cosa che capita applicando una migration.
+--
+-- ## Il tetto, che è condiviso
+--
+-- Resend free: **100 mail al giorno e 10 richieste al secondo**, e quelle 100
+-- sono condivise con la landing page (vedi `ACCESSI.md`). `email_max_per_tick`
+-- è il freno che impedisce a un giro solo di bruciare la giornata; la difesa
+-- vera resta il vincolo di unicità di `outbound_messages`.
+insert into app_config (key, value, config_group, label_it, notes) values
+  ('email_enabled', 0, 'integrations',
+   'Interruttore della consegna delle mail',
+   '0 = si compone e si accoda ma NON si consegna (le mail si leggono su Studio); 1 = si consegna. Nasce a 0: accenderlo è un gesto che si fa guardando la coda.'),
+  ('email_max_per_tick', 20, 'integrations',
+   'Mail consegnate al massimo in un giro dell''orologio',
+   'Freno sul tetto giornaliero di Resend (100 al giorno, CONDIVISE con la landing page) e sul limite di 10 richieste al secondo. Quelle in più aspettano il giro dopo, cioè cinque minuti.'),
+  ('email_max_attempts', 3, 'integrations',
+   'Tentativi di consegna prima di chiamare una persona',
+   'Oltre, la mail resta in coda e parte un alert email_non_consegnata. Un 4xx definitivo non consuma tentativi: va subito a failed, perché un corpo malformato non guarisce riprovando.'),
+  ('postcall_email_max_age_hours', 24, 'orders',
+   'Entro quante ore dalla fine della call può ancora partire la mail post-call',
+   'Oltre, NON parte e il team riceve un alert postcall_mail_non_partita. Serve a due cose: non mandare la mail a tutto lo storico il giorno che si accende, e non mandare "com''è andata la call?" tre giorni dopo perché n8n era fermo.'),
+  ('token_miss_alert_threshold', 50, 'integrations',
+   'Token inesistenti in una finestra prima di avvisare il team',
+   'Alta di proposito. Un link spezzato in due da un client di posta produce qualche tentativo a vuoto: un alert che scatta sul rumore è un alert che si impara a ignorare.'),
+  ('token_miss_alert_window_min', 60, 'integrations',
+   'Finestra su cui si contano i token inesistenti', 'Minuti.'),
+  ('token_miss_keep_days', 30, 'integrations',
+   'Per quanto si tengono i conteggi dei token inesistenti',
+   'Oltre, l''orologio li cancella: le finestre vecchie non servono più a nessuno.')
+on conflict (key) do nothing;
+
+-- I parametri di testo della posta.
+--
+-- `email_from` è **una casella vera dove arrivano le risposte**, e i testi sono
+-- scritti sapendolo: nessuna mail dice "non rispondere a questo indirizzo".
+-- Chi la presidia e con che tempi è una domanda aperta in `PUNTI_APERTI.md`.
+--
+-- `site_base_url` serve perché i link delle mail li compone Postgres, che non
+-- ha nessun modo di sapere a che indirizzo risponde il sito. In sviluppo si
+-- mette `http://localhost:3000` **su un database di sviluppo**, mai su quello
+-- vero: un link a localhost dentro una mail vera è un vicolo cieco.
+--
+-- `email_redirect_to` è il modo di provare senza scrivere a nessuno per
+-- sbaglio: se è valorizzato, **ogni** mail va lì invece che al destinatario
+-- vero, con l'oggetto che dice a chi sarebbe andata. Il destinatario vero resta
+-- scritto su `outbound_messages.recipient` (quindi il vincolo di unicità
+-- continua a significare quello che significa) e dove è finita davvero lo dice
+-- `delivered_to`. **Svuotarlo lo disattiva**, come per le altre righe di testo.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('email_from', null, 'XPETIS <info@xpetis.it>', 'integrations',
+   'Mittente delle mail transazionali',
+   'Casella VERA: è lì che arrivano le risposte dei viaggiatori. I testi sono scritti sapendolo e nessuno dice "non rispondere". Il dominio xpetis.it è verificato su Resend (SPF, DKIM, Return-Path).'),
+  ('email_redirect_to', null, '', 'integrations',
+   'Casella a cui dirottare TUTTE le mail durante le prove',
+   'Vuoto = disattivato, cioè la posta va ai destinatari veri. Valorizzato = ogni mail va lì, con l''oggetto che dichiara a chi sarebbe andata. recipient resta il destinatario vero; dove è finita lo dice delivered_to.'),
+  ('site_base_url', null, 'https://xpetis.it', 'integrations',
+   'Indirizzo pubblico del sito, per i link dentro le mail',
+   'Lo compone Postgres, che non ha modo di saperlo da sé. In sviluppo http://localhost:3000, ma SOLO su un database di sviluppo: un link a localhost dentro una mail vera è un vicolo cieco.')
 on conflict (key) do nothing;
