@@ -171,3 +171,103 @@ E'Ecco la proposta per il tuo itinerario su misura ({{human_ref}}): {{link_propo
    array['human_ref', 'link_proposta'],
    'Il messaggio che il designer copia nel gruppo WhatsApp dopo l''invio della proposta. Lo manda LUI, quindi è in prima persona sua. Si compone in pagina, non parte per mail.')
 on conflict (key) do nothing;
+
+-- ===========================================================================
+-- Aggiunti con la 0045
+-- ===========================================================================
+
+-- Al designer, quando il viaggiatore paga la proposta. Il Flusso vuole il
+-- messaggio «in pagina e via mail»: in pagina c'era già, questa è la mail.
+-- Senza, il designer lo scopre solo riaprendo il link per caso, e i giorni di
+-- consegna intanto corrono.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('order_paid_td', 'mail', 'td',
+   'Pagata la proposta {{human_ref}}: si comincia',
+E'{{saluto}},\n\n{{nome_viaggiatore}} ha pagato la proposta {{human_ref}} ({{prezzo}}). Da adesso puoi cominciare a lavorare all''itinerario.\n\nLa consegna è entro {{giorni_consegna}} dal pagamento, cioè entro il {{data_consegna}}.\n\nLa pagina dell''ordine è la stessa di sempre, e da lì seguirai i passi dopo:\n\n{{link_ordine}}\n\nQuesto link è personale: non inoltrarlo.\n\nPer qualunque dubbio il team è su WhatsApp al {{whatsapp}}.\n\nXPETIS',
+   array['saluto', 'nome_viaggiatore', 'human_ref', 'prezzo', 'giorni_consegna', 'data_consegna', 'link_ordine', 'whatsapp'],
+   'Parte quando un ordine su misura passa da proposal_sent a in_progress, cioè quando il viaggiatore paga (trigger della 0045). Porta lo stesso link della mail di nascita dell''ordine, che è una credenziale: il testo deve continuare a dire di non inoltrarlo. Niente aggettivi con il genere: né per il designer né per il viaggiatore.')
+on conflict (key) do nothing;
+
+-- L'involucro delle notifiche interne agli amministratori (0045). Il
+-- contenuto lo compone chi chiama — il messaggio di un alert, o quello del
+-- pagamento — e qui c'è solo la cornice. È per il team, non per un cliente:
+-- può dire da dove arriva e come si spegne.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('team_notifica', 'mail', null,
+   '{{titolo}}',
+E'{{messaggio}}\n\nArriva agli amministratori perché «{{evento}}» è fra gli eventi di app_config.team_notify_events. Per non riceverla più si toglie da lì, da Studio.',
+   array['titolo', 'messaggio', 'evento'],
+   'La cornice di tutte le notifiche interne: una riga di coda per destinatario, con message_kind = team_<evento>. Destinatari in app_config.team_notify_recipients, eventi in app_config.team_notify_events.')
+on conflict (key) do nothing;
+
+-- ===========================================================================
+-- Aggiunti con la 0046 — il dopo-call del designer, la consegna, la revisione
+-- ===========================================================================
+
+-- Al designer, alla fine della call: il silenzio chiude, i due tasti fermano.
+-- Il Flusso: «il TD ha nella sua mail i tasti per l'eccezione». Deve dire
+-- **che non fare niente va bene** — è il caso normale — e **fino a quando** i
+-- tasti funzionano. Niente aggettivi con il genere: né per il designer, né per
+-- chi ha prenotato (per questo «dall'altra parte non c'era nessuno» e non
+-- «non si è presentato»).
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('postcall_td', 'mail', 'td',
+   'La call del {{data_call}}: se è andata bene, non serve fare niente',
+E'{{saluto}},\n\nla call con {{nome_viaggiatore}} del {{data_call}} è finita. Se è andata bene non devi fare niente: fra {{ore_chiusura}} ore, il {{data_chiusura}}, la consulenza si chiude da sola.\n\nSe invece qualcosa non è andato, dillo da qui prima di allora. Ognuno dei due tasti apre una pagina con una domanda sola.\n\n{{tasti}}\n\nCon uno dei due la chiusura si ferma e la call passa al team, che ti scrive. Dopo il {{data_chiusura}} i tasti non funzionano più: per qualunque cosa il team è su WhatsApp al {{whatsapp}}.\n\nQuesti link sono personali: non inoltrarli.\n\nXPETIS',
+   array['saluto', 'nome_viaggiatore', 'data_call', 'ore_chiusura', 'data_chiusura', 'tasti', 'whatsapp'],
+   'Parte alla fine di ogni call confermata, dal ramo clock_ramo_postcall_td (0046). {{tasti}} va lasciato da solo sulla sua riga: sono i due bottoni. I link sono credenziali: il testo deve continuare a dire di non inoltrarli. Niente aggettivi con il genere.')
+on conflict (key) do nothing;
+
+insert into message_templates (key, template_kind, audience, body_it, button_label_it, placeholders, notes) values
+  ('blocco_td_no_show', 'blocco', 'td',
+   'Se all''orario della call dall''altra parte non c''era nessuno, anche dopo l''attesa prevista:',
+   'Segnala un no-show',
+   '{}',
+   'Il primo dei due tasti della mail postcall_td. Porta alla pagina del no-show: la segnalazione NON chiude la call come no-show, la passa al team che verifica.'),
+  ('blocco_td_problema', 'blocco', 'td',
+   'Se c''è stato un altro problema (la call interrotta, un collegamento che non ha funzionato, qualcosa che il team deve sapere):',
+   'Segnala un problema',
+   '{}',
+   'Il secondo dei due tasti della mail postcall_td. La call va in disputa e il team arbitra.')
+on conflict (key) do nothing;
+
+-- Al viaggiatore, alla consegna. Il Flusso: «il viaggiatore lo riceve via
+-- mail». ⚠️ Il link è quello della **pagina**, che non scade, e non quello del
+-- file: un link di Storage in una mail smetterebbe di funzionare, e il
+-- viaggiatore si troverebbe un itinerario pagato che non scarica più.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('delivery_traveler', 'mail', 'traveler',
+   'Il tuo itinerario su misura è arrivato ({{human_ref}})',
+E'{{saluto}},\n\n{{designer}} ha consegnato il tuo itinerario su misura ({{human_ref}}). Lo trovi qui, e da qui lo scarichi quando vuoi: il link resta valido.\n\n{{link_pagina}}\n\nLeggilo con calma. Se vuoi cambiare qualcosa hai una revisione inclusa: la chiedi dalla stessa pagina entro {{giorni_revisione}} giorni, cioè entro il {{data_limite_revisione}}, scrivendo cosa vorresti diverso.\n\nSe va bene così non devi fare niente.\n\n{{firma}}',
+   array['saluto', 'designer', 'human_ref', 'link_pagina', 'giorni_revisione', 'data_limite_revisione', 'firma'],
+   'Parte alla prima consegna, dal trigger della 0046. {{link_pagina}} è la pagina a token del viaggiatore: MAI mettere qui un link al file. La revisione si promette una, entro la data.')
+on conflict (key) do nothing;
+
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('revision_delivered_traveler', 'mail', 'traveler',
+   'La versione rivista del tuo itinerario ({{human_ref}})',
+E'{{saluto}},\n\n{{designer}} ha consegnato la versione rivista del tuo itinerario ({{human_ref}}). La trovi sulla stessa pagina di prima, insieme alla prima versione:\n\n{{link_pagina}}\n\nCon questa la revisione inclusa è fatta. Se qualcosa ancora non torna, scrivici prima del {{data_chiusura}}: è il giorno in cui l''ordine si chiude.\n\n{{firma}}',
+   array['saluto', 'designer', 'human_ref', 'link_pagina', 'data_chiusura', 'firma'],
+   'Parte alla riconsegna dopo la revisione (0046). Non promettere una seconda revisione: non esiste. {{data_chiusura}} è l''ultima consegna più revision_window_days.')
+on conflict (key) do nothing;
+
+-- Al designer, quando viene chiesta la revisione. {{nota}} è il testo di chi
+-- l'ha chiesta, così come l'ha scritto.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('revision_requested_td', 'mail', 'td',
+   'Revisione chiesta su {{human_ref}}',
+E'{{saluto}},\n\n{{nome_viaggiatore}} ha chiesto la revisione inclusa dell''itinerario {{human_ref}}. Ecco cosa ha scritto:\n\n{{nota}}\n\nQuando la versione rivista è pronta, la carichi dalla pagina dell''ordine, come la prima volta:\n\n{{link_ordine}}\n\nÈ l''unica revisione inclusa: se dopo servisse altro, se ne parla nel gruppo WhatsApp.\n\nQuesto link è personale: non inoltrarlo.\n\nPer qualunque dubbio il team è su WhatsApp al {{whatsapp}}.\n\nXPETIS',
+   array['saluto', 'nome_viaggiatore', 'human_ref', 'nota', 'link_ordine', 'whatsapp'],
+   'Parte quando il viaggiatore chiede la revisione (0046). Il link è una credenziale: il testo deve continuare a dire di non inoltrarlo. Niente aggettivi con il genere.')
+on conflict (key) do nothing;
+
+-- Il messaggio pronto dopo la consegna, da copiare nel gruppo. Con la voce del
+-- designer, come quello della proposta. Porta alla pagina, non al file, e non
+-- nomina la revisione: dopo la riconsegna non ce n'è più una da chiedere, e il
+-- messaggio vale per tutte e due le consegne.
+insert into message_templates (key, template_kind, audience, body_it, placeholders, notes) values
+  ('blocco_whatsapp_consegna', 'blocco', 'td',
+E'Ecco il tuo itinerario ({{human_ref}}): {{link_pagina}}\n\nLo trovi lì e lo scarichi quando vuoi. Se c''è qualcosa da cambiare, dimmelo qui.',
+   array['human_ref', 'link_pagina'],
+   'Il messaggio che il designer copia nel gruppo WhatsApp dopo una consegna. Lo manda LUI, in prima persona sua. Si compone in pagina, non parte per mail. Il link è la pagina del viaggiatore, mai il file.')
+on conflict (key) do nothing;

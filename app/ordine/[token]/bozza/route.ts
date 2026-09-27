@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { origineAmmessa, origineDi } from '@/lib/origine'
-import { euroInCentesimi, salvaBozza } from '@/lib/ordine'
+import { euroInCentesimi, importoBenScritto, salvaBozza } from '@/lib/ordine'
 
 /**
  * Il designer salva la bozza della proposta.
@@ -18,6 +18,11 @@ import { euroInCentesimi, salvaBozza } from '@/lib/ordine'
  * Un campo che non si legge (un prezzo «abc») arriva a Postgres come `null`, e
  * Postgres risponde `dati_non_validi` con il nome del campo: così le regole su
  * cosa è un prezzo valido restano in un posto solo.
+ *
+ * Prima ancora, la **forma** del campo (`importoBenScritto`: due decimali al
+ * massimo, nessuno zero iniziale). Il form la chiede già con `pattern`, ma
+ * quello è un suggerimento al browser: qui arriva comunque quello che viene
+ * mandato, e «030» non deve diventare 30 €.
  */
 export async function POST(request: Request, contesto: { params: Promise<{ token: string }> }) {
   const { token } = await contesto.params
@@ -31,13 +36,14 @@ export async function POST(request: Request, contesto: { params: Promise<{ token
   const testo = (k: string) => String(form.get(k) ?? '')
   const giorni = Number.parseInt(testo('giorni'), 10)
   const creditoGrezzo = testo('credito').trim()
+  const importo = (grezzo: string) => (importoBenScritto(grezzo) ? euroInCentesimi(grezzo) : null)
 
   const esito = await salvaBozza(token, {
     descrizione: testo('descrizione'),
-    prezzoCents: euroInCentesimi(testo('prezzo')),
+    prezzoCents: importo(testo('prezzo')),
     giorni: Number.isFinite(giorni) ? giorni : null,
     // Un campo credito lasciato vuoto vuol dire «non ho scalato niente».
-    creditoCents: creditoGrezzo === '' ? 0 : euroInCentesimi(creditoGrezzo),
+    creditoCents: creditoGrezzo === '' ? 0 : importo(creditoGrezzo),
   })
 
   // Il token non finisce nei log: solo l'esito.

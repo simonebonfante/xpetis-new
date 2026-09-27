@@ -230,6 +230,76 @@ l'agenzia); il ponte Stripe risponde con un alert a un pagamento su un ordine
 All Inclusive invece di indovinare; `my_orders` maschera già
 `proposal_pending_agency`.
 
+**Aggiornamento del 26 settembre 2026 — le correzioni delle prove del 23.** Le
+prove 41-56 sono passate tutte, e ne sono uscite cinque correzioni, fatte:
+`0045_correzioni_prove.sql`, il form della proposta, il campo degli importi e
+`CopiaTesto`. Harness a **614 asserzioni** (erano 599), `npm run build` verde.
+
+1. **Il form della proposta non perde più la descrizione al primo errore**: si
+   ripopola da quello che è stato inviato, con la riga di `orders` come ripiego
+   (`components/ricorda-modulo.tsx`). ⚠️ È il difetto più facile da far
+   tornare, perché «ripopolare dal database» sembra la cosa giusta: la prova
+   58 è scritta apposta.
+2. **Il campo degli importi**: al massimo due decimali, nessuno zero iniziale.
+   È `FORMA_IMPORTO` in `lib/ordine.ts`, usata dal `pattern` del campo **e**
+   dalla route. `euroInCentesimi` non è stata toccata, e adesso ha scritto
+   sopra perché non va «semplificata».
+3. **Il tasto *Copia***: il campo selezionabile c'era già nel codice provato;
+   adesso è dichiarato come la cosa principale (etichetta e istruzione sempre
+   visibili), su iOS si seleziona davvero, e se il bottone fallisce lo dice
+   in chiaro. Niente `execCommand`.
+4. **Gli importi negli alert** passano tutti da `euro_it()` (che c'era già
+   dalla 0044, per le mail): le quindici occorrenze stavano in quattro funzioni
+   vive, riemesse dalla 0045. L'harness adesso **legge il sorgente di tutte le
+   funzioni** e diventa rosso se una divide ancora per `100.0`.
+5. **Quando un viaggiatore paga lo sanno il designer e gli amministratori**, e
+   gli amministratori tramite un **meccanismo**: `team_notify_recipients` e
+   `team_notify_events` in `app_config`. Ogni `kind` di `team_alerts` è già un
+   evento, quindi **avvisare il team di `ordine_richiesto` è una parola in più
+   in una riga di Studio** — vedi il punto aperto, aggiornato.
+
+**Aggiornamento del 26 settembre 2026, seconda sessione — la milestone 6 è
+chiusa lato codice.** Il silenzio-conferma e i due modi di romperlo:
+`0046_silenzio_conferma.sql`, la pagina dei due tasti (`/eccezione/[token]`),
+la consegna dalla pagina ordine, lo scaricamento e la revisione dalla pagina
+del viaggiatore. Harness a **693 asserzioni** (erano 614), `npm run build`
+verde. Tre rami dell'orologio in più e **nessun workflow nuovo: n8n non si
+tocca**.
+
+Quattro cose da sapere, in ordine di peso.
+
+1. 🔴 **Il tasto no-show non chiude come no-show.** Porta la call a `disputed`
+   (lo stato «in arbitrato del team») come «altro problema», e ferma il
+   silenzio. Chiudere come `no_show` resta un gesto del team, da Studio, dopo
+   aver guardato: è il Flusso stesso a dire «verifica rapida del team». L'alert
+   porta quello che serve per arbitrare — attesa dichiarata, regola, **l'ora del
+   clic misurata dal server**, cosa ha scritto il designer, contatti del
+   viaggiatore. ⚠️ **Il viaggiatore non viene avvisato**: è un punto aperto qui
+   sotto, e non l'ho deciso io.
+2. 🔴 **I byte della consegna non passano dal nostro server, e `CLAUDE.md` è
+   stato aggiornato.** Una funzione Vercel accetta al massimo 4,5 MB di corpo;
+   un itinerario col template XPETIS li supera, il bucket ne ammette 50. Il
+   server decide tutto — controlla token e stato, **sceglie il percorso**, apre
+   un caricamento firmato su quel percorso soltanto, poi legge da Storage cosa
+   è arrivato davvero e registra — ma i byte vanno dal browser a Storage. n8n
+   non vede mai un file, come prima. È anche l'unico pezzo delle pagine a token
+   che vuole JavaScript.
+3. ⚠️ **Il link firmato non esce mai.** Le mail portano alla pagina a token (che
+   non scade); i file si scaricano da un indirizzo nostro che, al clic, firma un
+   link di **un minuto** e ci rimanda il browser. Nessuna mail, pagina o colonna
+   contiene un link di Storage, e l'harness lo controlla.
+4. ⚠️ **Due orologi sullo stesso stato `delivered`.** La finestra della revisione
+   parte dalla prima consegna e non riparte mai (`revision_deadline_at`); la
+   chiusura parte dall'ultima consegna e riparte dopo la riconsegna. Stessi
+   cinque giorni (`revision_window_days`), due significati.
+
+**Cosa NON è stato fatto, di proposito**: il tasto «C'è un problema» in fondo
+alla pagina ordine (il Flusso §7 lo chiede, il prompt di oggi parlava dei tasti
+del dopo-call: è una riga a sé); la mail al viaggiatore dichiarato assente
+(punto aperto); qualunque mail a `completed` (le recensioni sono milestone 8).
+E, come sempre, **niente è stato visto in un browser né contro Storage vero**:
+sono le prove 64-78.
+
 
 ### Cosa resta a te
 
@@ -324,7 +394,9 @@ All Inclusive invece di indovinare; `my_orders` maschera già
   5. **Reimportare `n8n/orologio.json`** — ha due nodi nuovi e due rami — e
      riassegnare le credenziali ai quattro nodi HTTP che le vogliono.
   6. Le prove 27-34.
-- 🔴 **Mettere in strada la 0044** (23 settembre 2026). Va **dopo** la 0043.
+- ~~🔴 **Mettere in strada la 0044**~~ (23 settembre 2026) → **fatta, prove
+  41-56 passate lo stesso giorno.** I passi restano come memoria. Va **dopo**
+  la 0043.
   n8n non si tocca: il ponte Stripe ha la stessa firma e lo stesso endpoint.
   1. `supabase db push` — la `0044_proposta_su_misura.sql`.
   2. **Una riga nuova di `app_config`**, a mano dal SQL Editor (il seed gira
@@ -350,6 +422,62 @@ All Inclusive invece di indovinare; `my_orders` maschera già
      guarda la coda e cancella le `order_new_td` degli ordini di collaudo: i
      designer sono persone vere.
   6. Le prove 41-56.
+- 🔴 **Mettere in strada la 0045** (26 settembre 2026). Va **dopo** la 0044.
+  n8n non si tocca: le mail nuove passano dalla stessa coda e dallo stesso
+  ramo di consegna.
+  1. `supabase db push` — la `0045_correzioni_prove.sql`.
+  2. **Due righe nuove di `app_config`**, a mano dal SQL Editor (il seed gira
+     solo su `db reset`):
+
+     ```sql
+     insert into app_config (key, value, value_text, config_group, label_it, notes) values
+       ('team_notify_recipients', null, '', 'integrations',
+        'Chi riceve le notifiche interne del team (indirizzi separati da virgola)',
+        'Deciso il 23 settembre 2026: gli amministratori, cioè Simone, Alessandro e Andrea. Una mail per indirizzo, accodata come tutte le altre: valgono email_enabled e email_redirect_to. Vuota = nessuna notifica, e al primo evento in elenco un alert lo dice.'),
+       ('team_notify_events', null, 'ordine_pagato', 'integrations',
+        'Di quali eventi si avvisa il team per mail (nomi separati da virgola)',
+        'Un nome è il kind di un alert di team_alerts (es. ordine_richiesto) oppure ordine_pagato. Aggiungerne uno è tutto quello che serve: nessun deploy. NON metterci gli alert di igiene operativa: una mail per ogni anomalia insegna al team a ignorarle. Vuota = nessun evento.')
+     on conflict (key) do nothing;
+     ```
+
+  3. **Scrivere gli indirizzi degli amministratori**, da Studio e non in un
+     file versionato:
+     `update app_config set value_text = '<simone>, <alessandro>, <andrea>' where key = 'team_notify_recipients';`
+     Finché è vuota, il primo pagamento scrive un alert
+     `notifica_team_non_configurata` invece di perdersi.
+  4. **Rieseguire `supabase/seed/0005_testi_mail.sql`**: aggiunge solo
+     `order_paid_td` e `team_notifica`, e non tocca i testi già corretti.
+  5. Deploy del sito (il form e `CopiaTesto`).
+  6. Le prove 57-63.
+- 🔴 **Mettere in strada la 0046** (26 settembre 2026). Va **dopo** la 0045.
+  n8n non si tocca.
+  1. `supabase db push` — la `0046_silenzio_conferma.sql`.
+  2. **Controllare tre righe di `app_config`** che esistono dal seed della
+     milestone 0 ma che nessuno aveva mai letto:
+     `select key, value from app_config where key in ('postcall_autoclose_hours', 'revision_window_days', 'td_wait_minutes_in_call');`
+     Devono dire 48, 5, 15. Se ne manca una, l'orologio lo dice con
+     `orologio_ramo_non_configurato`.
+  3. **Controllare il bucket**: `select id, public, file_size_limit from storage.buckets where id = 'order-documents';`
+     — privato, 52428800. È della 0017; se non c'è, la consegna si ferma al
+     primo passo.
+  4. **Rieseguire `supabase/seed/0005_testi_mail.sql`**: aggiunge le sette righe
+     nuove e non tocca quelle già corrette.
+  5. Deploy del sito.
+  6. ⚠️ **Al primo giro dell'orologio si chiudono tutte le call confermate finite
+     da più di 48 ore**, collaudi compresi. È giusto — lo sarebbero state da
+     sole — e a `completed` oggi non segue nessuna mail.
+  7. ⚠️ **Da questo momento ogni call che finisce manda una mail al designer**
+     (`postcall_td`). Con `email_enabled = 0` resta in coda; prima del gradino 3
+     cancella quelle delle call di collaudo: i designer sono persone vere.
+  8. 🟡 **Una decisione tua, da una riga**: i due tasti producono gli alert
+     `td_segnala_no_show` e `td_segnala_problema`, e sono esattamente il caso
+     «c'è una persona che aspetta» del punto aperto sulle notifiche. Senza,
+     nessuno li vede finché non apre Studio — e una call segnalata resta ferma.
+     Io li metterei:
+     `update app_config set value_text = 'ordine_pagato, td_segnala_no_show, td_segnala_problema' where key = 'team_notify_events';`
+     Ci sono anche `ordine_consegnato` e `revisione_richiesta`, che sono buone
+     notizie e secondo me possono restare fuori.
+  9. Le prove 64-78.
 - 🟡 **Una chiave Resend separata per XPETIS.** Oggi ce n'è **una sola, condivisa
   con la landing page**: ruotarla per un progetto rompe l'altro, e una fuga da
   uno espone entrambi. Resend permette più chiavi, anche di solo invio. Da fare
@@ -493,7 +621,7 @@ vedere. Da chiarire con l'agenzia, non con il codice.
 | 3 | Sito pubblico: ricerca, quiz, match, vetrina | 🟡 **le quattro pagine disegnate ci sono**; restano tre task miei e le domande per Chiara | 1-2 sessioni | — |
 | 4 | Prenotazione e pagamento consulenza | 🟡 **quasi chiusa** — i due ponti, il giro del pagamento e l'orologio sono dentro e provati. Restano le due mail di conferma (impalcatura pronta), il form della prenotazione, il calendario admin e il percorso "slot introvabile" | 2-3 sessioni | 3-4 h |
 | 5 | Prima della call: riprogrammazioni e reminder | ⚪ — ma le due mail che le servono adesso sono un ramo e una riga di seed | 2-3 sessioni | — |
-| 6 | Post-call e Itinerario su misura | 🟡 **aperta** — la cerniera del dopo-call è costruita: mail post-call, bottoni, ordine in `requested`, alert al team. Resta la vita dell'ordine | 4-5 sessioni | — |
+| 6 | Post-call e Itinerario su misura | 🟢 **chiusa lato codice il 26 settembre 2026** — dal dopo-call alla chiusura a 5 giorni. Restano le prove 64-78, il tasto «C'è un problema» della pagina ordine e i punti aperti del silenzio-conferma | — | 2-3 h di prove |
 | 7 | All Inclusive | ⚪ | 4-5 sessioni | 4-6 h |
 | 8 | Recensioni e chiusura del ciclo | ⚪ | 2-3 sessioni | — |
 | 9 | Operatività e validazione Beta | ⚪ | 3-4 sessioni | 12-18 h |
@@ -1451,7 +1579,7 @@ mail resta valido e al clic successivo ne creerebbe un altro: se vuoi spegnerlo,
 `update access_tokens set revoked_at = now() where booking_id = '<id>';`
 
 
-### 🔴 Le prove della proposta su misura (23 settembre 2026)
+### ✅ Le prove della proposta su misura — 41-56 tutte passate il 23 settembre 2026
 
 Il giro completo, dalla richiesta al pagamento, con i token presi a mano dal
 SQL Editor. Vale tutto quello che è scritto sopra per la posta, e in più:
@@ -1508,24 +1636,28 @@ credenziale**. Quello del designer, in più, scrive un prezzo.
 
 | # | Cosa fai | Cosa deve succedere | Esito |
 |---|---|---|---|
-| 41 | Applicata la `0044`, inserita la riga di `app_config` e rieseguito il seed dei testi: `select * from payment_account('full');` e `select * from consultation_payment_account();` | Tutte e due `xpetis`, `agency_id` nullo. E `select key from message_templates order by key;` ne elenca nove | Se `payment_account` solleva, manca la riga: il messaggio dice quale |
-| 42 | Crea un ordine (SQL sopra, o bottone della prova 33) | In `outbound_messages` una `order_new_td` **in coda** per la mail del designer, e nel corpo il link `/ordine/<token>` e il prezzo della consulenza | Se non c'è, guarda `team_alerts`: un `email_composizione_fallita` dice cosa manca |
-| 43 | Apri il link del designer **dal telefono** | Intestazione con riferimento, nome del viaggiatore (solo il nome), data della call e «consulenza pagata … da scalare». Sotto, il form | Se compare il cognome, la mail o il telefono del viaggiatore, fermati: quel link vive in una casella inoltrabile |
-| 44 | Scrivi un prezzo che non si legge («abc») e salva | Torni al form con un avviso sul prezzo, e l'ordine resta `requested` | — |
-| 45 | Salva una proposta valida, con un credito di qualche euro | Il riepilogo «Rileggila: … la riceverà così». L'ordine è `in_definition`, e in `order_status_history` l'attore è **`td`**. In `orders` il prezzo è **quello che hai scritto**: il credito non è sottratto | Se il prezzo salvato è diverso da quello scritto, il codice ha «corretto» il credito: è il difetto che non deve esistere |
-| 46 | *Modifica*, cambia il prezzo, salva | Riepilogo col prezzo nuovo; ordine ancora `in_definition` | — |
-| 47 | Apri il riepilogo in **due schede**. Nella seconda modifica il prezzo e salva; nella prima premi *Invia* | «La proposta è cambiata dopo che l'hai riletta». **Non parte niente** | È la difesa contro un prezzo che nessuno ha riletto |
-| 48 | Ricarica la prima scheda e premi *Invia* | «Proposta inviata», con il link e il messaggio pronto da copiare (prova il bottone *Copia* dal telefono). Ordine `proposal_sent`, attore `td`; una riga in `order_proposals`; una `proposal_traveler` in coda con descrizione, prezzo all'italiana e link `/proposta/<token>` — e **nessuna cifra di credito** | — |
-| 49 | Torna indietro col browser e ripremi *Invia* | Sempre «inviata»; **una** riga in `order_proposals` e **una** mail | — |
-| 50 | Da Studio: `update orders set proposal_price_cents = 100 where human_ref = '<XP-…>';` | **Errore**: «la proposta … è già partita» | Se passa, il congelamento non c'è: dimmelo, perché è la cosa su cui poggia tutto il resto |
-| 51 | Apri il link della pagina gemella **in una finestra anonima** | La proposta, il prezzo, il bottone *Paga*. Nessun dato del viaggiatore | — |
-| 52 | Paga con la carta di prova | Su Stripe l'importo è quello della proposta e **la mail non è precompilata**. Al ritorno «Stiamo registrando il pagamento…», poi «Pagata». In `orders` lo stato è `in_progress` con attore **`traveler`**; in `payments` una riga `full`, `paid`, `stripe_account = 'xpetis'`. Riaprendo il link del designer: «Il viaggiatore ha pagato» | Se resta su «Stiamo registrando»: guarda l'esecuzione n8n del webhook Stripe e il campo `esito` della risposta |
-| 53 | **L'ordine annullato che riceve un pagamento.** Un secondo ordine, proposta inviata, apri la cassa e **fermati** sulla pagina Stripe. Da Studio: `update orders set status='cancelled', cancelled_at=now(), last_actor='team' where human_ref='<XP-…>';` Poi paga | L'ordine **resta annullato**; la riga in `payments` è `paid`; in `team_alerts` uno `stripe_pagamento_su_ordine_non_in_attesa` che dice «va rimborsato» | È lo slot già dato via, sugli ordini |
-| 54 | **La proposta riaperta.** Un terzo ordine, proposta inviata, apri la cassa e fermati su Stripe. Da Studio: `update orders set status='in_definition', last_actor='team' where human_ref='<XP-…>';` Il designer cambia il prezzo e reinvia. Dalla pagina gemella premi *Paga* | Una **seconda** mail al viaggiatore, due righe in `order_proposals`, e la nuova cassa Stripe porta **il prezzo nuovo**: la vecchia è stata chiusa. Se paghi nella scheda vecchia, Stripe dice che la sessione è scaduta | Se la cassa riusata porta il prezzo vecchio, il controllo d'importo di `lib/cassa.ts` non sta lavorando: dimmelo |
-| 55 | Da Studio assegna uno di quegli ordini a un altro designer e riapri il link del primo | «Questo link non funziona» | Poi rimettilo com'era |
-| 56 | `select * from team_spot_check_proposte;` | Una riga per proposta partita, con prezzo della call, credito dichiarato e prezzo proposto affiancati | È lo spot-check del Flusso: se è leggibile a colpo d'occhio, va bene |
+| ✅ 41 | Applicata la `0044`, inserita la riga di `app_config` e rieseguito il seed dei testi: `select * from payment_account('full');` e `select * from consultation_payment_account();` | Tutte e due `xpetis`, `agency_id` nullo. E `select key from message_templates order by key;` ne elenca nove | Se `payment_account` solleva, manca la riga: il messaggio dice quale |
+| ✅ 42 | Crea un ordine (SQL sopra, o bottone della prova 33) | In `outbound_messages` una `order_new_td` **in coda** per la mail del designer, e nel corpo il link `/ordine/<token>` e il prezzo della consulenza | Se non c'è, guarda `team_alerts`: un `email_composizione_fallita` dice cosa manca |
+| ✅ 43 | Apri il link del designer **dal telefono** | Intestazione con riferimento, nome del viaggiatore (solo il nome), data della call e «consulenza pagata … da scalare». Sotto, il form | Se compare il cognome, la mail o il telefono del viaggiatore, fermati: quel link vive in una casella inoltrabile |
+| ✅ 44 | Scrivi un prezzo che non si legge («abc») e salva | Torni al form con un avviso sul prezzo, e l'ordine resta `requested` | — |
+| ✅ 45 | Salva una proposta valida, con un credito di qualche euro | Il riepilogo «Rileggila: … la riceverà così». L'ordine è `in_definition`, e in `order_status_history` l'attore è **`td`**. In `orders` il prezzo è **quello che hai scritto**: il credito non è sottratto | Se il prezzo salvato è diverso da quello scritto, il codice ha «corretto» il credito: è il difetto che non deve esistere |
+| ✅ 46 | *Modifica*, cambia il prezzo, salva | Riepilogo col prezzo nuovo; ordine ancora `in_definition` | — |
+| ✅ 47 | Apri il riepilogo in **due schede**. Nella seconda modifica il prezzo e salva; nella prima premi *Invia* | «La proposta è cambiata dopo che l'hai riletta». **Non parte niente** | È la difesa contro un prezzo che nessuno ha riletto |
+| ✅ 48 | Ricarica la prima scheda e premi *Invia* | «Proposta inviata», con il link e il messaggio pronto da copiare (prova il bottone *Copia* dal telefono). Ordine `proposal_sent`, attore `td`; una riga in `order_proposals`; una `proposal_traveler` in coda con descrizione, prezzo all'italiana e link `/proposta/<token>` — e **nessuna cifra di credito** | — |
+| ✅ 49 | Torna indietro col browser e ripremi *Invia* | Sempre «inviata»; **una** riga in `order_proposals` e **una** mail | — |
+| ✅ 50 | Da Studio: `update orders set proposal_price_cents = 100 where human_ref = '<XP-…>';` | **Errore**: «la proposta … è già partita» | Se passa, il congelamento non c'è: dimmelo, perché è la cosa su cui poggia tutto il resto |
+| ✅ 51 | Apri il link della pagina gemella **in una finestra anonima** | La proposta, il prezzo, il bottone *Paga*. Nessun dato del viaggiatore | — |
+| ✅ 52 | Paga con la carta di prova | Su Stripe l'importo è quello della proposta e **la mail non è precompilata**. Al ritorno «Stiamo registrando il pagamento…», poi «Pagata». In `orders` lo stato è `in_progress` con attore **`traveler`**; in `payments` una riga `full`, `paid`, `stripe_account = 'xpetis'`. Riaprendo il link del designer: «Il viaggiatore ha pagato» | Se resta su «Stiamo registrando»: guarda l'esecuzione n8n del webhook Stripe e il campo `esito` della risposta |
+| ✅ 53 | **L'ordine annullato che riceve un pagamento.** Un secondo ordine, proposta inviata, apri la cassa e **fermati** sulla pagina Stripe. Da Studio: `update orders set status='cancelled', cancelled_at=now(), last_actor='team' where human_ref='<XP-…>';` Poi paga | L'ordine **resta annullato**; la riga in `payments` è `paid`; in `team_alerts` uno `stripe_pagamento_su_ordine_non_in_attesa` che dice «va rimborsato» | È lo slot già dato via, sugli ordini |
+| ✅ 54 | **La proposta riaperta.** Un terzo ordine, proposta inviata, apri la cassa e fermati su Stripe. Da Studio: `update orders set status='in_definition', last_actor='team' where human_ref='<XP-…>';` Il designer cambia il prezzo e reinvia. Dalla pagina gemella premi *Paga* | Una **seconda** mail al viaggiatore, due righe in `order_proposals`, e la nuova cassa Stripe porta **il prezzo nuovo**: la vecchia è stata chiusa. Se paghi nella scheda vecchia, Stripe dice che la sessione è scaduta | Se la cassa riusata porta il prezzo vecchio, il controllo d'importo di `lib/cassa.ts` non sta lavorando: dimmelo |
+| ✅ 55 | Da Studio assegna uno di quegli ordini a un altro designer e riapri il link del primo | «Questo link non funziona» | Poi rimettilo com'era |
+| ✅ 56 | `select * from team_spot_check_proposte;` | Una riga per proposta partita, con prezzo della call, credito dichiarato e prezzo proposto affiancati | È lo spot-check del Flusso: se è leggibile a colpo d'occhio, va bene |
 
-#### 🔧 Da correggere, emerso durante le prove del 23 settembre
+#### ✅ Corretto il 26 settembre — emerso durante le prove del 23 settembre
+
+Tutte e quattro fatte con la `0045` e le modifiche al sito: il racconto è in
+`REGISTRO.md`, le prove per verificarle sono le 57-63 qui sotto. Il testo resta
+com'era perché dice **cosa non toccare**, e vale anche dopo.
 
 - **[C] Il form della proposta perde la descrizione al primo errore.** Se il
   designer sbaglia il prezzo alla **prima** stesura, torna al form **vuoto** e
@@ -1575,6 +1707,114 @@ delete from team_alerts where kind like 'stripe_%' and entity_type = 'order';
 ```
 
 I pagamenti di prova restano su Stripe sandbox, dove non costano niente.
+
+### 🔴 Le prove delle correzioni (26 settembre 2026)
+
+Tutte con **`email_enabled = 0`**: nessuna di queste ha bisogno che una mail
+parta, si guarda la coda. Per le 58-60 serve un ordine **nuovo**, senza bozza:
+il difetto del punto 1 si vede solo alla prima stesura.
+
+```sql
+-- la coda delle mail nuove, come la leggerà chi le riceve
+select message_kind, recipient, status, subject, body_text
+  from outbound_messages
+ where message_kind in ('order_paid_td', 'team_ordine_pagato', 'team_ordine_richiesto')
+ order by queued_at desc limit 20;
+```
+
+| # | Cosa fai | Cosa deve succedere | Esito |
+|---|---|---|---|
+| 57 | Applicata la `0045`, inserite le due righe e rieseguito il seed dei testi: `select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prosrc ~ '/\s*100\.0';` | **Nessuna riga.** E `select key from message_templates order by key;` ne elenca **undici** | Se esce un nome, quella funzione scrive ancora importi con sedici decimali |
+| 58 | ⚠️ **Il punto 1, ed è la prova che conta.** Ordine nuovo, link del designer, **prima stesura**: scrivi una descrizione lunga, i giorni, e come prezzo `0,10` (passa il campo ma è sotto il minimo). Salva | Torni al form con l'avviso sul prezzo, e **la descrizione è lì, intera**, insieme a `0,10` e ai giorni | Se il form è vuoto, il ripristino non lavora: è il difetto di prima |
+| 59 | Salva una proposta valida. *Modifica*: **cambia la descrizione** e metti prezzo `0,20`. Salva | Torni al form con **la descrizione nuova**, non quella salvata prima | È la trappola del «ripopolare dal database»: se ricompare la vecchia, il form legge la riga e non quello che hai inviato |
+| 60 | Nel campo prezzo scrivi `030`, poi `12,345`, e salva | Il **browser** ferma l'invio e dice il formato; non perdi niente. Poi dagli strumenti di sviluppo togli l'attributo `pattern` dal campo e risalva `030` | Col `pattern` tolto: avviso sul prezzo dalla route, ordine ancora `requested`. Se passa e salva 30 €, la route non ricontrolla |
+| 61 | Invia la proposta e premi *Copia* **dall'indirizzo di rete** (`http://192.168.x.x:3000`, dal telefono o dal desktop) | «Il bottone non è riuscito a copiare», testo **selezionato**. Tenendo il dito sopra si copia e si incolla in WhatsApp. Da `localhost`: «Copiato» | Se il campo non c'è o non si seleziona, il designer resta senza link |
+| 62 | **Il punto 5.** Con i tuoi indirizzi in `team_notify_recipients`, paga una proposta (come la 52) | In coda: **una** `order_paid_td` al designer, con link `/ordine/…`, prezzo all'italiana e «entro il GG/MM/AAAA»; **una `team_ordine_pagato` per indirizzo**, oggetto «[XPETIS] Pagata la proposta XP-… · 1.400,00 €». Tutte `queued` | Se al posto delle `team_…` c'è un alert `notifica_team_non_configurata`, la riga dei destinatari è vuota |
+| 63 | **Il cablaggio di `ordine_richiesto`, e poi si rimette com'era.** `update app_config set value_text = 'ordine_pagato, ordine_richiesto' where key = 'team_notify_events';` e premi un bottone post-call (come la 33) | Una `team_ordine_richiesto` per indirizzo, oggetto «[XPETIS · da guardare] Nuova richiesta XP-…». Poi `update app_config set value_text = 'ordine_pagato' where key = 'team_notify_events';` — la decisione resta parcheggiata | Dimostra che il punto aperto è una riga di configurazione, non un deploy |
+
+Rigiocando la **54**, l'alert deve dire «1.400,00 €» e non «700.0000000000000000».
+
+⚠️ **Pulizia**, oltre a quella delle prove 41-56:
+
+```sql
+delete from outbound_messages
+ where message_kind in ('order_paid_td', 'team_ordine_pagato', 'team_ordine_richiesto')
+   and status = 'queued';
+delete from team_alerts where kind like 'notifica_team_%';
+```
+
+### 🔴 Le prove del silenzio-conferma (26 settembre 2026)
+
+Tutte con **`email_enabled = 0`**: si guarda la coda. Servono una call di prova
+confermata e un ordine su misura pagato (prove 41-52), con i token presi dal SQL
+Editor come allora.
+
+#### Come si fabbrica una finestra scaduta senza aspettare
+
+Nessuna di queste prove richiede di aspettare 48 ore o 5 giorni: le scadenze si
+calcolano **dalle date sulla riga**, quindi si spostano indietro le date e si
+lascia girare l'orologio (o lo si chiama a mano con `select * from clock_tick(10);`).
+
+```sql
+-- una call finita da 49 ore: al prossimo giro si chiude da sola
+update bookings set starts_at = now() - interval '49 hours 30 minutes',
+                    ends_at   = now() - interval '49 hours'
+ where id = '<id della call>';
+
+-- una call appena finita, per far partire la mail dei tasti (serve che sia
+-- 'confirmed' e finita da meno di 24 ore)
+update bookings set starts_at = now() - interval '40 minutes',
+                    ends_at   = now() - interval '10 minutes'
+ where id = '<id della call>';
+
+-- la finestra della revisione scaduta, senza chiudere l'ordine
+update orders set revision_deadline_at = now() - interval '1 minute'
+ where human_ref = '<XP-…>';
+
+-- l'ordine consegnato cinque giorni fa: al prossimo giro si chiude
+update orders set delivered_at = now() - interval '5 days 1 minute'
+ where human_ref = '<XP-…>';
+-- ⚠️ dopo una riconsegna la chiusura conta da revision_delivered_at: va
+-- spostata quella, non delivered_at
+update orders set revision_delivered_at = now() - interval '5 days 1 minute'
+ where human_ref = '<XP-…>';
+```
+
+```sql
+-- i link dei due tasti di una call
+select purpose, '<site_base_url>/eccezione/' || token
+  from access_tokens where booking_id = '<id della call>'
+   and purpose in ('td_exception_no_show', 'td_exception_problem');
+```
+
+| # | Cosa fai | Cosa deve succedere | Esito |
+|---|---|---|---|
+| 64 | Applicata la `0046` e rieseguito il seed: `select * from clock_tick(10);` | Nessun errore, nessun `orologio_ramo_non_configurato`. `select key from message_templates order by key;` ne elenca **diciotto** | Se c'è l'alert, legge le chiavi che mancano |
+| 65 | Una call appena finita (SQL sopra), poi un giro dell'orologio | In coda una `postcall_td` al designer, con due bottoni `/eccezione/…` e la data in cui la call si chiude | — |
+| 66 | Apri il link **no-show dal telefono** | «Dall'altra parte non c'era nessuno?», il solo nome di chi ha prenotato, la regola dei 15 minuti, e scritto prima del tasto che **la call non si chiude come no-show da sola** | Se compare cognome, mail o telefono del viaggiatore, fermati |
+| 67 | Segnala il no-show con 20 minuti e una nota | «Segnalazione ricevuta». La call è `disputed` con attore `td`; in `team_alerts` un `td_segnala_no_show` **critical** che dice attesa dichiarata, regola, **dopo quanti minuti dall'inizio hai cliccato**, la tua nota, i contatti del viaggiatore e «NON è stato avvisato» | Leggilo come lo leggerebbe Alessandro: basta per decidere? Se manca qualcosa, dimmelo |
+| 68 | Ripremi il tasto no-show, poi apri il link «altro problema» della stessa call | «Già segnalata», con data e tipo. **Una** riga in `booking_exceptions`, **un** alert | — |
+| 69 | Sposta quella call a 49 ore fa e fai girare l'orologio | Resta `disputed`: il silenzio non chiude una call segnalata | Se diventa `completed`, il silenzio ha scavalcato il designer |
+| 70 | Da Studio: `update bookings set status = 'no_show', last_actor = 'team' where id = '<id>';` | In `booking_exceptions` la riga ha `resolved_at` e `resolution = no_show` | — |
+| 71 | Un'altra call confermata spostata a 49 ore fa, un giro | `completed`, attore `system`. Apri uno dei suoi tasti (fabbricalo con l'`insert` delle prove 27-40, scopo `td_exception_problem`, `audience 'td'`): «Questa call si è chiusa», nessun modulo | — |
+| 72 | **La consegna.** Sull'ordine pagato, dalla pagina del designer **dal telefono**: scegli un PDF **sopra i 5 MB** e premi *Consegna* | «Carico il file…», poi la pagina diventa «Consegnato», col messaggio da girare nel gruppo e il file in elenco. `orders` in `delivered`, attore `td`; una riga in `order_files`; in Storage il file sotto `ordini/<id ordine>/` | ⚠️ È la prova che conta per la scelta dei byte diretti: sopra i 4,5 MB la strada «dal nostro server» si sarebbe rotta su Vercel. Se fallisce, guarda la console del browser (CORS di Storage) |
+| 73 | Prova a consegnare un `.html` o un file sopra i 50 MB | Un messaggio chiaro **prima** di caricare, niente in Storage | — |
+| 74 | In coda la `delivery_traveler`: leggila | Porta `/proposta/<token>` e la data limite della revisione, **nessun link di Storage** | Se c'è un indirizzo `…/storage/v1/…`, fermati: è il difetto che si vede fra tre settimane |
+| 75 | ⚠️ **Il link firmato scaduto.** Dalla pagina del viaggiatore clicca il file: si scarica. Copia l'indirizzo su cui è finito il browser (quello di Storage, con `token=`), **aspetta due minuti** e riaprilo | Storage risponde che il token è scaduto. **Poi** riclicca il file dalla pagina: si scarica di nuovo | È esattamente quello che succederebbe a una mail con dentro il link di Storage; la pagina invece funziona sempre |
+| 76 | Dalla pagina del viaggiatore chiedi la revisione con una nota | «Richiesta ricevuta», ordine `revision_requested` attore `traveler`, in coda la `revision_requested_td` con la nota. La pagina **non** mostra più il tasto | — |
+| 77 | Riconsegna dalla pagina del designer, poi dalla pagina del viaggiatore riprova a chiedere una revisione (ricarica una scheda vecchia col modulo, se ce l'hai) | Due file in elenco; `revision_deadline_at` **uguale** a prima; seconda mail al viaggiatore. Alla seconda richiesta: «era una sola, ed è già stata chiesta», con le date | È la regola «una sola»: se la seconda passa, dimmelo |
+| 78 | Su un secondo ordine consegnato: finestra della revisione scaduta (SQL sopra), apri la pagina del viaggiatore. Poi `delivered_at` a cinque giorni fa e un giro | Prima: niente tasto, «il tempo per chiedere la revisione è finito il…». Dopo: `completed` attore `system`, la pagina dice «chiusa» e **il file si scarica ancora** | — |
+
+⚠️ **Pulizia** delle prove 64-78:
+
+```sql
+delete from outbound_messages
+ where message_kind in ('postcall_td', 'delivery_traveler', 'revision_delivered_traveler',
+                        'revision_requested_td') and status = 'queued';
+delete from team_alerts where kind in ('td_segnala_no_show', 'td_segnala_problema');
+-- booking_exceptions e order_files vanno via per cascata con la call e l'ordine;
+-- i file in Storage NO: si cancellano dal pannello Storage, cartella ordini/<id>.
+```
 
 ### ❓ Come si accorge il team che c'è un ordine da lavorare (23 settembre 2026)
 
@@ -1626,10 +1866,33 @@ scritte in quattro posti. Serve invece: **una lista di destinatari interni** e
 uno è una riga e non un deploy. Il Flusso, per il pagamento, chiede il messaggio
 «in pagina e via mail»: in pagina c'è già.
 
-**Decisione che spetta a Simone:** a quale casella. `info@xpetis.it` è il
-mittente verso i viaggiatori, quindi è lì che arrivano le loro risposte;
-mescolarci gli alert interni significa perdere entrambi. È la stessa domanda
-rimasta aperta chiudendo S-04, che adesso ha una conseguenza concreta.
+~~**Decisione che spetta a Simone:** a quale casella.~~ → **decisa il 23
+settembre**: agli amministratori, cioè agli indirizzi di Simone, Alessandro e
+Andrea in `team_notify_recipients`. `info@xpetis.it` resta il **mittente** —
+casella vera, dove arrivano le risposte dei viaggiatori — e non riceve gli
+alert interni: mescolarli significherebbe perdere entrambi.
+
+**Aggiornamento del 26 settembre 2026 — il meccanismo c'è (`0045`).** Una lista
+di destinatari interni (`team_notify_recipients`) e un elenco di eventi che la
+usano (`team_notify_events`), tutti e due in `app_config`. Un evento è **o il
+`kind` di un alert** — un trigger su `team_alerts` li guarda tutti — **o un
+evento che non è un'anomalia**, come `ordine_pagato`, che non va scritto fra
+gli alert perché riempirebbe di buone notizie la tabella da svuotare.
+
+**Quindi `ordine_richiesto` adesso è una riga di configurazione**, non un
+deploy:
+
+```sql
+update app_config set value_text = 'ordine_pagato, ordine_richiesto'
+ where key = 'team_notify_events';
+```
+
+**Non è stata scritta, per scelta**: resta parcheggiata con il digest, come
+deciso da Simone. Restano aperti, e il meccanismo non li pregiudica: il
+**digest giornaliero** (che si reggerà sulla stessa lista di destinatari) e la
+dipendenza dalla vista operativa minima per marcare gli alert risolti. E vale
+ancora l'avvertenza sopra: l'elenco nomina gli eventi uno per uno proprio per
+non diventare «una mail per ogni anomalia».
 
 ---
 
@@ -1692,29 +1955,56 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
         e da lì discende la regola per le due milestone che seguono: dietro un
         token permanente non va mai un'azione che muove denaro o consegna un
         file
-- [ ] **[C]** Tasti eccezione del TD: no-show e "altro problema" → disputa
-- [ ] **[C]** Chiusura a 48 ore (dentro l'orologio unico)
-- [~] **[C]** Pagina ordine del TD a stati (uno stato, una azione), con upload su
-      Storage. **La parte proposta è fatta il 23 settembre 2026** →
-      `app/ordine/[token]/`, `td_order_page()`, `save_proposal_draft()`,
-      `send_proposal()`. Il link arriva al designer per mail alla nascita
-      dell'ordine (trigger, non orologio). **Manca l'upload**, che è la
-      consegna: seconda metà
+- [x] **[C]** Tasti eccezione del TD: no-show e "altro problema" → disputa.
+      **Fatto il 26 settembre 2026** → `0046_silenzio_conferma.sql` parte A,
+      `app/eccezione/[token]/`. La mail con i due tasti è un ramo
+      dell'orologio (`clock_ramo_postcall_td`). **Tutti e due portano a
+      `disputed`**: il no-show si dichiara, lo chiude il team dopo aver
+      verificato. Una segnalazione per call (`booking_exceptions`), che si
+      chiude da sola quando il team porta la call fuori da `disputed`
+- [x] **[C]** Chiusura a 48 ore (dentro l'orologio unico). **Fatto il 26
+      settembre 2026** → `clock_ramo_chiusura_call()`: un `update`, niente
+      compito. Tocca solo `confirmed`, quindi una segnalazione la ferma senza
+      che il ramo sappia che le segnalazioni esistono
+- [x] **[C]** Pagina ordine del TD a stati (uno stato, una azione), con upload su
+      Storage. **Proposta il 23 settembre, consegna il 26 settembre 2026** →
+      `td_delivery_ticket()`, `td_deliver()`, `components/carica-consegna.tsx`.
+      I byte vanno dal browser a Storage con un caricamento firmato scelto dal
+      database: il limite di 4,5 MB di Vercel non lascia alternative (vedi
+      `CLAUDE.md`, convenzione sui file)
 - [x] **[C]** Invio proposta: Checkout Session creata dal server con l'importo
       scritto dal TD, pagina pubblica gemella, mail al viaggiatore, messaggio
       pronto al TD. **Fatto il 23 settembre 2026** → `0044_proposta_su_misura.sql`,
       `app/proposta/[token]/`, `lib/cassa.ts`. Il ponte Stripe porta l'ordine a
       `in_progress` e riconosce ordine sconosciuto, annullato, riaperto e doppio
-      incasso. ⚠️ Il messaggio pronto è **in pagina**; il Flusso lo vuole
-      «in pagina e via mail», e la mail al designer non c'è (domanda aperta sotto)
-- [ ] **[C]** Consegna, richiesta di revisione, chiusura a 5 giorni
+      incasso. Il messaggio «pagata» è **in pagina e via mail** come vuole il
+      Flusso: la mail al designer (e agli amministratori) è entrata con la
+      `0045` il 26 settembre 2026
+- [x] **[C]** Consegna, richiesta di revisione, chiusura a 5 giorni. **Fatto il
+      26 settembre 2026** → `0046` parti B e C, `request_revision()`,
+      `clock_ramo_chiusura_ordini()`, `app/proposta/[token]/revisione` e
+      `/file/[id]`. Una revisione sola, dentro la finestra; la chiusura riparte
+      dopo la riconsegna, la finestra della revisione no
+- [ ] **[C]** Il tasto «C'è un problema» in fondo alla pagina ordine (Flusso §7:
+      «in fondo, sempre»). Non chiesto con i tasti del dopo-call; oggi c'è
+      «Scrivi al team» su WhatsApp
+
+### ❓ Domande aperte nate dal silenzio-conferma (26 settembre 2026)
+
+| Domanda | Perché è aperta | Chi decide |
+|---|---|---|
+| 🔴 **Il viaggiatore dichiarato assente deve saperlo, e poter dire «c'ero»?** Oggi il designer preme no-show, la call va al team, e il viaggiatore **non riceve niente**. Se il team chiude come `no_show`, ha perso la consulenza e non lo sa: il silenzio qui è di chi non è stato informato, non di chi ha scelto di tacere. **Il mio parere: sì, va avvisato prima che il team decida** — una mail breve, «il designer segnala che alla call non c'eri; se non è così scrivici entro 48 ore», con il WhatsApp. Costa una riga di `message_templates` e una riga nel clic del no-show. Non l'ho fatto perché cambia il modo in cui si arbitra, e il Flusso non lo prevede | È una scelta di prodotto e di tono: avvisare vuol dire anche aprire una contestazione per ogni no-show | Simone, Alessandro, Andrea; testo di Gaia |
+| **Una revisione mai consegnata resta aperta per sempre.** In `revision_requested` il silenzio non chiude (sarebbe il silenzio di chi non è stato servito), ma nessun timer si accorge se il designer non riconsegna mai. Il Flusso non dà un tempo per la revisione | Serve un tempo (i giorni di consegna originali? un numero fisso?) e cosa succede allo scadere: un alert al team, probabilmente | Simone |
+| **Una call rimasta senza la mail dei tasti si chiude lo stesso a 48 ore.** Succede se l'orologio è stato fermo più di `postcall_email_max_age_hours` (24): la mail al designer non parte più, e la call si chiude senza che abbia avuto i tasti. L'alert `postcall_mail_non_partita` conta già quelle call per il viaggiatore; il testo dice di riprenderle a mano | Se va bene così, basta saperlo; altrimenti la chiusura dovrebbe aspettare che la mail sia partita | Simone |
+| **La pagina dei tasti non ha un disegno.** Il Flusso le chiede a Chiara («semplicissime, una domanda e un tasto»). Oggi usano il guscio delle altre pagine a token | Serve un disegno, o un ok a quello che c'è | Chiara |
+| **Per l'All Inclusive lo scaricamento va ripensato.** La pagina del viaggiatore è girata nel gruppo: per un itinerario va bene, per biglietti e voucher (milestone 7) chi ha il link ha il documento. Scritto in testa alla 0046 | Da decidere quando si fa l'All Inclusive | Simone |
 
 ### ❓ Domande aperte nate dalla proposta su misura (23 settembre 2026)
 
 | Domanda | Perché è aperta | Chi decide |
 |---|---|---|
 | **La pagina ordine del designer e la pagina gemella non hanno un disegno.** Il Flusso le chiede a Chiara («mobile first, uno stato una azione»; la gemella «deve sembrare una pagina XPETIS, non una fattura») e il Figma non le ha. Per il corollario di `CLAUDE.md` l'assenza non è una decisione: oggi usano il guscio delle altre pagine a token, colonna stretta e niente header | Serve un disegno, o un ok a quello che c'è | Chiara |
-| **Una mail al designer quando il viaggiatore paga?** Il Flusso vuole il messaggio pronto «in pagina e via mail», e il designer oggi scopre di essere stato pagato solo riaprendo la sua pagina — o dal gruppo. Il prompt di oggi chiedeva due mail e sono due; la terza è una riga di `message_templates` e un trigger sul passaggio a `in_progress` | È la mail che dice al designer «puoi cominciare»: senza, il tempo di consegna parte senza che lui lo sappia | Simone, testi di Gaia |
+| ~~**Una mail al designer quando il viaggiatore paga?**~~ → **Decisa da Simone il 23 settembre e fatta il 26** (`0045`): al designer e agli amministratori. Il Flusso vuole il messaggio pronto «in pagina e via mail», e il designer oggi scopre di essere stato pagato solo riaprendo la sua pagina — o dal gruppo. Il prompt di oggi chiedeva due mail e sono due; la terza è una riga di `message_templates` e un trigger sul passaggio a `in_progress` | È la mail che dice al designer «puoi cominciare»: senza, il tempo di consegna parte senza che lui lo sappia | Simone, testi di Gaia |
 | **Un ordine annullato libera il credito della call?** `orders_one_credit_per_booking` (0009) conta anche gli annullati: se l'ordine col credito viene annullato, un secondo ordine della stessa call non può più dichiararlo, e dalla 0044 il team non può azzerarlo a mano (la proposta di un ordine annullato è congelata). Se la risposta è sì, è una riga: l'indice con `status <> 'cancelled'` | È una regola di prodotto: dipende se l'annullamento è rimborsato | Alessandro, Andrea |
 | **Una proposta a zero euro?** Se il credito copre tutto il prezzo, il designer dovrebbe scrivere 0 — ma Stripe non incassa sotto 0,50 € e senza pagamento l'ordine non arriva a `in_progress`. Oggi il minimo è 0,50 € (è il contratto dell'API, non un parametro). Con i prezzi dei 25 non dovrebbe succedere | Se succede serve un passaggio a mano, o un tasto che salta la cassa | Simone |
 

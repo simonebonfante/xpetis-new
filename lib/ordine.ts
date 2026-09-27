@@ -42,6 +42,28 @@ export type PaginaOrdine = {
   inviata_il?: string | null
   link_proposta?: string | null
   messaggio_pronto?: string | null
+  // Dalla 0046: la consegna e la revisione.
+  messaggio_consegna?: string | null
+  file?: FileOrdine[]
+  consegnato_il?: string | null
+  revisione_entro?: string | null
+  revisione_chiesta_il?: string | null
+  revisione_nota?: string | null
+  revisione_consegnata_il?: string | null
+  chiuso_il?: string | null
+  si_chiude_il?: string | null
+}
+
+/**
+ * Un file dell'ordine come lo vede una pagina: **niente percorso, niente
+ * link**. Si scarica da `/ordine|proposta/[token]/file/[id]`, dove la route
+ * genera un link firmato al clic (vedi `lib/documenti.ts`).
+ */
+export type FileOrdine = {
+  id: string
+  tipo: 'itinerary' | 'revision'
+  nome: string
+  caricato_il: string
 }
 
 /** Le risposte di `save_proposal_draft` e `send_proposal`. */
@@ -56,7 +78,16 @@ export type EsitoAzione = {
   prezzo_call_cents?: number
 }
 
-export type FaseProposta = 'da_pagare' | 'pagata' | 'in_aggiornamento' | 'annullata' | 'in_verifica'
+export type FaseProposta =
+  | 'da_pagare'
+  | 'pagata'
+  // Dalla 0046: il dopo-pagamento ha tre facce invece di una.
+  | 'consegnata'
+  | 'in_revisione'
+  | 'chiusa'
+  | 'in_aggiornamento'
+  | 'annullata'
+  | 'in_verifica'
 
 export type PaginaProposta = {
   esito: EsitoToken
@@ -70,6 +101,16 @@ export type PaginaProposta = {
   prezzo_cents?: number | null
   giorni?: number | null
   inviata_il?: string | null
+  // Dalla 0046.
+  file?: FileOrdine[]
+  consegnato_il?: string | null
+  revisione_entro?: string | null
+  revisione_chiesta_il?: string | null
+  revisione_nota?: string | null
+  revisione_consegnata_il?: string | null
+  chiuso_il?: string | null
+  si_chiude_il?: string | null
+  puo_chiedere_revisione?: boolean
 }
 
 async function rpc<T>(funzione: string, argomenti: Record<string, unknown>, ripiego: T): Promise<T> {
@@ -107,10 +148,89 @@ export const inviaProposta = (token: string, prezzoConfermatoCents: number | nul
 export const leggiPaginaProposta = (token: string) =>
   rpc<PaginaProposta>('proposal_public_page', { p_token: token }, { esito: 'irraggiungibile' })
 
+// ---------------------------------------------------------------- la consegna (0046)
+
+/** Le risposte di `td_delivery_ticket`, `td_deliver` e `request_revision`. */
+export type EsitoConsegna = {
+  ok: boolean
+  esito: string
+  campo?: string
+  stato?: string
+  path?: string
+  tipo?: 'itinerary' | 'revision'
+  chiesta_il?: string
+  consegnata_il?: string
+  scaduta_il?: string
+  chiuso_il?: string
+}
+
+/** Il permesso di caricare: il database controlla e **sceglie il percorso**. */
+export const bigliettoConsegna = (token: string, file: { nome: string; byte: number; tipo: string }) =>
+  rpc<EsitoConsegna>(
+    'td_delivery_ticket',
+    { p_token: token, p_nome: file.nome, p_size: file.byte, p_mime: file.tipo },
+    { ok: false, esito: 'irraggiungibile' },
+  )
+
+/** La consegna, con dimensione e tipo letti da Storage e non dichiarati dal browser. */
+export const registraConsegna = (
+  token: string,
+  file: { path: string; nome: string; byte: number; tipo: string },
+) =>
+  rpc<EsitoConsegna>(
+    'td_deliver',
+    { p_token: token, p_path: file.path, p_nome: file.nome, p_size: file.byte, p_mime: file.tipo },
+    { ok: false, esito: 'irraggiungibile' },
+  )
+
+/** Il permesso di scaricare: un **percorso**, mai un URL. Firmare è mestiere della route. */
+export const permessoFile = (token: string, fileId: string) =>
+  rpc<{ esito: string; path?: string; nome?: string }>(
+    'order_file_for_token',
+    { p_token: token, p_file_id: fileId },
+    { esito: 'irraggiungibile' },
+  )
+
+export const chiediRevisione = (token: string, nota: string) =>
+  rpc<EsitoConsegna>('request_revision', { p_token: token, p_nota: nota }, { ok: false, esito: 'irraggiungibile' })
+
 // ---------------------------------------------------------------- gli euro
 
 /**
+ * La forma ammessa di un importo scritto a mano: **la guardia del campo**, non
+ * il calcolo. Al massimo due decimali, e nessuno zero iniziale — «030» non è un
+ * prezzo, è un dito scivolato, e `euroInCentesimi` da sola lo leggerebbe 30 €.
+ *
+ * Sta in un posto solo perché la usano in due: l'attributo `pattern` del campo
+ * (il browser ferma l'invio e il designer non perde niente) e la route, che
+ * **deve** ricontrollare: `pattern` e `type="number"` sono suggerimenti al
+ * browser, e la route riceve comunque quello che le si manda.
+ *
+ * Accetta «450», «0,50», «1150,50», «1150.50», «1.150», «1.150,50 €». Il punto
+ * delle migliaia va solo con la virgola decimale: «1.150.50» si rifiuta, come
+ * lo rifiuta `euroInCentesimi`. È scritta per valere identica come `RegExp` e
+ * come `pattern` HTML (che la ancora da sé e la compila col flag `v`).
+ */
+export const FORMA_IMPORTO = String.raw`\s*(?:(?:0|[1-9]\d*)(?:[.,]\d{1,2})?|[1-9]\d{0,2}(?:\.\d{3})+(?:,\d{1,2})?)\s*€?\s*`
+
+const IMPORTO_BEN_SCRITTO = new RegExp(`^(?:${FORMA_IMPORTO})$`, 'u')
+
+export function importoBenScritto(testo: string): boolean {
+  return IMPORTO_BEN_SCRITTO.test(testo)
+}
+
+/**
  * Da quello che un designer scrive in un campo prezzo a centesimi.
+ *
+ * ⚠️ **Non semplificarla con `parseFloat(testo) * 100`.** È corretta così ed è
+ * stata verificata caso per caso: virgola italiana (`1200,50` → 120050), punto
+ * come migliaia (`1.200` → 120000), tre decimali rifiutati, e soprattutto
+ * **aritmetica intera** — `19,99` dà 1999. Con la virgola mobile `19.99 * 100`
+ * fa 1998.9999999999998, e un arrotondamento per difetto è un centesimo di
+ * scarto: il ponte Stripe confronta l'incassato col prezzo della proposta,
+ * **rifiuta il pagamento** se non combaciano, e ne esce un alert critico e un
+ * ordine che non si conferma mai. Le regole sulla forma del campo non vanno
+ * qui dentro: stanno in `FORMA_IMPORTO`.
  *
  * Il campo è testo libero di proposito: su telefono un `type="number"` in
  * italiano vuole la virgola su certe tastiere e il punto su altre, e rifiuta in

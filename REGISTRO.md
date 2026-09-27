@@ -9,6 +9,168 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**26 settembre 2026 — la milestone 6 si chiude: il silenzio-conferma, e i due modi di romperlo**
+
+Il prompt: chiusura a 48 ore con i due tasti del designer, consegna con i file,
+revisione e chiusura a 5 giorni. È `0046_silenzio_conferma.sql`, la pagina
+`/eccezione/[token]`, la consegna dalla pagina ordine, lo scaricamento e la
+revisione dalla pagina del viaggiatore. Harness da 614 a **693 asserzioni**,
+build verde. Tre rami dell'orologio in più, nessun workflow: n8n non si tocca.
+
+**Il tasto no-show non chiude come no-show, e la ragione l'ha data il Flusso.**
+Il prompt avvertiva che quel tasto decide chi tiene i soldi sulla sola parola
+del designer. Rileggendo §6 c'era già la risposta: «verifica rapida del team,
+chiusura come no-show». Quindi il tasto **dichiara**: la call va a `disputed`
+come per «altro problema», il silenzio si ferma, e `no_show` lo scrive il team.
+Ho scartato uno stato nuovo nell'enum (`alter type ... add value` dentro una
+migration è fragile, e `disputed` è già definito come «in arbitrato del team»)
+e le colonne su `bookings` (sono i dati di un arbitrato, e `bookings` ha già
+abbastanza porte verso il browser): è una tabella, `booking_exceptions`, una
+riga per call. Dentro c'è la cosa che in un arbitrato vale di più, e che il
+designer non può scrivere: **l'ora del clic, misurata dal server**. Ho aggiunto
+anche il rifiuto del no-show prima dei 15 minuti dall'inizio: la regola resta
+d'onore sull'attesa, ma non si può dichiarare prima che la regola sia scaduta.
+
+**Il viaggiatore dichiarato assente non lo sa, e non l'ho deciso io.** Il
+prompt chiedeva di dirlo invece di decidere che il silenzio vada bene: il mio
+parere è che vada avvisato prima che il team decida, ed è in `PIANO.md` come
+punto aperto rosso. Nel frattempo l'alert scrive in chiaro che il viaggiatore
+non è stato sentito, con mail e telefono per farlo.
+
+**La scelta più grossa riguarda i byte, e contraddice una riga di `CLAUDE.md`.**
+«Il caricamento passa dal nostro server» si scontra con il limite di 4,5 MB del
+corpo di una funzione Vercel: un itinerario col template XPETIS lo supera, e il
+bucket ne ammette 50. Costruito come chiedeva il prompt, avrebbe funzionato in
+sviluppo e si sarebbe rotto col primo PDF vero in produzione. Quindi il server
+decide tutto e non porta niente: il database sceglie il percorso, la route apre
+un caricamento firmato su quel percorso soltanto, il browser carica, e poi la
+route guarda cosa è arrivato davvero prima di registrare. L'altra metà della
+convenzione — n8n non vede mai un file — resta intera. Ho aggiornato
+`CLAUDE.md` e lo dico qui perché è una modifica a una regola, non un dettaglio.
+Il prezzo: la consegna è l'unico pezzo delle pagine a token che vuole
+JavaScript.
+
+**Il link firmato non esce mai, e non ce ne sono due modi.** Le mail portano
+alla pagina a token; la pagina porta a un indirizzo nostro; solo al clic la
+route chiede al database un **percorso** (mai un URL: il database non ha la
+chiave di Storage, ed è giusto) e firma un link di un minuto. Il difetto che il
+prompt temeva — la mail che funziona oggi e non fra tre settimane — non si può
+provare su PGlite, che non ha Storage: l'harness prova la cosa che lo rende
+impossibile, cioè che nessuna mail in coda e nessuna colonna contenga un link
+di Storage. La scadenza vera è la prova 75, a mano.
+
+**La regola della 0043 che si piega.** «Dietro un token permanente non va mai
+un'azione che consegna un file»: la consegna è esattamente quello, per
+costruzione del Flusso. In testa alla 0046 c'è cosa può fare chi trova i due
+link — consegnare un file sbagliato, scaricare un itinerario — e perché per un
+itinerario va bene e per i biglietti dell'All Inclusive no.
+
+**Due orologi sullo stesso stato.** Come proponeva il prompt: la finestra della
+revisione dalla prima consegna, scritta una volta; la chiusura dall'ultima,
+calcolata. Un test che li confrontava come stringhe passava anche col difetto
+(prima consegna e riconsegna cadono nello stesso secondo): l'ho trovato
+sabotando la funzione apposta, e l'ho riscritto con una scadenza riconoscibile.
+Gli altri sabotaggi provati — il silenzio che chiude anche le `disputed`, la
+revisione senza controllo della finestra, la consegna senza controllo dello
+stato — fanno diventare rosso il giro; l'ultimo lo ferma il trigger della
+macchina a stati, che è la difesa di fondo.
+
+**Tre punti dell'harness della 0043 aggiornati** (facevano fallire nove
+asserzioni), perché davano per scontato che dopo una call partisse una sola
+mail e nascessero solo i token dei servizi. Ognuno è stato ristretto a quello
+che prova — la mail al viaggiatore, i token dei servizi — non allentato.
+
+**Cosa NON è stato fatto, di proposito:** il tasto «C'è un problema» in fondo
+alla pagina ordine (Flusso §7; riga a sé in `PIANO.md`), la mail al viaggiatore
+assente (punto aperto), un tempo massimo per consegnare una revisione (punto
+aperto), qualunque mail a `completed` (milestone 8). Niente è stato visto in un
+browser né provato contro Storage vero: sono le prove 64-78, e la 72 — un PDF
+sopra i 5 MB dal telefono — è quella che dice se la scelta sui byte regge.
+
+---
+
+**26 settembre 2026 — le correzioni uscite dalle prove del 23 settembre**
+
+Il prompt: spuntare le prove 41-56 (passate tutte) e fare le cinque correzioni
+che ne sono uscite. È `0045_correzioni_prove.sql`, più il form della proposta,
+la route della bozza, `lib/ordine.ts` e `CopiaTesto`. Harness da 599 a **614
+asserzioni**, build verde. Il prompt diceva «41-57»: la tabella finisce alla
+56, le nuove partono dalla 57.
+
+**La cosa da ricordare di questa sessione: quattro difetti su cinque non
+erano nel codice della logica.** Erano in un campo (gli importi), in un
+ripiego mancante (il form che si ripopolava dalla riga sbagliata), in una
+formattazione (i sedici decimali) e in una notifica che non esisteva. Le
+funzioni che decidono — la macchina a stati, il congelamento, il confronto
+dell'incasso col listino — hanno retto tutte. L'harness era a 599 asserzioni e
+**non poteva vederne nessuno**: prova Postgres, e questi difetti stanno dove
+Postgres finisce, cioè nel browser, nel testo che legge una persona e nel
+silenzio. Si trovano solo guardando, ed è la ragione per cui le prove di
+Simone restano un passaggio e non una formalità.
+
+**1 · Il form.** La tentazione era la correzione lato server: tenere i valori
+inviati e rimetterli nel form. Non ci stanno: la descrizione arriva a
+ventimila caratteri, che non entrano in un indirizzo e nemmeno in un cookie, e
+passare alle Server Action avrebbe rifatto la route per un campo. Quindi
+`RicordaModulo`: all'invio mette i campi in `sessionStorage` (senza il token),
+al ritorno con un errore li rimette, e una pagina aperta senza errore li butta.
+La riga resta il ripiego che disegna il server, e senza JavaScript si torna a
+com'era prima. Il commento del componente dice perché ripopolare dal database
+**sembra** giusto e non lo è — la riga è l'ultima bozza salvata, non l'ultima
+inviata — e la prova 59 è scritta per intercettare chi lo rimettesse così.
+
+**2 · Il campo degli importi.** `FORMA_IMPORTO`, una regex sola usata in due
+posti: il `pattern` del campo (il browser ferma l'invio e non si perde niente)
+e la route (che riceve comunque quello che le si manda). Verificata con i casi
+del prompt sia come `RegExp` sia col flag `v` che usa il browser per
+`pattern`. `euroInCentesimi` **non è stata toccata**: ha adesso sopra il
+commento che spiega cosa succede a chi la «semplifica» con `parseFloat` —
+`19.99 * 100` fa 1998,999…, il ponte Stripe rifiuta l'incasso, alert critico.
+
+**3 · Il tasto *Copia*.** Una scoperta da dire: **il campo selezionabile c'era
+già** nel codice provato il 23, e il ripiego al clic pure. Quello che mancava
+era dichiararlo come la cosa principale: adesso ha un'etichetta e l'istruzione
+«tieni il dito sul testo» sempre visibili, la selezione funziona anche su iOS
+(dove `select()` da solo non basta su un campo in sola lettura), e se il
+bottone fallisce lo dice in grassetto. Niente `execCommand`, come chiesto.
+
+**4 · I sedici decimali.** `euro_it()` **esisteva già** dalla 0044, usata per le
+mail e non per gli alert. Delle quindici occorrenze in cinque migration, le
+funzioni vive erano quattro: `calcom_webhook` (0037), `clock_task_done`
+(0043), `stripe_checkout_ordine` e `stripe_webhook` (0044). Riemesse parola per
+parola salvo le righe degli importi, estratte con uno script e confrontate con
+`diff`. Un dettaglio: nel confronto dell'incasso la valuta sbagliata adesso è
+detta a parole («MA IN VALUTA USD»), perché `euro_it` mette sempre il simbolo
+dell'euro e «700,00 € USD» si sarebbe contraddetto. E perché il prossimo alert
+erediti la regola invece di ripetere il difetto, l'harness **legge il sorgente
+di tutte le funzioni in `pg_proc`** e diventa rosso su ogni `/ 100.0`.
+
+**5 · Chi viene avvisato.** Costruito come meccanismo: due righe di
+`app_config`, `team_notify_recipients` e `team_notify_events`, e
+`notifica_team()` che accoda una mail per destinatario. La scelta che fa il
+lavoro è **dove nascono gli eventi**: un trigger su `team_alerts` rende ogni
+`kind` di alert un evento, quindi `ordine_richiesto` — e domani disputa e
+no-show — si cablano con una parola in una riga, da Studio. `ordine_pagato`
+invece non è un alert, e non l'ho fatto diventare tale: una buona notizia in
+`team_alerts` sporcherebbe la tabella che il team deve svuotare, e il digest
+che verrà. Lo chiama il trigger del passaggio `proposal_sent → in_progress`,
+che accoda anche la mail al designer (`order_paid_td`, un testo per Gaia, senza
+aggettivi col genere). Due difese: il `message_kind` è `team_<evento>`, perché
+con un tipo unico due eventi sullo stesso ordine si ruberebbero la riga di coda;
+e gli alert del meccanismo stesso (`notifica_team_*`) non si notificano,
+altrimenti un testo rotto farebbe un ciclo — l'harness lo prova rompendo il
+testo apposta. `team_notify_recipients` nasce **vuota**: gli indirizzi degli
+amministratori non vanno in un file versionato, e finché è vuota il primo
+pagamento scrive un alert invece di perdersi.
+
+**Cosa NON è stato fatto, di proposito:** `ordine_richiesto` non è stato
+scritto nell'elenco degli eventi (resta parcheggiato con il digest, per scelta
+di Simone: la prova 63 lo accende e lo rispegne), il digest, la vista
+operativa minima. Niente è stato visto in un browser né applicato al database
+vero: sono le prove 57-63.
+
+---
+
 **23 settembre 2026 — la proposta su misura, dalla richiesta al pagamento**
 
 Il prompt: portare l'ordine su misura da `requested` a `in_progress`, cioè

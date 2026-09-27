@@ -334,3 +334,26 @@ insert into app_config (key, value, value_text, config_group, label_it, notes) v
    'Indirizzo pubblico del sito, per i link dentro le mail',
    'Lo compone Postgres, che non ha modo di saperlo da sé. In sviluppo http://localhost:3000, ma SOLO su un database di sviluppo: un link a localhost dentro una mail vera è un vicolo cieco.')
 on conflict (key) do nothing;
+
+-- Le notifiche interne (0045): **chi** riceve gli avvisi del team e **di
+-- cosa**. È un meccanismo solo, così aggiungere un evento è una parola in più
+-- qui e non un deploy.
+--
+-- Un evento è o il `kind` di un alert di `team_alerts` (`ordine_richiesto`,
+-- `stripe_importo_non_combacia`, …) o un evento che non è un'anomalia
+-- (`ordine_pagato`). **Scrivere `ordine_richiesto` in `team_notify_events` è
+-- tutto quello che serve** perché il team riceva una mail a ogni richiesta
+-- nuova: il punto aperto del PIANO lascia a Simone la decisione.
+--
+-- ⚠️ `team_notify_recipients` nasce **vuota** di proposito: gli indirizzi degli
+-- amministratori non stanno in un file versionato. Finché è vuota, il primo
+-- evento in elenco scrive un alert `notifica_team_non_configurata` invece di
+-- perdersi in silenzio.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('team_notify_recipients', null, '', 'integrations',
+   'Chi riceve le notifiche interne del team (indirizzi separati da virgola)',
+   'Deciso il 23 settembre 2026: gli amministratori, cioè Simone, Alessandro e Andrea. Una mail per indirizzo, accodata come tutte le altre: valgono email_enabled e email_redirect_to. Vuota = nessuna notifica, e al primo evento in elenco un alert lo dice.'),
+  ('team_notify_events', null, 'ordine_pagato', 'integrations',
+   'Di quali eventi si avvisa il team per mail (nomi separati da virgola)',
+   'Un nome è il kind di un alert di team_alerts (es. ordine_richiesto) oppure ordine_pagato. Aggiungerne uno è tutto quello che serve: nessun deploy. NON metterci gli alert di igiene operativa: una mail per ogni anomalia insegna al team a ignorarle. Vuota = nessun evento.')
+on conflict (key) do nothing;

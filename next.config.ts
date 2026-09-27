@@ -52,7 +52,11 @@ const nextConfig: NextConfig = {
     // ordine del designer e la pagina gemella della proposta. La cassa della
     // proposta rimanda a Stripe con un 303: senza `strict-origin` il browser
     // manderebbe a Stripe, come Referer, l'indirizzo con dentro il token.
-    return ['/servizio/:token*', '/ordine/:token*', '/proposta/:token*'].map((source) => ({
+    //
+    // Dalla 0046 anche le micro-pagine dei tasti del dopo-call, e i percorsi
+    // `/…/file/[id]` stanno sotto `:token*`: la loro risposta è un redirect a
+    // Storage, e senza `strict-origin` porterebbe con sé il token come Referer.
+    return ['/servizio/:token*', '/ordine/:token*', '/proposta/:token*', '/eccezione/:token*'].map((source) => ({
       source,
       headers: pagineToken,
     }))

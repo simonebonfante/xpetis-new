@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CHIAVI, leggiContatto } from '@/lib/config'
-import { euro, euroPerCampo, leggiPaginaOrdine, type PaginaOrdine, type StatoOrdine } from '@/lib/ordine'
+import { euro, euroPerCampo, FORMA_IMPORTO, leggiPaginaOrdine, type PaginaOrdine, type StatoOrdine } from '@/lib/ordine'
 import { Avviso, Guscio, ScriviciWhatsApp, Spiegazione } from '@/components/pagina-token'
 import { CopiaTesto } from '@/components/copia-testo'
+import { RicordaModulo } from '@/components/ricorda-modulo'
+import { CaricaConsegna } from '@/components/carica-consegna'
+import { ElencoFile } from '@/components/elenco-file'
 
 /**
  * La pagina ordine del Travel Designer: il suo unico strumento di lavoro.
@@ -34,13 +37,21 @@ import { CopiaTesto } from '@/components/copia-testo'
  * accanto è la sua dichiarazione di quanto ha scalato, per lo spot-check del
  * team: la pagina non la sottrae, e non deve. Vedi `CLAUDE.md`.
  *
+ * ## La consegna (0046)
+ *
+ * Pagato → il caricamento del file col tasto «Consegna». Consegnato → il
+ * messaggio pronto da girare nel gruppo e i file. Revisione chiesta → cosa è
+ * stato chiesto e il caricamento della versione rivista. I file si scaricano
+ * da un indirizzo nostro che firma un link di un minuto al clic: nessun link
+ * di Storage sta in questa pagina.
+ *
  * ## Cosa manca, di proposito
  *
- * Consegna e revisione (la seconda metà della milestone 6) e il tasto «C'è un
- * problema» (i tasti eccezione, riga a sé). Al loro posto, oggi, WhatsApp al
- * team. E manca un disegno: il Figma non ha questa pagina — è segnata come
- * domanda aperta in `PIANO.md`, e fino ad allora usa il guscio delle altre
- * pagine a token.
+ * Il tasto «C'è un problema» in fondo alla pagina ordine, che il Flusso §7
+ * chiede e che non è stato chiesto con i tasti del dopo-call: al suo posto,
+ * oggi, WhatsApp al team. E manca un disegno: il Figma non ha questa pagina —
+ * è segnata come domanda aperta in `PIANO.md`, e fino ad allora usa il guscio
+ * delle altre pagine a token.
  */
 
 export const dynamic = 'force-dynamic'
@@ -64,7 +75,7 @@ const STATO: Record<StatoOrdine, string> = {
   disputed: 'In verifica dal team',
 }
 
-type Query = { esito?: string; campo?: string; motivo?: string; su?: string; modifica?: string }
+type Query = { esito?: string; campo?: string; motivo?: string; su?: string; modifica?: string; file?: string }
 
 export default async function PaginaOrdineTd({
   params,
@@ -92,36 +103,66 @@ export default async function PaginaOrdineTd({
       <Intestazione pagina={pagina} stato={stato} />
 
       {avviso && <Avviso tono={avviso.tono}>{avviso.testo}</Avviso>}
+      {q.file && (
+        <Avviso tono="errore">
+          {q.file === 'irraggiungibile'
+            ? 'Non riusciamo a preparare il file adesso. Riprova fra un minuto.'
+            : 'Questo file non si trova. Ricarica la pagina e riprova.'}
+        </Avviso>
+      )}
 
       {(stato === 'requested' || stato === 'in_definition') &&
         (bozzaCompleta && !q.modifica ? (
           <Riepilogo pagina={pagina} base={base} />
         ) : (
-          <Modulo pagina={pagina} base={base} />
+          // Tornati con un errore dalla route: il form si ripopola da quello
+          // che è stato inviato, non dalla riga (vedi RicordaModulo).
+          <Modulo pagina={pagina} base={base} ripristina={!!q.esito && q.esito !== 'salvata'} />
         ))}
 
       {stato === 'proposal_sent' && <Inviata pagina={pagina} />}
 
       {stato === 'in_progress' && (
-        <section className="space-y-3">
+        <section className="space-y-5">
           <p className="text-corpo-big">
             Il viaggiatore ha pagato: puoi cominciare. Hai {pagina.giorni} giorni per la consegna.
           </p>
-          <p className="text-corpo opacity-80">
-            Il caricamento dell&apos;itinerario arriverà su questa stessa pagina. Per ora, quando è
-            pronto, scrivi al team.
-          </p>
+          <CaricaConsegna base={base} revisione={false} />
         </section>
       )}
 
-      {(stato === 'cancelled' || stato === 'disputed' || stato === 'delivered' ||
-        stato === 'revision_requested' || stato === 'completed') && (
+      {stato === 'delivered' && <Consegnato pagina={pagina} base={base} />}
+
+      {stato === 'revision_requested' && (
+        <section className="space-y-5">
+          <p className="text-corpo-big">
+            {pagina.nome_viaggiatore ?? 'Il viaggiatore'} ha chiesto la revisione inclusa
+            {pagina.revisione_chiesta_il ? `, il ${DATA.format(new Date(pagina.revisione_chiesta_il))}` : ''}.
+            Ecco cosa ha scritto:
+          </p>
+          <blockquote className="whitespace-pre-line rounded-2xl border border-scuro/30 p-5 text-corpo">
+            {pagina.revisione_nota}
+          </blockquote>
+          <CaricaConsegna base={base} revisione />
+          <ElencoFile file={pagina.file ?? []} base={base} titolo="Quello che hai consegnato" />
+        </section>
+      )}
+
+      {stato === 'completed' && (
+        <section className="space-y-5">
+          <p className="text-corpo-big">
+            Ordine chiuso{pagina.chiuso_il ? ` il ${DATA.format(new Date(pagina.chiuso_il))}` : ''}: il
+            viaggiatore non ha chiesto altro, e il tuo compenso matura. Grazie.
+          </p>
+          <ElencoFile file={pagina.file ?? []} base={base} titolo="Quello che hai consegnato" />
+        </section>
+      )}
+
+      {(stato === 'cancelled' || stato === 'disputed') && (
         <p className="text-corpo-big">
           {stato === 'cancelled'
             ? 'Questo ordine è stato annullato: non c’è niente da fare qui.'
-            : stato === 'disputed'
-              ? 'Su questo ordine il team sta guardando una cosa a mano, e ti scriverà.'
-              : 'Da qui in avanti se ne occupa il team: per qualunque cosa, scrivi su WhatsApp.'}
+            : 'Su questo ordine il team sta guardando una cosa a mano, e ti scriverà.'}
         </p>
       )}
 
@@ -172,13 +213,17 @@ function Intestazione({ pagina, stato }: { pagina: PaginaOrdine; stato: StatoOrd
  *
  * Il prezzo è un campo di testo e non `type="number"`: su telefono quest'ultimo
  * vuole la virgola o il punto a seconda della tastiera, e scarta in silenzio
- * quello che non capisce. La lettura degli euro sta in `euroInCentesimi()`.
+ * quello che non capisce. La lettura degli euro sta in `euroInCentesimi()`, la
+ * forma ammessa in `FORMA_IMPORTO`: col `pattern` il browser ferma l'invio di
+ * «030» o di tre decimali senza che il designer perda quello che ha scritto.
+ * La route ricontrolla comunque.
  */
-function Modulo({ pagina, base }: { pagina: PaginaOrdine; base: string }) {
+function Modulo({ pagina, base, ripristina }: { pagina: PaginaOrdine; base: string; ripristina: boolean }) {
   const creditoBloccato = !!pagina.credito_usato_su || pagina.prezzo_call_cents == null
 
   return (
     <form action={`${base}/bozza`} method="post" className="space-y-6">
+      <RicordaModulo chiave={`proposta:${pagina.human_ref}`} ripristina={ripristina} />
       <label className="block space-y-2">
         <span className="text-corpo-big">La proposta</span>
         <span className="block text-corpo opacity-70">
@@ -209,6 +254,8 @@ function Modulo({ pagina, base }: { pagina: PaginaOrdine; base: string }) {
           inputMode="decimal"
           autoComplete="off"
           placeholder="es. 450 oppure 1.150,50"
+          pattern={FORMA_IMPORTO}
+          title="In euro, con al massimo due decimali: 450, 1.150 oppure 1150,50"
           defaultValue={euroPerCampo(pagina.prezzo_cents)}
           className="w-full rounded-full border border-scuro/30 bg-transparent px-5 py-3 text-corpo-big"
         />
@@ -240,6 +287,8 @@ function Modulo({ pagina, base }: { pagina: PaginaOrdine; base: string }) {
           <input
             name="credito"
             inputMode="decimal"
+            pattern={FORMA_IMPORTO}
+            title="In euro, con al massimo due decimali. Se non hai scalato niente, 0"
             autoComplete="off"
             defaultValue={euroPerCampo(pagina.credito_cents ?? 0)}
             className="w-40 rounded-full border border-scuro/30 bg-transparent px-5 py-3 text-corpo-big"
@@ -319,6 +368,38 @@ function Inviata({ pagina }: { pagina: PaginaOrdine }) {
   )
 }
 
+/**
+ * Dopo la consegna: il messaggio da girare nel gruppo (porta alla pagina del
+ * viaggiatore, mai al file), i file, e i due orologi detti in chiaro.
+ */
+function Consegnato({ pagina, base }: { pagina: PaginaOrdine; base: string }) {
+  const rivista = !!pagina.revisione_consegnata_il
+  const revisioneAperta =
+    !pagina.revisione_chiesta_il && pagina.revisione_entro && new Date(pagina.revisione_entro) > new Date()
+
+  return (
+    <section className="space-y-6">
+      <p className="text-corpo-big">
+        {rivista ? 'Revisione consegnata' : 'Consegnato'}: {pagina.nome_viaggiatore ?? 'il viaggiatore'} ha
+        ricevuto la mail con il link alla sua pagina. Gira il messaggio anche nel gruppo WhatsApp.
+      </p>
+
+      {pagina.messaggio_consegna && <CopiaTesto testo={pagina.messaggio_consegna} />}
+
+      <ElencoFile file={pagina.file ?? []} base={base} titolo="Quello che hai consegnato" />
+
+      <p className="text-corpo opacity-80">
+        {revisioneAperta && pagina.revisione_entro
+          ? `Il viaggiatore può chiedere la revisione inclusa fino al ${DATA.format(new Date(pagina.revisione_entro))}. `
+          : ''}
+        {pagina.si_chiude_il
+          ? `Se non arriva nessuna richiesta, l’ordine si chiude da solo il ${DATA.format(new Date(pagina.si_chiude_il))}.`
+          : ''}
+      </p>
+    </section>
+  )
+}
+
 function Proposta({ pagina }: { pagina: PaginaOrdine }) {
   return (
     <article className="space-y-4 rounded-2xl border border-scuro/30 p-5">
@@ -379,7 +460,7 @@ function testoCampo(q: Query, pagina: PaginaOrdine): string {
     case 'descrizione':
       return 'Manca la descrizione del viaggio.'
     case 'prezzo':
-      return 'Il prezzo non si legge: scrivilo in euro, per esempio 450 oppure 1.150,50. Il minimo è 0,50 €.'
+      return 'Il prezzo non si legge: scrivilo in euro, con al massimo due decimali e senza zeri davanti, per esempio 450 oppure 1.150,50. Il minimo è 0,50 €.'
     case 'giorni':
       return 'I giorni di consegna devono essere almeno 1.'
     case 'credito':

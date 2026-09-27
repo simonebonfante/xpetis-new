@@ -2544,10 +2544,13 @@ console.log('\n== I testi delle mail ==')
     const r = (await db.query(
       `select key, template_kind from message_templates where key not like 'prova_%' order by key`)).rows
     const attesi = ['blocco_firma', 'blocco_intro_servizi', 'blocco_servizio_all_inclusive',
-                    'blocco_servizio_custom_itinerary', 'blocco_whatsapp_proposta', 'order_new_td',
-                    'postcall_traveler', 'proposal_traveler', 'unpaid_cancelled_traveler']
+                    'blocco_servizio_custom_itinerary', 'blocco_td_no_show', 'blocco_td_problema',
+                    'blocco_whatsapp_consegna', 'blocco_whatsapp_proposta', 'delivery_traveler',
+                    'order_new_td', 'order_paid_td', 'postcall_td', 'postcall_traveler',
+                    'proposal_traveler', 'revision_delivered_traveler', 'revision_requested_td',
+                    'team_notifica', 'unpaid_cancelled_traveler']
     JSON.stringify(r.map(x => x.key)) === JSON.stringify(attesi)
-      ? ok('le nove righe del seed ci sono (sei della 0043, tre della 0044)')
+      ? ok('le diciotto righe del seed ci sono (sei della 0043, tre della 0044, due della 0045, sette della 0046)')
       : fail('righe: ' + JSON.stringify(r.map(x => x.key)))
   }
   {
@@ -2582,9 +2585,13 @@ console.log('\n== La cerniera del dopo-call: la coda ==')
 
   const tick = async (limite = 100) =>
     (await db.query('select * from clock_tick($1)', [limite])).rows
+  // Dalla 0046 sulla stessa call parte anche la mail al designer con i tasti
+  // eccezione (`postcall_td`): questa sezione parla della mail al viaggiatore,
+  // e la esclude. La mail al designer ha le sue prove, nella sezione della 0046.
   const coda = async (bookingId) =>
     (await db.query(
       `select * from outbound_messages where entity_type='booking' and entity_id=$1
+          and message_kind <> 'postcall_td'
         order by queued_at`, [bookingId])).rows
   const nAlert = async (kind) =>
     Number((await db.query(
@@ -2666,7 +2673,8 @@ console.log('\n== La cerniera del dopo-call: la coda ==')
     // bottoni nella stessa mail quell'assunto non regge più, ed è il motivo per
     // cui l'indice è stato rifatto.
     const c = Number((await db.query(
-      `select count(*) from access_tokens where booking_id = $1 and revoked_at is null`, [C(1)])).rows[0].count)
+      `select count(*) from access_tokens where booking_id = $1 and revoked_at is null
+          and purpose = 'traveler_service_request'`, [C(1)])).rows[0].count)
     c === 2 ? ok('l\'indice rifatto ammette due token attivi perché i servizi sono due') : fail('token attivi: ' + c)
   }
   {
@@ -2972,7 +2980,8 @@ console.log('\n== Le pagine a token ==')
   {
     const CALL2 = 'c0dac0da-0000-4000-8000-000000000005'
     const t = (await db.query(
-      `select token from access_tokens where booking_id = $1 and revoked_at is null limit 1`, [CALL2])).rows[0]
+      `select token from access_tokens where booking_id = $1 and revoked_at is null
+          and purpose = 'traveler_service_request' limit 1`, [CALL2])).rows[0]
     // Su quella call il designer non aveva servizi attivi, quindi non c'è
     // nessun token: se ne fabbrica uno a mano, come si farebbe dal SQL Editor.
     const tok = t?.token ?? (await db.query(
@@ -3544,6 +3553,561 @@ console.log('\n== L\'ordine su misura: proposta e pagamento ==')
     const v = (await db.query(`select euro_it(115000) a, euro_it(50) b, euro_it(123456789) c`)).rows[0]
     v.a === '1.150,00 €' && v.b === '0,50 €' && v.c === '1.234.567,89 €'
       ? ok('euro_it scrive gli importi all\'italiana') : fail(JSON.stringify(v))
+  }
+
+  // =================================================== 0045: gli importi negli alert
+  console.log('  -- 0045: gli importi negli alert si leggono --')
+  {
+    // La regola, non il caso: nessuna funzione viva divide per 100.0. È il
+    // controllo che fa diventare rosso il giro quando un alert nuovo ricade
+    // nel difetto della prova 54, invece di scoprirlo leggendo l'alert.
+    const r = (await db.query(
+      `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.prosrc ~ '/\\s*100\\.0'`)).rows
+    r.length === 0
+      ? ok('nessuna funzione scrive un importo con / 100.0: passano tutte da euro_it')
+      : fail('funzioni che dividono ancora per 100.0: ' + r.map(x => x.proname).join(', '))
+  }
+  {
+    const a = (await db.query(`select message from team_alerts where kind='stripe_importo_non_combacia'
+                                and entity_id=$1 order by created_at limit 1`, [O(1)])).rows[0]
+    a?.message.includes('arrivati 1.000,00 €') && a.message.includes('attesi 1.150,00 €')
+      && !/\d\.\d{3,}0{4}/.test(a.message) && !a.message.includes('EUR')
+      ? ok('l\'alert d\'importo scrive «1.000,00 €» e non «1000.0000000000000000 EUR»')
+      : fail(a?.message)
+  }
+
+  // =================================================== 0045: chi viene avvisato
+  console.log('  -- 0045: quando il viaggiatore paga, lo sanno designer e team --')
+  const conf = (k, v) => db.query(`update app_config set value_text=$2 where key=$1`, [k, v])
+  {
+    // O(1) è stato pagato sopra, con il seed: destinatari interni vuoti.
+    const m = await posta('order_paid_td', O(1))
+    m.length === 1 && m[0].recipient === 'marco@example.com' && m[0].status === 'queued'
+      ? ok('al pagamento parte la mail al designer, in coda e non spedita')
+      : fail('mail pagata al TD: ' + JSON.stringify(m.map(x => [x.recipient, x.status])))
+    const t = m[0]?.body_text ?? ''
+    t.includes('/ordine/' + TOK) && t.includes('1.150,00 €') && /entro il \d{2}\/\d{2}\/\d{4}/.test(t)
+      ? ok('con il link della pagina ordine, il prezzo all\'italiana e la data di consegna')
+      : fail('corpo: ' + t)
+    const team = await posta('team_ordine_pagato', O(1))
+    team.length === 0 && await nAlert('notifica_team_non_configurata') === 1
+      ? ok('senza destinatari interni non si perde in silenzio: un alert lo dice')
+      : fail(JSON.stringify([team.length, await nAlert('notifica_team_non_configurata')]))
+    await db.query(`update team_alerts set resolved_at=now() where kind='notifica_team_non_configurata'`)
+  }
+  await conf('team_notify_recipients', 'simone@xpetis.test, alessandro@xpetis.test,andrea@xpetis.test, simone@xpetis.test')
+  await creaCall(7)
+  await creaOrdine(4, B(7))
+  const T4 = await tokenDi('td_order_page', O(4))
+  await salva(T4, 'Giappone in autunno', 140000, 10, 0); await invia(T4, 140000)
+  await cassa(O(4), 'cs_test_sumisura_45', 140000)
+  {
+    const e = await webhook(evento('cs_test_sumisura_45', O(4), 140000))
+    const team = await posta('team_ordine_pagato', O(4))
+    const dest = team.map(x => x.recipient).sort()
+    e.esito === 'ordine_pagato'
+      && JSON.stringify(dest) === JSON.stringify(['alessandro@xpetis.test', 'andrea@xpetis.test', 'simone@xpetis.test'])
+      && team.every(x => x.status === 'queued')
+      ? ok('una mail per amministratore, in coda, e l\'indirizzo ripetuto una volta sola')
+      : fail(JSON.stringify([e.esito, dest]))
+    const r = team[0]
+    r?.subject.includes((await ordine(O(4))).human_ref) && r.subject.includes('1.400,00 €')
+      && r.body_text.includes('Giulia') === false && r.body_text.includes('ha pagato la proposta')
+      && r.body_text.includes('team_notify_events')
+      ? ok('oggetto con riferimento e importo, corpo che dice cosa è successo e come si spegne')
+      : fail(JSON.stringify(r && [r.subject, r.body_text]))
+    const td = await posta('order_paid_td', O(4))
+    td.length === 1 ? ok('e il designer riceve la sua') : fail('mail TD: ' + td.length)
+  }
+  {
+    const e = await webhook(evento('cs_test_sumisura_45', O(4), 140000))
+    const n = (await posta('team_ordine_pagato', O(4))).length + (await posta('order_paid_td', O(4))).length
+    e.esito === 'gia_pagato' && n === 4
+      ? ok('lo stesso pagamento raccontato due volte non raddoppia le mail') : fail(JSON.stringify([e.esito, n]))
+  }
+  {
+    // Il punto aperto del PIANO: avvisare il team di ogni richiesta nuova è
+    // una parola in team_notify_events, nessun deploy.
+    const alert = async () => (await db.query(
+      `insert into team_alerts (kind, severity, entity_type, entity_id, message)
+       values ('ordine_richiesto', 'warning', 'order', $1, 'Nuova richiesta di prova') returning id`,
+      [O(4)])).rows[0].id
+    const a1 = await alert()
+    const prima = await posta('team_ordine_richiesto', a1)
+    await conf('team_notify_events', 'ordine_pagato, ordine_richiesto')
+    const a2 = await alert()
+    const dopo = await posta('team_ordine_richiesto', a2)
+    prima.length === 0 && dopo.length === 3 && dopo.every(x => x.entity_type === 'team_alert')
+      && dopo[0].subject.startsWith('[XPETIS · da guardare] Nuova richiesta di prova')
+      ? ok('ordine_richiesto non notifica finché non è in elenco; aggiunto con una riga, notifica')
+      : fail(JSON.stringify([prima.length, dopo.length, dopo[0]?.subject]))
+  }
+  {
+    // Un testo rotto non fa ciclo: la notifica fallita scrive un alert che
+    // per costruzione non si notifica, e l'alert d'origine resta scritto.
+    await db.query(`update message_templates set body_it = body_it || ' {{inesistente}}' where key='team_notifica'`)
+    let errore = null
+    try {
+      await db.query(`insert into team_alerts (kind, severity, message) values ('ordine_richiesto', 'warning', 'Testo rotto')`)
+    } catch (e) { errore = e }
+    const n = await nAlert('notifica_team_fallita')
+    const scritto = Number((await db.query(`select count(*) from team_alerts where message='Testo rotto'`)).rows[0].count)
+    !errore && n === 1 && scritto === 1
+      ? ok('un testo di notifica rotto: un alert, nessuna eccezione, nessun ciclo')
+      : fail(JSON.stringify([String(errore), n, scritto]))
+    await db.query(`update message_templates set body_it = replace(body_it, ' {{inesistente}}', '') where key='team_notifica'`)
+    await db.query(`update team_alerts set resolved_at=now() where kind='notifica_team_fallita'`)
+  }
+  {
+    // Il ramo spento si dichiara: la riga degli eventi che manca del tutto.
+    await db.query(`delete from app_config where key='team_notify_events'`)
+    await db.query(`insert into team_alerts (kind, severity, message) values ('prova_qualunque', 'info', 'x')`)
+    await nAlert('notifica_team_non_configurata') === 1
+      ? ok('senza la riga team_notify_events: un alert, non il silenzio') : fail('nessun alert di configurazione')
+    await db.query(`insert into app_config (key, value, value_text, config_group, label_it)
+                    values ('team_notify_events', null, 'ordine_pagato', 'integrations', 'ripristino')`)
+    await db.query(`update team_alerts set resolved_at=now() where kind='notifica_team_non_configurata'`)
+  }
+  await conf('team_notify_recipients', '')
+  await conf('team_notify_events', 'ordine_pagato')
+  for (const f of ['notifica_team(text,text,uuid,text,text)', 'accoda_mail_pagata_td(uuid)']) {
+    const r = (await db.query(
+      `select has_function_privilege('anon', $1, 'EXECUTE') as a,
+              has_function_privilege('authenticated', $1, 'EXECUTE') as u`, [f])).rows[0]
+    !r.a && !r.u ? ok(`${f}: chiusa ad anon e authenticated`) : fail(`${f} aperta: ${JSON.stringify(r)}`)
+  }
+}
+
+
+// ===========================================================================
+// Il silenzio-conferma, e i due modi di romperlo (migration 0046)
+// ===========================================================================
+console.log('\n== Il silenzio-conferma: 48 ore, consegna, revisione ==')
+{
+  const TD   = '11111111-1111-1111-1111-111111111111'   // Marco
+  const ANNA = '44444444-4444-4444-4444-444444444444'
+  const X = (n) => `e0e0e0e0-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`
+  const Q = (n) => `9e9e9e9e-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`
+
+  const tick = async () => (await db.query('select * from clock_tick(100)')).rows
+  const rpc  = async (sql, params) => (await db.query(sql, params)).rows[0].r
+  const call = (n, inizio, fine, stato = 'confirmed') => db.query(
+    `insert into bookings (id, traveler_id, td_id, service_type, status, cal_booking_uid,
+                           cal_event_type_slug, starts_at, ends_at, original_starts_at,
+                           price_cents, confirmed_at, last_actor)
+     values ($1, $2, $3, 'consultation', $4, 'uid-silenzio-' || $5, 'consulenza-xpetis-30',
+             ${inizio}, ${fine}, ${inizio}, 6000, now(), 'n8n')`, [X(n), ANNA, TD, stato, String(n)])
+  const tokenCall = async (scopo, bookingId) => {
+    await db.query(`insert into access_tokens (purpose, audience, booking_id, td_id)
+                    values ($1, 'td', $2, $3) on conflict do nothing`, [scopo, bookingId, TD])
+    return (await db.query(`select token from access_tokens where purpose=$1 and booking_id=$2
+                             and revoked_at is null`, [scopo, bookingId])).rows[0].token
+  }
+  const paginaEcc = (t) => rpc('select td_exception_page($1) as r', [t])
+  const segnala   = (t, min, nota) => rpc('select td_report_exception($1,$2,$3) as r', [t, min, nota])
+  const prenot    = async (id) => (await db.query('select * from bookings where id=$1', [id])).rows[0]
+  const nAlert    = async (kind) => Number((await db.query(
+    `select count(*) from team_alerts where kind=$1 and resolved_at is null`, [kind])).rows[0].count)
+  const posta     = async (kind, entity) => (await db.query(
+    `select * from outbound_messages where message_kind=$1 and entity_id=$2`, [kind, entity])).rows
+
+  // ====================================================== A · dopo la call
+  console.log('  -- la mail al designer con i due tasti --')
+  await call(1, `now() - interval '40 minutes'`, `now() - interval '10 minutes'`)
+  await tick()
+  const TNS = (await db.query(`select token, expires_at from access_tokens
+                                where purpose='td_exception_no_show' and booking_id=$1`, [X(1)])).rows[0]
+  const TPB = (await db.query(`select token from access_tokens
+                                where purpose='td_exception_problem' and booking_id=$1`, [X(1)])).rows[0]
+  {
+    const m = await posta('postcall_td', X(1))
+    m.length === 1 && m[0].recipient === 'marco@example.com' && m[0].status === 'queued'
+      ? ok('a fine call parte la mail al designer, in coda, al suo indirizzo')
+      : fail('postcall_td: ' + JSON.stringify(m.map(x => [x.recipient, x.status])))
+    TNS && TPB && TNS.expires_at === null
+      && m[0]?.body_html.includes('/eccezione/' + TNS.token) && m[0]?.body_html.includes('/eccezione/' + TPB.token)
+      ? ok('con i due tasti, due token che non scadono: la finestra la fa valere la funzione')
+      : fail('tasti: ' + JSON.stringify([!!TNS, !!TPB]))
+    ;/48 ore/.test(m[0]?.body_text ?? '') && /non devi fare niente/.test(m[0]?.body_text ?? '')
+      ? ok('e dice che non fare niente va bene, e fra quanto la call si chiude')
+      : fail('testo: ' + m[0]?.body_text)
+  }
+
+  console.log('  -- il tasto no-show dichiara, non chiude --')
+  {
+    const p = await paginaEcc(TNS.token)
+    p.esito === 'valido' && p.fase === 'aperta' && p.tipo === 'no_show' && p.nome_viaggiatore === 'Anna'
+      ? ok('la pagina del tasto: aperta, col solo nome di chi ha prenotato')
+      : fail('pagina: ' + JSON.stringify(p))
+    !/viaggiatore@example|Bianchi/.test(JSON.stringify(p))
+      ? ok('niente cognome né mail: il link vive in una casella inoltrabile') : fail('dati in più nella pagina')
+    const e0 = await segnala(TNS.token, null, null)
+    e0.ok === false && e0.esito === 'dati_non_validi' && e0.campo === 'minuti'
+      ? ok('un no-show senza i minuti di attesa non si dichiara') : fail(JSON.stringify(e0))
+  }
+  {
+    const e = await segnala(TNS.token, 20, 'Collegato alle 10:00, nessuno fino alle 10:22')
+    const b = await prenot(X(1))
+    e.ok && e.esito === 'segnalata' && b.status === 'disputed' && b.last_actor === 'td'
+      ? ok('segnalato: la call va in disputed, attribuita al designer — non a no_show')
+      : fail(JSON.stringify([e, b.status]))
+    const h = (await db.query(`select to_status, actor from booking_status_history
+                                where booking_id=$1 order by id desc limit 1`, [X(1)])).rows[0]
+    h.to_status === 'disputed' && h.actor === 'td'
+      ? ok('e la storia lo scrive col designer come attore: è l\'unica prova') : fail(JSON.stringify(h))
+    const x = (await db.query(`select * from booking_exceptions where booking_id=$1`, [X(1)])).rows[0]
+    x?.kind === 'no_show' && x.waited_minutes === 20 && x.minutes_after_start >= 39 && x.minutes_after_start <= 41
+      ? ok('la segnalazione porta la dichiarazione e l\'ora misurata dal server (40 minuti dopo l\'inizio)')
+      : fail('segnalazione: ' + JSON.stringify(x))
+    const a = (await db.query(`select severity, message from team_alerts where kind='td_segnala_no_show'
+                                and entity_id=$1`, [X(1)])).rows[0]
+    a?.severity === 'critical' && a.message.includes('aspettato 20 minuti') && a.message.includes('la regola è 15')
+      && /40 minuti dopo l'inizio/.test(a.message) && a.message.includes('nessuno fino alle 10:22')
+      ? ok('l\'alert porta quello che serve per arbitrare: attesa dichiarata, regola, ora vera, cosa ha scritto')
+      : fail('alert: ' + a?.message)
+    a?.message.includes('NON è stato avvisato') && a.message.includes('viaggiatore@example.com')
+      && a.message.includes('60,00 €')
+      ? ok('e dice che il viaggiatore non sa niente, con i contatti per sentirlo, e quanto ha pagato')
+      : fail('alert: ' + a?.message)
+  }
+  {
+    const e = await segnala(TNS.token, 25, 'di nuovo')
+    const e2 = await segnala(TPB.token, null, 'e anche un problema')
+    const n = Number((await db.query(`select count(*) from booking_exceptions where booking_id=$1`, [X(1)])).rows[0].count)
+    e.ok && e.esito === 'gia_segnalata' && e2.esito === 'gia_segnalata' && n === 1
+      && await nAlert('td_segnala_no_show') === 1
+      ? ok('no-show dichiarato due volte, e poi l\'altro tasto: una segnalazione, un alert')
+      : fail(JSON.stringify([e.esito, e2.esito, n]))
+    ;(await paginaEcc(TPB.token)).fase === 'gia_segnalata'
+      ? ok('e la pagina dell\'altro tasto dice che la call è già segnalata') : fail('pagina altro tasto')
+  }
+
+  console.log('  -- il silenzio a 48 ore --')
+  {
+    // La call segnalata, invecchiata oltre le 48 ore: il silenzio non la tocca.
+    await db.query(`update bookings set starts_at = now() - interval '3 days',
+                    ends_at = now() - interval '3 days' + interval '30 minutes' where id=$1`, [X(1)])
+    await tick()
+    ;(await prenot(X(1))).status === 'disputed'
+      ? ok('chiusura a 48 ore su una call con una segnalazione aperta: non la chiude')
+      : fail('la call segnalata è stata chiusa dal silenzio')
+    await db.query(`update bookings set status='no_show', last_actor='team' where id=$1`, [X(1)])
+    const x = (await db.query(`select resolved_at, resolution from booking_exceptions where booking_id=$1`, [X(1)])).rows[0]
+    x.resolved_at && x.resolution === 'no_show'
+      ? ok('il team decide no_show: la segnalazione si chiude da sola con la decisione sopra')
+      : fail(JSON.stringify(x))
+  }
+  await call(2, `now() - interval '49 hours 30 minutes'`, `now() - interval '49 hours'`)
+  await call(3, `now() - interval '47 hours 30 minutes'`, `now() - interval '47 hours'`)
+  await tick()
+  {
+    const b2 = await prenot(X(2)), b3 = await prenot(X(3))
+    b2.status === 'completed' && b2.completed_at && b2.last_actor === 'system'
+      ? ok('49 ore di silenzio: completed, dall\'orologio') : fail('b2: ' + b2.status)
+    b3.status === 'confirmed' ? ok('47 ore: ancora aperta') : fail('b3 chiusa in anticipo: ' + b3.status)
+  }
+  {
+    const t = await tokenCall('td_exception_no_show', X(2))
+    const p = await paginaEcc(t)
+    const e = await segnala(t, 20, 'tardi')
+    p.fase === 'chiusa' && e.ok === false && e.esito === 'chiusa' && (await prenot(X(2))).status === 'completed'
+      ? ok('segnalare una call già chiusa dal silenzio: pagina onesta, niente cambia')
+      : fail(JSON.stringify([p.fase, e]))
+  }
+  {
+    // Finestra passata, ma l'orologio non ci è ancora arrivato: vale la finestra.
+    await call(4, `now() - interval '49 hours 30 minutes'`, `now() - interval '49 hours'`)
+    const t = await tokenCall('td_exception_problem', X(4))
+    const e = await segnala(t, null, 'un problema')
+    e.esito === 'chiusa' && (await prenot(X(4))).status === 'confirmed'
+      ? ok('oltre le 48 ore prima del giro dell\'orologio: chiusa lo stesso, niente disputa')
+      : fail(JSON.stringify(e))
+  }
+  {
+    await call(5, `now() - interval '5 minutes'`, `now() + interval '25 minutes'`)
+    const tn = await tokenCall('td_exception_no_show', X(5))
+    const tp = await tokenCall('td_exception_problem', X(5))
+    const e = await segnala(tn, 5, 'non c\'è')
+    e.esito === 'troppo_presto' && (await prenot(X(5))).status === 'confirmed'
+      ? ok('no-show dichiarato prima dei 15 minuti di attesa: rifiutato') : fail(JSON.stringify(e))
+    const e2 = await segnala(tp, null, '   ')
+    e2.esito === 'dati_non_validi' && e2.campo === 'nota'
+      ? ok('«altro problema» senza dire quale: non si segnala') : fail(JSON.stringify(e2))
+    const e3 = await segnala(tp, null, 'La connessione è caduta tre volte')
+    const a = (await db.query(`select message from team_alerts where kind='td_segnala_problema' and entity_id=$1`, [X(5)])).rows[0]
+    e3.esito === 'segnalata' && (await prenot(X(5))).status === 'disputed' && a?.message.includes('caduta tre volte')
+      ? ok('«altro problema» durante la call: disputa, alert con la nota')
+      : fail(JSON.stringify([e3, a?.message]))
+  }
+  {
+    // Gli alert dei tasti sono eventi del meccanismo della 0045: una parola in elenco.
+    await db.query(`update app_config set value_text='simone@xpetis.test' where key='team_notify_recipients'`)
+    await db.query(`update app_config set value_text='ordine_pagato, td_segnala_no_show' where key='team_notify_events'`)
+    await call(6, `now() - interval '40 minutes'`, `now() - interval '10 minutes'`)
+    const t = await tokenCall('td_exception_no_show', X(6))
+    await segnala(t, 16, null)
+    const a = (await db.query(`select id from team_alerts where kind='td_segnala_no_show' and entity_id=$1`, [X(6)])).rows[0]
+    ;(await posta('team_td_segnala_no_show', a.id)).length === 1
+      ? ok('il no-show si notifica al team con una parola in team_notify_events')
+      : fail('nessuna notifica del no-show')
+    await db.query(`update app_config set value_text='' where key='team_notify_recipients'`)
+    await db.query(`update app_config set value_text='ordine_pagato' where key='team_notify_events'`)
+  }
+
+  // ====================================================== B · la consegna
+  console.log('  -- la consegna --')
+  const creaOrdine = async (n, callN) => {
+    await call(callN, `now() - interval '3 days'`, `now() - interval '3 days' + interval '30 minutes'`, 'completed')
+    await db.query(`insert into orders (id, traveler_id, td_id, service_type, source_booking_id, last_actor)
+                    values ($1, $2, $3, 'custom_itinerary', $4, 'traveler')`, [Q(n), ANNA, TD, X(callN)])
+    const t = (await db.query(`select token from access_tokens where purpose='td_order_page' and order_id=$1`, [Q(n)])).rows[0].token
+    await db.query('select save_proposal_draft($1,$2,$3,$4,$5)', [t, 'Scozia', 90000, 7, 0])
+    await db.query('select send_proposal($1,$2)', [t, 90000])
+    const tv = (await db.query(`select token from access_tokens where purpose='traveler_public_proposal' and order_id=$1`, [Q(n)])).rows[0].token
+    return { td: t, viaggiatore: tv }
+  }
+  const paga      = (id) => db.query(`update orders set status='in_progress', last_actor='traveler' where id=$1`, [id])
+  const biglietto = (t, nome = 'Itinerario Scozia.pdf', size = 3_000_000, mime = 'application/pdf') =>
+    rpc('select td_delivery_ticket($1,$2,$3,$4) as r', [t, nome, size, mime])
+  const consegna  = (t, path, nome = 'Itinerario Scozia.pdf', size = 3_000_000, mime = 'application/pdf') =>
+    rpc('select td_deliver($1,$2,$3,$4,$5) as r', [t, path, nome, size, mime])
+  const ordine    = async (id) => (await db.query('select * from orders where id=$1', [id])).rows[0]
+  const pagTd     = (t) => rpc('select td_order_page($1) as r', [t])
+  const pagV      = (t) => rpc('select proposal_public_page($1) as r', [t])
+  const file      = (t, id) => rpc('select order_file_for_token($1,$2) as r', [t, id])
+  const revisione = (t, nota) => rpc('select request_revision($1,$2) as r', [t, nota])
+
+  const T1 = await creaOrdine(1, 11)
+  {
+    const b = await biglietto(T1.td)
+    const finto = `ordini/${Q(1)}/00000000-0000-4000-8000-000000000000.pdf`
+    const e = await consegna(T1.td, finto)
+    b.ok === false && b.esito === 'stato_non_ammesso' && e.esito === 'stato_non_ammesso'
+      && (await ordine(Q(1))).status === 'proposal_sent'
+      ? ok('consegna su un ordine non pagato: né biglietto né consegna, l\'ordine non si muove')
+      : fail(JSON.stringify([b, e]))
+  }
+  await paga(Q(1))
+  let PATH1
+  {
+    const b = await biglietto(T1.td)
+    PATH1 = b.path
+    b.ok && b.tipo === 'itinerary' && new RegExp(`^ordini/${Q(1)}/[0-9a-f-]{36}\\.pdf$`).test(b.path)
+      ? ok('pagato: il biglietto c\'è, e il percorso lo sceglie il database') : fail(JSON.stringify(b))
+    const bm = await biglietto(T1.td, 'x.html', 1000, 'text/html')
+    const bs = await biglietto(T1.td, 'x.pdf', 60_000_000, 'application/pdf')
+    bm.campo === 'tipo' && bs.campo === 'dimensione'
+      ? ok('un tipo non ammesso o un file oltre i 50 MB: rifiutati prima di caricare')
+      : fail(JSON.stringify([bm, bs]))
+  }
+  {
+    const altro = `ordini/${Q(2)}/00000000-0000-4000-8000-000000000000.pdf`
+    const e = await consegna(T1.td, altro)
+    e.esito === 'dati_non_validi' && e.campo === 'percorso'
+      ? ok('col token di un ordine non si registra il file di un altro') : fail(JSON.stringify(e))
+  }
+  {
+    const e = await consegna(T1.td, PATH1)
+    const o = await ordine(Q(1))
+    e.ok && e.esito === 'consegnato' && o.status === 'delivered' && o.last_actor === 'td'
+      ? ok('consegnato: l\'ordine è delivered, attribuito al designer') : fail(JSON.stringify([e, o.status]))
+    const f = (await db.query(`select * from order_files where order_id=$1`, [Q(1)])).rows
+    f.length === 1 && f[0].kind === 'itinerary' && f[0].uploaded_by === 'td' && f[0].filename === 'Itinerario Scozia.pdf'
+      ? ok('il file è registrato: itinerario, caricato dal designer, col suo nome') : fail(JSON.stringify(f))
+    const giorni = (new Date(o.revision_deadline_at) - new Date(o.delivered_at)) / 86400000
+    Math.abs(giorni - 5) < 0.001 ? ok('la finestra della revisione: cinque giorni dalla consegna')
+                                 : fail('finestra: ' + giorni)
+    const e2 = await consegna(T1.td, PATH1)
+    const n = Number((await db.query(`select count(*) from order_files where order_id=$1`, [Q(1)])).rows[0].count)
+    e2.ok && e2.esito === 'gia_consegnato' && n === 1
+      ? ok('il doppio «fatto» sullo stesso file: innocuo') : fail(JSON.stringify([e2, n]))
+  }
+  let FILE1
+  {
+    FILE1 = (await db.query(`select id from order_files where order_id=$1`, [Q(1)])).rows[0].id
+    const m = await posta('delivery_traveler', FILE1)
+    const t = m[0]?.body_text ?? ''
+    m.length === 1 && m[0].recipient === 'viaggiatore@example.com' && t.includes('/proposta/' + T1.viaggiatore)
+      ? ok('la mail al viaggiatore porta la pagina a token, che non scade')
+      : fail('mail consegna: ' + t)
+    !/storage|ordini\/|token=|sign/i.test(m[0]?.body_html + t)
+      ? ok('e nessun link di Storage: una mail così funziona anche fra tre settimane')
+      : fail('link di Storage nella mail')
+    ;/entro il \d{2}\/\d{2}\/\d{4}/.test(t) ? ok('con la data limite della revisione') : fail('data limite assente')
+  }
+  {
+    const p = await pagTd(T1.td)
+    p.file?.length === 1 && p.messaggio_consegna?.includes('/proposta/' + T1.viaggiatore) && p.si_chiude_il
+      ? ok('la pagina del designer: il file, il messaggio da girare nel gruppo, la data di chiusura')
+      : fail(JSON.stringify(p))
+    const v = await pagV(T1.viaggiatore)
+    v.fase === 'consegnata' && v.file?.length === 1 && v.puo_chiedere_revisione === true
+      ? ok('la pagina del viaggiatore: consegnata, col file e il tasto della revisione')
+      : fail(JSON.stringify(v))
+    !JSON.stringify([p, v]).includes('ordini/')
+      ? ok('nessuna delle due pagine riceve un percorso di Storage, tantomeno un link')
+      : fail('percorso esposto a una pagina')
+  }
+  {
+    const fv = await file(T1.viaggiatore, FILE1)
+    const ft = await file(T1.td, FILE1)
+    fv.esito === 'valido' && fv.path === PATH1 && fv.nome === 'Itinerario Scozia.pdf' && ft.esito === 'valido'
+      ? ok('scaricare: il permesso dà il percorso alla route, al viaggiatore e al designer')
+      : fail(JSON.stringify([fv, ft]))
+    !('url' in fv) ? ok('e restituisce un percorso, mai un URL firmato') : fail('URL restituito')
+    const fx = await file(T1.viaggiatore, '00000000-0000-4000-8000-000000000000')
+    fx.esito === 'file_sconosciuto' ? ok('un file che non è di questo ordine: sconosciuto') : fail(JSON.stringify(fx))
+  }
+  const T2 = await creaOrdine(2, 12)
+  await paga(Q(2))
+  {
+    const f = await file(T2.viaggiatore, FILE1)
+    f.esito === 'file_sconosciuto'
+      ? ok('col token di un altro ordine il file non si scarica') : fail(JSON.stringify(f))
+  }
+
+  // ====================================================== C · la revisione
+  console.log('  -- la revisione, una sola --')
+  {
+    const e0 = await revisione(T1.viaggiatore, '  ')
+    e0.esito === 'dati_non_validi' ? ok('una revisione senza dire cosa: non si chiede') : fail(JSON.stringify(e0))
+    const e = await revisione(T1.viaggiatore, 'Più giorni a Skye, meno a Edimburgo')
+    const o = await ordine(Q(1))
+    e.ok && e.esito === 'revisione_chiesta' && o.status === 'revision_requested' && o.last_actor === 'traveler'
+      ? ok('revisione chiesta dentro la finestra: revision_requested, attribuita al viaggiatore')
+      : fail(JSON.stringify([e, o.status]))
+    const m = await posta('revision_requested_td', Q(1))
+    m.length === 1 && m[0].recipient === 'marco@example.com' && m[0].body_text.includes('Più giorni a Skye')
+      && m[0].body_text.includes('/ordine/' + T1.td)
+      ? ok('il designer riceve la mail con cosa è stato chiesto e il link per riconsegnare')
+      : fail('mail revisione: ' + JSON.stringify(m.map(x => x.body_text)))
+    const e2 = await revisione(T1.viaggiatore, 'di nuovo')
+    e2.ok && e2.esito === 'revisione_in_corso' ? ok('il doppio clic: è già in corso, ed è la verità')
+                                               : fail(JSON.stringify(e2))
+    ;(await pagV(T1.viaggiatore)).puo_chiedere_revisione === false
+      ? ok('e la pagina non offre più il tasto') : fail('tasto ancora offerto')
+  }
+  {
+    // Il silenzio non chiude un ordine che aspetta il designer.
+    await db.query(`update orders set delivered_at = now() - interval '10 days' where id=$1`, [Q(1)])
+    await tick()
+    ;(await ordine(Q(1))).status === 'revision_requested'
+      ? ok('una revisione chiesta e non consegnata: il silenzio non chiude') : fail('chiuso con la revisione aperta')
+  }
+  {
+    // Una scadenza riconoscibile, lontana da «adesso + 5 giorni»: nell'harness
+    // prima consegna e riconsegna cadono nello stesso secondo, e un confronto
+    // fra le due date non vedrebbe una finestra rifatta.
+    await db.query(`update orders set revision_deadline_at = now() + interval '1 day' where id=$1`, [Q(1)])
+    const scadenzaPrima = (await ordine(Q(1))).revision_deadline_at
+    const b = await biglietto(T1.td, 'Scozia v2.pdf')
+    const e = await consegna(T1.td, b.path, 'Scozia v2.pdf')
+    const o = await ordine(Q(1))
+    b.tipo === 'revision' && e.esito === 'consegnato' && o.status === 'delivered' && o.revision_delivered_at
+      ? ok('la riconsegna: di nuovo delivered, con la data della revisione') : fail(JSON.stringify([b, e, o.status]))
+    new Date(o.revision_deadline_at).getTime() === new Date(scadenzaPrima).getTime()
+      ? ok('e la finestra della revisione NON riparte: era una sola') : fail('finestra rifatta')
+    const f = (await db.query(`select id, kind from order_files where order_id=$1 order by created_at desc`, [Q(1)])).rows
+    f.length === 2 && f[0].kind === 'revision'
+      ? ok('due file: l\'itinerario e la revisione, tutti e due scaricabili') : fail(JSON.stringify(f))
+    ;(await posta('revision_delivered_traveler', f[0].id)).length === 1
+      ? ok('e una seconda mail al viaggiatore, per la versione rivista') : fail('mail della riconsegna assente')
+  }
+  {
+    const e = await revisione(T1.viaggiatore, 'e ancora una cosa')
+    e.ok === false && e.esito === 'revisione_gia_chiesta' && e.chiesta_il && e.consegnata_il
+      ? ok('seconda revisione: no, con le date della prima e della sua consegna')
+      : fail(JSON.stringify(e))
+    const v = await pagV(T1.viaggiatore)
+    v.puo_chiedere_revisione === false && v.revisione_chiesta_il && v.revisione_consegnata_il
+      ? ok('e la pagina lo sa prima del clic: niente tasto, le date per dirlo') : fail(JSON.stringify(v))
+  }
+
+  console.log('  -- due orologi sullo stesso stato --')
+  {
+    // La finestra della revisione è scaduta, la prima consegna è di dieci giorni
+    // fa: ma la riconsegna è di adesso, e la chiusura riparte da lì.
+    await db.query(`update orders set revision_deadline_at = now() - interval '5 days' where id=$1`, [Q(1)])
+    await tick()
+    ;(await ordine(Q(1))).status === 'delivered'
+      ? ok('dopo la riconsegna la chiusura riparte: cinque giorni per leggere la versione nuova')
+      : fail('chiuso contando dalla prima consegna')
+    await db.query(`update orders set revision_delivered_at = now() - interval '5 days 1 minute' where id=$1`, [Q(1)])
+    await tick()
+    const o = await ordine(Q(1))
+    const h = (await db.query(`select actor from order_status_history where order_id=$1 order by id desc limit 1`, [Q(1)])).rows[0]
+    o.status === 'completed' && o.completed_at && h.actor === 'system'
+      ? ok('cinque giorni dall\'ultima consegna: completed, dall\'orologio') : fail(o.status)
+  }
+  {
+    const v = await pagV(T1.viaggiatore)
+    const f = await file(T1.viaggiatore, FILE1)
+    v.fase === 'chiusa' && v.file.length === 2 && f.esito === 'valido'
+      ? ok('chiuso è chiuso, ma i file si scaricano ancora: sono pagati')
+      : fail(JSON.stringify([v.fase, f.esito]))
+    const b = await biglietto(T1.td)
+    b.esito === 'stato_non_ammesso' ? ok('su un ordine chiuso non si consegna più') : fail(JSON.stringify(b))
+  }
+  {
+    // Fuori finestra: consegnato, finestra scaduta, orologio della chiusura non
+    // ancora arrivato.
+    const b = await biglietto(T2.td)
+    await consegna(T2.td, b.path)
+    await db.query(`update orders set revision_deadline_at = now() - interval '1 minute' where id=$1`, [Q(2)])
+    const e = await revisione(T2.viaggiatore, 'troppo tardi?')
+    e.ok === false && e.esito === 'finestra_chiusa' && e.scaduta_il && (await ordine(Q(2))).status === 'delivered'
+      ? ok('revisione chiesta fuori finestra: no, con la data in cui si è chiusa')
+      : fail(JSON.stringify(e))
+    ;(await pagV(T2.viaggiatore)).puo_chiedere_revisione === false
+      ? ok('e la pagina non offre il tasto fuori finestra') : fail('tasto fuori finestra')
+    await db.query(`update orders set delivered_at = now() - interval '6 days' where id=$1`, [Q(2)])
+    await tick()
+    const e2 = await revisione(T2.viaggiatore, 'e adesso?')
+    e2.esito === 'ordine_chiuso' ? ok('a ordine chiuso: «chiuso», non un tasto che non fa niente')
+                                 : fail(JSON.stringify(e2))
+  }
+
+  // ====================================================== D · il link firmato
+  console.log('  -- il link firmato non esce mai --')
+  {
+    // Il link firmato di Storage si genera nella route, al clic, e scade in un
+    // minuto: qui non si può far scadere davvero (PGlite non ha Storage), si
+    // prova la cosa che lo rende innocuo — non sta scritto da nessuna parte.
+    const r = (await db.query(
+      `select count(*) from outbound_messages
+        where coalesce(body_html,'') || coalesce(body_text,'') ~* '/storage/v1/|[?&]token='`)).rows[0]
+    Number(r.count) === 0
+      ? ok('nessuna mail in coda contiene un link di Storage o un token firmato')
+      : fail(r.count + ' mail con un link di Storage')
+    const c = (await db.query(
+      `select table_name, column_name from information_schema.columns
+        where table_schema='public' and column_name ~ '(signed|firmat)'`)).rows
+    c.length === 0 ? ok('e nessuna colonna ne conserva uno') : fail(JSON.stringify(c))
+  }
+
+  // ====================================================== E · chi arriva a cosa
+  console.log('  -- anon e authenticated non arrivano a niente --')
+  for (const f of ['td_exception_page(text)', 'td_report_exception(text,integer,text)',
+                   'td_delivery_ticket(text,text,bigint,text)', 'td_deliver(text,text,text,bigint,text)',
+                   'order_file_for_token(text,uuid)', 'request_revision(text,text)',
+                   'clock_ramo_chiusura_call()', 'clock_ramo_chiusura_ordini()', 'clock_ramo_postcall_td()']) {
+    const r = (await db.query(
+      `select has_function_privilege('anon', $1, 'EXECUTE') as a,
+              has_function_privilege('authenticated', $1, 'EXECUTE') as u`, [f])).rows[0]
+    !r.a && !r.u ? ok(`${f}: chiusa ad anon e authenticated`) : fail(`${f} aperta: ${JSON.stringify(r)}`)
+  }
+  for (const f of ['td_exception_page(text)', 'td_report_exception(text,integer,text)',
+                   'td_delivery_ticket(text,text,bigint,text)', 'td_deliver(text,text,text,bigint,text)',
+                   'order_file_for_token(text,uuid)', 'request_revision(text,text)']) {
+    const v = (await db.query(`select has_function_privilege('service_role', $1, 'EXECUTE') as v`, [f])).rows[0].v
+    v ? ok(`${f}: la chiama la route server`) : fail(`${f} non raggiungibile dalla chiave secret`)
+  }
+  {
+    const r = (await db.query(
+      `select has_table_privilege('anon', 'booking_exceptions', 'SELECT') as a,
+              has_table_privilege('authenticated', 'booking_exceptions', 'SELECT') as u`)).rows[0]
+    !r.a && !r.u ? ok('booking_exceptions: non leggibile dal browser') : fail(JSON.stringify(r))
   }
 }
 

@@ -3,6 +3,7 @@ import { CHIAVI, leggiContatto } from '@/lib/config'
 import { euro, leggiPaginaProposta, type PaginaProposta } from '@/lib/ordine'
 import { Avviso, Guscio, ScriviciWhatsApp, Spiegazione } from '@/components/pagina-token'
 import { AttesaConferma } from '@/components/attesa-conferma'
+import { ElencoFile } from '@/components/elenco-file'
 
 /**
  * La pagina gemella della proposta su misura.
@@ -25,6 +26,18 @@ import { AttesaConferma } from '@/components/attesa-conferma'
  * l'importo letto dal database, e Stripe lo ridichiara a chi mette la carta. Il
  * denaro lo muove quella persona, con un gesto suo.
  *
+ * ## Dopo la consegna (0046)
+ *
+ * La stessa pagina diventa quella da cui si scarica l'itinerario e si chiede la
+ * revisione. È il link che arriva nella mail di consegna, **al posto del file**:
+ * un link di Storage in una mail scadrebbe, questo no. I file si scaricano da un
+ * indirizzo nostro che firma un link di un minuto al clic.
+ *
+ * La revisione è **una**, dentro la finestra: il tasto c'è solo quando
+ * `puo_chiedere_revisione` lo dice (lo calcola il database con le stesse
+ * regole di `request_revision`), e altrimenti la pagina dice perché — già
+ * chiesta, o finestra chiusa — invece di mostrare un bottone che non fa niente.
+ *
  * ## Cosa manca
  *
  * Un disegno. Il Flusso chiede a Chiara «la pagina proposta pubblica (deve
@@ -40,7 +53,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 }
 
-type Query = { ritorno?: string; cassa?: string }
+type Query = { ritorno?: string; cassa?: string; revisione?: string; file?: string }
+
+const DATA = new Intl.DateTimeFormat('it-IT', { dateStyle: 'long', timeZone: 'Europe/Rome' })
 
 export default async function PaginaProposta({
   params,
@@ -59,6 +74,7 @@ export default async function PaginaProposta({
   }
 
   const designer = pagina.td_name ?? 'il designer'
+  const base = `/proposta/${encodeURIComponent(token)}`
 
   return (
     <Guscio>
@@ -106,6 +122,19 @@ export default async function PaginaProposta({
         </>
       )}
 
+      {q.file && (
+        <Avviso tono="errore">
+          {q.file === 'irraggiungibile'
+            ? 'Non riusciamo a preparare il file adesso. Riprova fra un minuto.'
+            : 'Questo file non si trova. Ricarica la pagina e riprova; se continua, scrivici.'}
+        </Avviso>
+      )}
+      {avvisoRevisione(q.revisione)}
+
+      {(pagina.fase === 'consegnata' || pagina.fase === 'in_revisione' || pagina.fase === 'chiusa') && (
+        <Consegna pagina={pagina} base={base} designer={designer} />
+      )}
+
       {pagina.fase === 'in_aggiornamento' && (
         <p className="text-corpo-big">
           Questa proposta è in aggiornamento: {designer} ne sta preparando una nuova, e la riceverai
@@ -128,6 +157,112 @@ export default async function PaginaProposta({
       </div>
     </Guscio>
   )
+}
+
+function Consegna({ pagina, base, designer }: { pagina: PaginaProposta; base: string; designer: string }) {
+  return (
+    <>
+      <p className="text-corpo-big">
+        {pagina.fase === 'in_revisione'
+          ? `Hai chiesto la revisione: ${designer} ci sta lavorando, e riceverai una mail quando la versione rivista è pronta.`
+          : pagina.fase === 'chiusa'
+            ? `Il tuo itinerario su misura. Buon viaggio!`
+            : `${designer} ha consegnato il tuo itinerario su misura.`}
+      </p>
+
+      <ElencoFile file={pagina.file ?? []} base={base} titolo="Da scaricare" />
+
+      <Revisione pagina={pagina} base={base} />
+
+      <details>
+        <summary className="cursor-pointer text-corpo underline">La proposta</summary>
+        <div className="pt-4">
+          <Proposta pagina={pagina} />
+        </div>
+      </details>
+    </>
+  )
+}
+
+/**
+ * La revisione inclusa, in tutte le sue facce. Il tasto c'è solo se il
+ * database dice che si può; negli altri casi si dice perché, con le date.
+ */
+function Revisione({ pagina, base }: { pagina: PaginaProposta; base: string }) {
+  if (pagina.puo_chiedere_revisione) {
+    return (
+      <form action={`${base}/revisione`} method="post" className="space-y-3">
+        <label className="block space-y-2">
+          <span className="text-corpo-big">Vuoi cambiare qualcosa?</span>
+          <span className="block text-corpo opacity-70">
+            Hai una revisione inclusa, una sola
+            {pagina.revisione_entro ? `, da chiedere entro il ${DATA.format(new Date(pagina.revisione_entro))}` : ''}.
+            Scrivi tutto quello che vorresti diverso, in una volta.
+          </span>
+          <textarea
+            name="nota"
+            required
+            rows={5}
+            maxLength={5000}
+            className="w-full rounded-2xl border border-scuro/30 bg-transparent p-4 text-corpo"
+          />
+        </label>
+        <button
+          type="submit"
+          className="rounded-full border border-scuro px-5 py-2 text-corpo transition hover:bg-scuro hover:text-neutro"
+        >
+          Chiedi la revisione
+        </button>
+        <p className="text-corpo opacity-60">Se va bene così, non devi fare niente.</p>
+      </form>
+    )
+  }
+
+  if (pagina.revisione_chiesta_il) {
+    return (
+      <p className="text-corpo opacity-80">
+        La revisione inclusa l&apos;hai chiesta il {DATA.format(new Date(pagina.revisione_chiesta_il))}
+        {pagina.revisione_consegnata_il
+          ? ` ed è stata consegnata il ${DATA.format(new Date(pagina.revisione_consegnata_il))}`
+          : ''}
+        . Era una sola: per altre modifiche, scrivilo nel gruppo WhatsApp.
+        {pagina.fase === 'consegnata' && pagina.si_chiude_il
+          ? ` L’ordine si chiude il ${DATA.format(new Date(pagina.si_chiude_il))}.`
+          : ''}
+      </p>
+    )
+  }
+
+  if (pagina.fase === 'chiusa') return null
+
+  return (
+    <p className="text-corpo opacity-80">
+      Il tempo per chiedere la revisione inclusa è finito
+      {pagina.revisione_entro ? ` il ${DATA.format(new Date(pagina.revisione_entro))}` : ''}. Se qualcosa non
+      torna, scrivici.
+    </p>
+  )
+}
+
+/** Dopo «Chiedi la revisione» la route torna qui con `?revisione=`. */
+function avvisoRevisione(codice: string | undefined) {
+  switch (codice) {
+    case undefined:
+      return null
+    case 'revisione_chiesta':
+    case 'revisione_in_corso':
+      return <Avviso>Richiesta ricevuta: il designer la riceve adesso per mail.</Avviso>
+    case 'revisione_gia_chiesta':
+      return <Avviso tono="errore">La revisione inclusa era una sola, ed è già stata chiesta.</Avviso>
+    case 'finestra_chiusa':
+      return <Avviso tono="errore">Il tempo per chiedere la revisione è finito.</Avviso>
+    case 'ordine_chiuso':
+      return <Avviso tono="errore">Questo ordine è chiuso: per qualunque cosa, scrivici.</Avviso>
+    case 'dati_non_validi':
+      return <Avviso tono="errore">Scrivi cosa vorresti cambiare: senza, il designer non sa da dove partire.</Avviso>
+    default:
+      return <Avviso tono="errore">Non siamo riusciti a registrare la richiesta. Riprova fra un minuto.</Avviso>
+  }
 }
 
 function Proposta({ pagina }: { pagina: PaginaProposta }) {

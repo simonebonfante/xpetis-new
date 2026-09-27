@@ -81,6 +81,8 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0042_firme_rifiutate.sql` | Il contatore delle firme Cal.com rifiutate, e il ramo 2 dell'orologio che ci alza un alert sopra |
 | `0043_posta.sql` | La cerniera del dopo-call: `message_templates`, `outbound_messages` che diventa una coda, la composizione in Postgres, i rami post-call e consegna dell'orologio, il resolver dei token a cinque risposte e `create_order_from_token()` |
 | `0044_proposta_su_misura.sql` | L'ordine su misura fino al pagamento: `payment_account(kind)`, la proposta congelata dopo l'invio, `order_proposals`, le due mail (link al designer, proposta al viaggiatore), le funzioni delle pagine `/ordine` e `/proposta`, il ponte Stripe che riconosce un ordine, `my_orders` che non mostra le bozze |
+| `0045_correzioni_prove.sql` | Le correzioni delle prove del 23 settembre: gli importi di tutti gli alert passano da `euro_it()` (riemesse `calcom_webhook`, `clock_task_done`, `stripe_checkout_ordine`, `stripe_webhook`); la mail al designer quando il viaggiatore paga (`order_paid_td`); le notifiche interne come meccanismo — `notifica_team()`, destinatari ed eventi in `app_config`, ogni `kind` di `team_alerts` è già un evento |
+| `0046_silenzio_conferma.sql` | Il silenzio-conferma e i due modi di romperlo: la mail al designer con i tasti no-show e «altro problema» (`clock_ramo_postcall_td`), `booking_exceptions`, la chiusura a 48 ore (`clock_ramo_chiusura_call`); la consegna (`td_delivery_ticket`, `td_deliver`, `order_file_for_token`) con le mail; la revisione (`request_revision`) e la chiusura a 5 giorni (`clock_ramo_chiusura_ordini`); `td_order_page` e `proposal_public_page` riemesse con la consegna; `clock_tick` con tre rami in più |
 
 ## La geografia
 
@@ -852,6 +854,93 @@ nulle in `requested`, `in_definition` e `proposal_pending_agency` — quest'ulti
 perché il Flusso vuole che una proposta All Inclusive non raggiunga il
 viaggiatore prima della conferma dell'agenzia.
 
+## Il silenzio-conferma (0046)
+
+Il terzo principio — se nessuno segnala un problema, le cose si chiudono da
+sole — ha due orologi e due modi di essere rotto.
+
+### Dopo la call
+
+- **La mail al designer** parte a fine call, dallo stesso grilletto della mail
+  post-call al viaggiatore: un ramo dell'orologio, `clock_ramo_postcall_td`.
+  Porta due bottoni, due token (`td_exception_no_show`, `td_exception_problem`)
+  che **non scadono**: la finestra la fa valere la funzione del clic, così una
+  call chiusa dice «si è chiusa il…» invece di «link scaduto».
+- **La chiusura a 48 ore** è un `update` (`clock_ramo_chiusura_call`) su
+  `confirmed` → `completed`, contando da `ends_at` più
+  `postcall_autoclose_hours`. La colonna `bookings.autoclose_at` della 0008
+  non la scrive nessuno e non la legge nessuno: cambiare il parametro da Studio
+  vale anche per le call già finite.
+- **I due tasti** (`td_report_exception`) portano la call a `disputed` — tutti e
+  due, **anche il no-show**. Il no-show si dichiara, non si chiude: lo chiude il
+  team dopo aver verificato, come dice il Flusso. Il silenzio si ferma da solo,
+  perché tocca solo `confirmed`.
+- **`booking_exceptions`**: una segnalazione per call (indice unico), con la
+  dichiarazione del designer (minuti di attesa, nota) e l'ora del clic misurata
+  dal server (`minutes_after_start`), che in un arbitrato vale più della
+  dichiarazione. Si chiude da sola quando il team porta la call fuori da
+  `disputed` (`resolution` = lo stato scelto).
+- Il no-show si rifiuta prima di `td_wait_minutes_in_call` dall'inizio. Dopo la
+  finestra delle 48 ore si rifiuta tutto, anche se l'orologio non è ancora
+  passato.
+
+⚠️ Il viaggiatore dichiarato assente **non riceve niente**: punto aperto in
+`PIANO.md`. L'alert lo scrive, così chi arbitra lo sa.
+
+### La consegna, e perché i byte non passano da noi
+
+Una funzione Vercel accetta 4,5 MB di corpo, il bucket `order-documents` 50.
+Quindi tre passi, e il database decide in due:
+
+1. `td_delivery_ticket(token, nome, byte, tipo)` controlla token, stato
+   (`in_progress` o `revision_requested`), tipo e dimensione **dichiarati**, e
+   **sceglie il percorso**: `ordini/<order_id>/<uuid>.<estensione>`. La route
+   apre un caricamento firmato su quel percorso (due ore, un file, senza
+   sovrascrittura);
+2. il browser carica direttamente su Storage;
+3. la route legge da Storage dimensione e tipo **veri** e chiama
+   `td_deliver(token, percorso, nome, byte, tipo)`, che controlla che il
+   percorso sia di quell'ordine, registra `order_files` e porta l'ordine a
+   `delivered` con `last_actor = 'td'`. Se rifiuta, la route cancella l'oggetto.
+
+`documento_ammesso()` ripete i limiti del bucket (0017): il bucket li impone
+comunque, la funzione risponde prima. Se si cambiano lì, si cambiano qui.
+
+### Il link firmato non esce mai
+
+`order_file_for_token(token, file)` restituisce un **percorso**, mai un URL. La
+route `/…/file/[id]` firma un link di **un minuto** e ci rimanda il browser con
+un 303. Nessuna mail, pagina o colonna contiene un link di Storage (l'harness lo
+controlla sulla coda e sulle colonne): le mail portano alla pagina a token, che
+non scade. Il designer scarica i file del suo ordine sempre; la pagina del
+viaggiatore solo da `delivered` in poi, **anche dopo la chiusura**.
+
+### La revisione, e i due orologi su `delivered`
+
+- **La finestra della revisione** (`revision_deadline_at`) si scrive alla
+  prima consegna, più `revision_window_days`, e **non riparte mai**: la
+  revisione inclusa è una.
+- **La chiusura** si calcola: `coalesce(revision_delivered_at, delivered_at) +
+  revision_window_days`. Riparte dopo la riconsegna, perché chi riceve la
+  versione rivista deve avere il tempo di leggerla. Il ramo è
+  `clock_ramo_chiusura_ordini`, solo su misura, solo `delivered`: un ordine in
+  `revision_requested` aspetta il designer, e lì il silenzio non chiude.
+- `request_revision(token, nota)` risponde con parole diverse per casi diversi:
+  `revisione_in_corso` (doppio clic), `revisione_gia_chiesta` (con le date),
+  `finestra_chiusa` (con la data), `ordine_chiuso`. La pagina legge
+  `puo_chiedere_revisione` da `proposal_public_page`, calcolato con le stesse
+  regole: non decide se mostrare il tasto.
+
+### Le mail e gli eventi
+
+Tutte composte e accodate, dal trigger dello stato: `delivery_traveler` e
+`revision_delivered_traveler` (entità: il file, così ogni consegna ha la sua),
+`revision_requested_td`. Il messaggio da girare nel gruppo dopo la consegna è
+`blocco_whatsapp_consegna`, in pagina. Per il meccanismo della 0045 nascono
+gli eventi `ordine_consegnato` e `revisione_richiesta`, più gli alert
+`td_segnala_no_show` e `td_segnala_problema`, che sono eventi anche loro: per
+avvisare il team basta una parola in `team_notify_events`.
+
 ## La pubblicazione di un profilo
 
 `td_publish_blockers(td_id)` restituisce i motivi che impediscono di pubblicare:
@@ -1033,4 +1122,4 @@ import.
 4. ~~Workflow n8n: Cal.com → `bookings`, Stripe → `payments`, insoluti, timer~~
    → fatti, più la posta.
 5. La vita dell'ordine su misura: ~~proposta, pagamento~~ → **fatti** (0044);
-   restano consegna, revisione e chiusura a silenzio (milestone 6).
+   ~~consegna, revisione e chiusura a silenzio~~ → **fatti** (0046).

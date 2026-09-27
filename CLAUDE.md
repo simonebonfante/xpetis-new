@@ -202,11 +202,17 @@ di chi ha agito.
   authenticated` esplicito: su Supabase i privilegi di default concedono le
   tabelle create dopo, e la revoca della 0016 non si eredita.
 - Importi sempre in centesimi, colonne `*_cents`.
-- **I file non passano mai dentro n8n.** I documenti li carica il nostro server
-  su Supabase Storage; n8n manda un link firmato a scadenza, mai un allegato.
-  Così l'istanza n8n non ha bisogno di disco (tutto il suo stato vive nel suo
-  Postgres) e un documento di viaggio non resta per sempre in una casella email
-  inoltrabile a chiunque.
+- **I file non passano mai dentro n8n.** Il caricamento lo **decide** il nostro
+  server: controlla il token, sceglie il percorso, apre un caricamento firmato
+  su quel percorso soltanto, e dopo legge da Storage cosa è arrivato e lo
+  registra. I byte però vanno dal browser a Storage, perché una funzione Vercel
+  accetta al massimo 4,5 MB di corpo (0046). Così l'istanza n8n non ha bisogno
+  di disco (tutto il suo stato vive nel suo Postgres) e un documento di viaggio
+  non resta per sempre in una casella email inoltrabile a chiunque.
+- **Un link firmato di Storage non va mai in una mail né in una pagina.** È una
+  credenziale e scade: la mail porta alla pagina a token, e la pagina a un
+  indirizzo nostro (`/…/file/[id]`) che al clic firma un link di un minuto e ci
+  rimanda il browser.
 - Timestamp `timestamptz`, mai `timestamp`.
 - Migration numerate a quattro cifre, mai modificate dopo essere state
   applicate: si aggiunge una migration nuova.
