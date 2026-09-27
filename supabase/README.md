@@ -83,6 +83,8 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0044_proposta_su_misura.sql` | L'ordine su misura fino al pagamento: `payment_account(kind)`, la proposta congelata dopo l'invio, `order_proposals`, le due mail (link al designer, proposta al viaggiatore), le funzioni delle pagine `/ordine` e `/proposta`, il ponte Stripe che riconosce un ordine, `my_orders` che non mostra le bozze |
 | `0045_correzioni_prove.sql` | Le correzioni delle prove del 23 settembre: gli importi di tutti gli alert passano da `euro_it()` (riemesse `calcom_webhook`, `clock_task_done`, `stripe_checkout_ordine`, `stripe_webhook`); la mail al designer quando il viaggiatore paga (`order_paid_td`); le notifiche interne come meccanismo — `notifica_team()`, destinatari ed eventi in `app_config`, ogni `kind` di `team_alerts` è già un evento |
 | `0046_silenzio_conferma.sql` | Il silenzio-conferma e i due modi di romperlo: la mail al designer con i tasti no-show e «altro problema» (`clock_ramo_postcall_td`), `booking_exceptions`, la chiusura a 48 ore (`clock_ramo_chiusura_call`); la consegna (`td_delivery_ticket`, `td_deliver`, `order_file_for_token`) con le mail; la revisione (`request_revision`) e la chiusura a 5 giorni (`clock_ramo_chiusura_ordini`); `td_order_page` e `proposal_public_page` riemesse con la consegna; `clock_tick` con tre rami in più |
+| `0047_all_inclusive.sql` | L'All Inclusive intero: `payment_account()` risponde anche per `deposit` e `balance`, la chiave ristretta dell'agenzia da Vault (`agency_stripe_key`), le regole dell'ordine (`ai_order_rules`: congelamento, acconto calcolato, tempi del saldo, consegna col documento finale), il token monouso dell'agenzia e `agency_decisions`, la pagina e il clic dell'agenzia, la cascata, le due rate nel ponte Stripe (`stripe_checkout_ai`), le pagine del designer e del viaggiatore riemesse con lo smistamento, il documento finale col login (`final_document_for_traveler`), due rami dell'orologio |
+| `0048_tre_event_type_e_gruppi.sql` | Le tre reti sui tre event type (deviazione 10 riscritta): `td_services_one_service_per_slug` (designer + slug unici), `calcom_expected_slugs()` e il ramo nuovo di `td_publish_blockers` sugli slug fuori elenco, il trigger che li vieta su un designer già pubblicato, e `calcom_webhook` riemessa col confronto fra durata dello slot e listino (`calcom_durata_non_combacia`). E `td_group_trips`, i viaggi di gruppo, con la colonna `group_trips` in coda a `public_td_showcase` |
 
 ## La geografia
 
@@ -150,6 +152,43 @@ Attenzione all'import: nel form il prezzo della consulenza è testo libero (un
 designer scrive `"20"`, l'esempio del form `"30€"`). Chi importa parsa e segnala
 ciò che non capisce, mai indovina.
 
+### Le due consulenze e i tre event type (0048)
+
+Dal 27 settembre 2026 (deviazione 10 del PIANO, riscritta): la **breve**
+`consultation` dura sempre 30 minuti e ce l'ha ogni designer; l'**approfondita**
+`consultation_deep` dura 60 oppure 90 ed è opzionale. Gli event type Cal.com
+sono tre, e gli slug ammessi per tipo stanno in `app_config`:
+
+| Riga di `app_config` | Valore |
+|---|---|
+| `calcom_slugs_consultation` | `consulenza-xpetis-30` |
+| `calcom_slugs_consultation_deep` | `consulenza-xpetis-60, consulenza-xpetis-90` |
+
+Tre reti, una per modo di sbagliare:
+
+- **Designer + slug unici** (`td_services_one_service_per_slug`). Il ponte trova
+  il servizio con quella coppia; due servizi sulla stessa coppia facevano
+  scegliere il `limit 1`, cioè il prezzo, a caso. `unique (td_id,
+  service_type)` della 0007 non bastava: breve e approfondita hanno tipi
+  diversi. La migration controlla i doppioni prima di creare il vincolo e li
+  nomina.
+- **Slug fuori elenco = profilo non pubblicabile.** Cal.com genera l'URL dal
+  titolo in modo imprevedibile (`consulenza-xpetis-30-min`), e uno slug
+  sbagliato non dà errori: il ponte scarta la prenotazione come «non nostra».
+  Il blocco è in `td_publish_blockers`, quindi prima che un viaggiatore veda la
+  vetrina; su un designer **già** pubblicato lo stesso controllo lo fa il
+  trigger `td_services_enforce_slug`, sulla sola riga scritta. Per tipo e non in
+  un elenco unico: la breve sul `-60` è proprio l'errore che la regola del 21
+  settembre lascia in eredità. **Senza la riga di configurazione il servizio è
+  bloccato**, e il motivo lo dice. I servizi spenti non si guardano: possono
+  avere prenotazioni in volo, e il ponte li deve riconoscere.
+- **Durata vera contro listino.** Al `BOOKING_CREATED` il ponte confronta
+  `endTime - startTime` con `duration_minutes`. Se non combaciano **crea
+  comunque la prenotazione** — il viaggiatore ha uno slot vero — e alza un
+  `calcom_durata_non_combacia` critico sulla prenotazione. Lo slug e la durata
+  non si confrontano fra loro nel database (il numero nello slug è una
+  convenzione di nomi, non un dato): lo fa questa rete, sul fatto.
+
 ## Il contenuto di vetrina
 
 `td_signature_trips` con `td_signature_trip_images`, `td_ready_itineraries` e
@@ -189,6 +228,15 @@ e la scheda hero elenca le macro-aree mentre la vista dà i paesi. In entrambi i
 casi la pagina mostra meno invece di procurarsi il dato altrove — leggere una
 tabella con la chiave secret sarebbe lecito ma scavalcherebbe la regola. Se un
 campo serve davvero si aggiunge alla vista, con una migration.
+
+`td_group_trips` (migration 0048) è la gemella di `td_ready_itineraries` per
+la chiave `gruppo` del form nuovo, con due campi in più — `dates_label` e
+`group_size_label` — e **tutto testo**, come lo dà il form: `"14 – 25 set
+2025"`, `"10 persone"`, `"1.380€"`. Solo vetrina: nessuna cassa, nessun ordine.
+Niente `slug`, perché oggi un viaggio di gruppo non ha una pagina sua. ⚠️ **Un
+viaggio di gruppo scade e niente lo nasconde**: con la data come testo il
+database non sa che è passata. Domanda aperta in `PIANO.md`, milestone 3.
+La vista lo espone nella colonna `group_trips`, in coda.
 
 Il seed `0003_demo.sql` popola queste tabelle per i due designer finti: senza
 contenuto la vetrina renderizza vuota e non si vede se funziona. **Le prove
@@ -941,11 +989,111 @@ gli eventi `ordine_consegnato` e `revisione_richiesta`, più gli alert
 `td_segnala_no_show` e `td_segnala_problema`, che sono eventi anche loro: per
 avvisare il team basta una parola in `team_notify_events`.
 
+## L'All Inclusive (0047)
+
+Il Flusso §8, dalla richiesta al documento finale, con l'agenzia in mezzo:
+
+```
+requested → in_definition → proposal_pending_agency → awaiting_deposit → deposit_paid
+                  ▲                    │                                     │ (tempi del saldo)
+                  └── non fattibile ───┘                                     ▼
+                              delivered ← balance_paid ← awaiting_balance ←──┘
+```
+
+### Un conto solo (decisione del 27 settembre 2026)
+
+Il conto Stripe è **uno, dell'agenzia**, dedicato a XPETIS. `payment_account()`
+risponde per tipo dalle righe di `app_config` — `deposit` e `balance` da
+`all_inclusive_stripe_account` — e in produzione diranno tutte `agency`. Un solo
+endpoint, un solo `whsec_` (`stripe_webhook_secret`, com'era). La chiave è
+**ristretta**, in Vault sotto il nome in `agencies.stripe_credential_ref`, e la
+legge `agency_stripe_key()`, che rifiuta tutto ciò che non comincia per `rk_`:
+niente rimborsi via API. La route della cassa sceglie la chiave dal conto (sulla
+riga di `payments` per le casse già aperte, così una sessione si rilegge dove è
+nata) e rifiuta di aprire se l'agenzia che incassa non è quella dell'ordine.
+
+### Le regole dell'ordine
+
+`ai_order_rules()` è un trigger `before update` (non `of status`: il team scrive
+`balance_due_at` senza toccare lo stato) che gira **dopo**
+`orders_enforce_transition`, così agenzia, prezzo e documento mancanti li ferma
+la 0009 con le sue parole:
+
+- dopo l'invio **non si toccano** descrizione, prezzo, credito, date, totale,
+  acconto, saldo e agenzia; si riaprono se l'agenzia non conferma;
+- all'invio: descrizione e partenza nel futuro obbligatorie, agenzia attiva,
+  **acconto = `deposit_percent`** (oggi 30) del totale arrotondato, **saldo per
+  residuo**, entrambi ≥ 0,50 € (due casse Stripe);
+- `balance_due_at`: nel futuro, non dopo la partenza, non su un ordine saldato;
+  e senza di lei `awaiting_balance` non si raggiunge;
+- `delivered` solo col **documento finale**.
+
+`deposit_paid → awaiting_balance` non lo fa nessuno a mano: quando ci sono
+l'acconto pagato **e** i tempi del saldo, in qualunque ordine arrivino, lo fa
+il trigger `orders_soldi_all_inclusive` (chiamato così per girare dopo
+`orders_log_status`, e tenere la storia in ordine).
+
+### L'agenzia: il terzo destinatario di una pagina a token
+
+- All'invio (`ai_send_to_agency`, o da Studio) nascono la fotografia in
+  `order_proposals` (con `document_file_id`, date e rate) e un token
+  `agency_proposal_confirm` **monouso, che scade** dopo
+  `agency_confirm_valid_days`, legato all'agenzia e alla proposta
+  (`payload.proposta`). Il token di un invio precedente si revoca.
+- `agency_page(token)` e `agency_decide(token, 'conferma'|'non_fattibile', nota)`.
+  **La prima risposta vince**: `agency_decisions` ha la chiave primaria sulla
+  proposta. Il secondo clic risponde `gia_decisa`, e un link consumato mostra
+  com'è andata. «Non fattibile» vuole una nota.
+- Uscire da `proposal_pending_agency` per qualunque strada spegne il link
+  ancora aperto. La conferma da Studio (l'agenzia al telefono) fa partire la
+  cascata lo stesso, con `actor = 'team'` nella decisione.
+- Link scaduto senza risposta: alert `verifica_agenzia_scaduta` dall'orologio,
+  e il team ne manda uno nuovo con `select rinnova_verifica_agenzia('<ordine>')`.
+
+### La cascata, le due rate, il documento finale
+
+- **Alla conferma**: token `traveler_public_proposal`, mail al viaggiatore con la
+  proposta e il link dell'acconto (`ai_proposal_traveler`), mail al designer
+  (`agency_confirmed_td`) col messaggio pronto in pagina.
+- **Il ponte Stripe** smista l'All Inclusive a `stripe_checkout_ai`. La rata la
+  dice la riga di `payments`, o `metadata.xpetis`; senza, alert
+  `stripe_rata_non_riconosciuta` e ordine fermo. Importo contro `deposit_cents` o
+  `balance_cents`; stato atteso `awaiting_deposit` o `awaiting_balance`; ogni
+  altro caso (saldo prima dell'acconto, acconto su una proposta rifiutata,
+  ordine annullato, secondo incasso) registra i soldi se l'indice lo permette,
+  non tocca l'ordine e scrive un alert critico che dice quale caso è. Il saldo
+  vero che arriva dopo uno anticipato e rimborsato non fa sollevare
+  `payments_one_paid_per_kind`: alert `stripe_rata_gia_registrata`, ordine fermo.
+- `payments_one_pending_per_kind` è su (entità, tipo): una cassa acconto e una
+  saldo possono stare aperte insieme, due acconto no (l'harness lo prova).
+- **Il documento finale** passa dalle stesse porte della consegna
+  (`td_delivery_ticket`, `td_deliver`, riemesse con lo smistamento): in
+  `requested`/`in_definition` si carica il documento di proposta, in
+  `balance_paid` quello finale, che porta a `delivered`.
+- **Scaricare**: `order_file_for_token` dà al designer tutto, all'agenzia il
+  solo documento della sua proposta finché il token vale, alla pagina del
+  viaggiatore il documento della proposta confermata. **Il documento finale no**:
+  si scarica da `/documento/<id>` con `final_document_for_traveler(file, utente)`,
+  solo se l'utente Google della sessione è il viaggiatore dell'ordine.
+- Saldo non arrivato entro `balance_due_at`: alert critico `saldo_scaduto`. Il
+  sistema non annulla niente.
+
+Mail: `order_new_td_ai`, `agency_proposal_confirm`, `agency_confirmed_td`,
+`agency_rejected_td`, `ai_proposal_traveler`, `ai_balance_traveler`,
+`ai_balance_paid_td`, `ai_delivery_traveler`; in pagina
+`blocco_whatsapp_ai_proposta` e `blocco_whatsapp_ai_consegna`. Eventi per
+`team_notify_events`: `agenzia_ha_confermato`, `agenzia_non_fattibile`,
+`acconto_pagato`, `saldo_pagato`, `ordine_consegnato`, e gli alert nuovi.
+
+**Non c'è**: la chiusura `delivered → completed` (resta al team), i rimborsi via
+API, la riconciliazione mensile, una seconda agenzia.
+
 ## La pubblicazione di un profilo
 
 `td_publish_blockers(td_id)` restituisce i motivi che impediscono di pubblicare:
 foto o bio mancanti, nessun paese, **nessun paese di livello 1**, assi
-incompleti, nessuna consulenza attiva, account Cal.com non collegato. Un trigger
+incompleti, nessuna consulenza attiva, account Cal.com non collegato, e dalla
+0048 **uno slug Cal.com fuori elenco** su una consulenza attiva. Un trigger
 di vincolo li impone: un profilo con tutti i paesi allo stesso livello non si
 pubblica, perché sarebbe completo e inutile — non prenderebbe mai il badge e
 finirebbe sotto a chiunque.
@@ -1014,12 +1162,12 @@ numerico, modificabile a vista da Supabase Studio senza deploy:
 
 - `matching` — 50/50 quiz/filtri, 60/40 tema/contesto, soglia del badge (0.80)
 - `booking_rules` — preavviso 12h, orizzonte 30gg, finestra di pagamento 30min, rimborso 24h, limiti di riprogrammazione (5 / 2 / 20 giorni), 15 minuti di attesa in call
-- `orders` — silenzio-conferma 48h, revisione 5 giorni, acconto 30%
+- `orders` — silenzio-conferma 48h, revisione 5 giorni, acconto 30% (`deposit_percent`), validità del link dell'agenzia 7 giorni (`agency_confirm_valid_days`)
 - `reviews` — buon viaggio 3 giorni prima, recensione viaggio 3 giorni dopo, alert sotto le 3 stelle
-- `payments` — su quale conto Stripe incassano una consulenza e un itinerario su misura (`consultation_stripe_account`, `custom_itinerary_stripe_account`: `xpetis` oggi, `agency` in produzione)
+- `payments` — su quale conto Stripe incassano una consulenza, un itinerario su misura e le due rate dell'All Inclusive (`consultation_stripe_account`, `custom_itinerary_stripe_account`, `all_inclusive_stripe_account`: `xpetis` in sandbox, `agency` in produzione — il conto è uno solo, dell'agenzia)
 - `showcase` — le stringhe che il sito stampa in pagina: la nota sotto il prezzo degli itinerari
 - `contacts` — i recapiti del team (numero WhatsApp), **fuori** dalla superficie pubblica
-- `integrations` — quello che serve a parlare col mondo: l'indirizzo di cancellazione Cal.com, le soglie dei due contatori (firme rifiutate, token inventati) e tutta la posta (`email_enabled`, `email_from`, `email_redirect_to`, `email_max_per_tick`, `email_max_attempts`, `site_base_url`). **Fuori** dalla superficie pubblica, e a maggior ragione
+- `integrations` — quello che serve a parlare col mondo: l'indirizzo di cancellazione Cal.com, gli slug ammessi dei tre event type (`calcom_slugs_consultation`, `calcom_slugs_consultation_deep`, 0048), le soglie dei due contatori (firme rifiutate, token inventati) e tutta la posta (`email_enabled`, `email_from`, `email_redirect_to`, `email_max_per_tick`, `email_max_attempts`, `site_base_url`). **Fuori** dalla superficie pubblica, e a maggior ragione
 
 Il sito legge dalla vista `public_config` i gruppi `booking_rules` e `showcase`;
 `matching` è chiuso dalla 0018 (il match è lato server) e i parametri operativi
@@ -1104,7 +1252,9 @@ import.
 
 | Punto | Dove |
 |---|---|
-| Le credenziali Stripe per agenzia: Vault, n8n o Stripe Connect | `0006_agencies.sql` |
+| ~~Le credenziali Stripe per agenzia: Vault, n8n o Stripe Connect~~ → **Vault, chiave ristretta, un conto solo** (27 settembre 2026) | `0047_all_inclusive.sql` |
+| Quando si chiude un All Inclusive consegnato, e con quale silenzio | `0047_all_inclusive.sql` |
+| Chi toglie dalla vetrina un viaggio di gruppo già partito (la data è testo) | `0048_tre_event_type_e_gruppi.sql` |
 | L'asse "con chi viaggi" ammette più valori per TD? (oggi sì) | `0007_travel_designers.sql` |
 | Le quattro categorie di "con chi viaggi" non sono nel flusso: quelle nel seed sono un'ipotesi | `seed/0001_config.sql` |
 | Le etichette delle scale 1-4 degli altri cinque assi (le scrive Gaia) | `seed/0001_config.sql` |
@@ -1123,3 +1273,4 @@ import.
    → fatti, più la posta.
 5. La vita dell'ordine su misura: ~~proposta, pagamento~~ → **fatti** (0044);
    ~~consegna, revisione e chiusura a silenzio~~ → **fatti** (0046).
+6. ~~L'All Inclusive~~ → **fatto** (0047), tranne la chiusura dopo la consegna.

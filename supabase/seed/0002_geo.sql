@@ -4,7 +4,8 @@
 -- xpetis_destinazioni.json. Non modificare a mano: rigenerare.
 -- Attese: 6 continenti, 14 macro-aree, 129 stati, 244 regioni, 1220 città.
 
--- Regole di selezione dichiarate dalla tassonomia:
+-- Regole di selezione dichiarate dalla tassonomia
+-- (le regioni italiane NON filtrano: deviazione 7 del PIANO, confermata il 27/09/2026):
 --   selezionabili: macro_area, state, italian_region
 --   solo cercabili: continent, city, foreign_region
 --   Cercando 'Italia' il sistema suggerisce le 20 regioni italiane (tutte selezionabili).

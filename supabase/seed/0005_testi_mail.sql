@@ -271,3 +271,105 @@ E'Ecco il tuo itinerario ({{human_ref}}): {{link_pagina}}\n\nLo trovi lì e lo s
    array['human_ref', 'link_pagina'],
    'Il messaggio che il designer copia nel gruppo WhatsApp dopo una consegna. Lo manda LUI, in prima persona sua. Si compone in pagina, non parte per mail. Il link è la pagina del viaggiatore, mai il file.')
 on conflict (key) do nothing;
+
+-- ===========================================================================
+-- Aggiunti con la 0047 — l'All Inclusive
+-- ===========================================================================
+--
+-- Una regola in più, oltre alle tre in testa al file: **l'agenzia non parla
+-- mai con il viaggiatore** (Flusso §8, «la cucina resta in cucina»). Nelle mail
+-- al viaggiatore l'agenzia compare come garanzia — chi organizza il viaggio e
+-- incassa — e mai come interlocutore: per qualunque cosa si scrive nel gruppo.
+
+-- Al designer, alla nascita dell'ordine All Inclusive. È la gemella di
+-- order_new_td: stesso link, ma la proposta qui è un documento e passa
+-- dall'agenzia prima di arrivare al viaggiatore.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('order_new_td_ai', 'mail', 'td',
+   'Nuova richiesta {{human_ref}}: All Inclusive',
+E'{{saluto}},\n\n{{nome_viaggiatore}} ha chiesto l''All Inclusive dopo la call del {{data_call}}. Il riferimento è {{human_ref}}: usalo nei due gruppi WhatsApp che apriamo, quello con il viaggiatore e quello tecnico con l''agenzia.\n\nQuando il pacchetto è definito nel gruppo tecnico, la proposta si prepara da qui: il documento di viaggio, il prezzo totale e la data di partenza. È la pagina di questo ordine, e da qui seguirai anche i passi dopo.\n\n{{link_ordine}}\n\nTre cose da sapere prima.\n\nLa proposta non arriva subito al viaggiatore: va prima all''agenzia, che la verifica. Se qualcosa non torna te lo dice, la correggi e la rimandi.\n\nIl prezzo che scrivi è il totale che paga il viaggiatore. La consulenza costava {{prezzo_call}} e va già scalata lì, a meno che quel credito non sia stato usato su un altro ordine della stessa call: la pagina te lo dice. Il sistema non toglie niente da solo. L''acconto lo calcola il sistema sul totale.\n\nQuesto link è personale: non inoltrarlo. Chi lo apre può preparare la proposta al posto tuo.\n\nPer qualunque dubbio il team è su WhatsApp al {{whatsapp}}.\n\nXPETIS',
+   array['saluto', 'nome_viaggiatore', 'data_call', 'human_ref', 'prezzo_call', 'link_ordine', 'whatsapp'],
+   'Parte alla nascita di ogni ordine All Inclusive (0047). Porta il link della pagina ordine: senza, il designer non può preparare la proposta. Il link NON scade ed è una credenziale: il testo deve continuare a dire di non inoltrarlo. Niente aggettivi con il genere.')
+on conflict (key) do nothing;
+
+-- All'agenzia, all'invio della proposta. Flusso §8: «via mail, con documento,
+-- prezzo e un tasto di conferma». Il documento non è allegato: si scarica
+-- dalla pagina, dove stanno anche i due tasti. Il link si consuma alla prima
+-- risposta e scade: il testo lo deve dire, altrimenti un link morto sembra un
+-- guasto.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('agency_proposal_confirm', 'mail', 'agency',
+   'Da verificare: proposta All Inclusive {{human_ref}}',
+E'Buongiorno {{agenzia}},\n\n{{designer}} ha preparato la proposta All Inclusive {{human_ref}} (invio n. {{invio_n}}). Prima di arrivare al viaggiatore passa da voi.\n\nTotale: {{totale}}\nAcconto ({{percentuale}}): {{acconto}}\nSaldo: {{saldo}}\nPartenza: {{partenza}}\nRientro: {{ritorno}}\nDocumento: {{documento}}\n\n{{descrizione}}\n\nDalla pagina qui sotto scaricate il documento e rispondete con un clic: Confermo, oppure Non fattibile, con due righe sul perché.\n\n{{link_verifica}}\n\nIl link vale per una risposta sola ed entro il {{valido_fino}}. Alla conferma il viaggiatore riceve la proposta con il link dell''acconto: da quel momento prezzo e condizioni non si cambiano più.\n\nSe qualcosa va chiarito prima, se ne parla nel gruppo tecnico. Per il team XPETIS: WhatsApp {{whatsapp}}.\n\nXPETIS',
+   array['agenzia', 'designer', 'human_ref', 'invio_n', 'descrizione', 'totale', 'percentuale', 'acconto', 'saldo', 'partenza', 'ritorno', 'documento', 'link_verifica', 'valido_fino', 'whatsapp'],
+   'Parte a ogni invio della proposta all''agenzia, e a ogni rinnovo del link (0047). Il link è una credenziale monouso a scadenza: il testo deve dire che vale una volta ed entro quando. {{descrizione}} è il testo del designer.')
+on conflict (key) do nothing;
+
+-- Al designer, l'esito della verifica. Confermata: il viaggiatore ha già la
+-- proposta, e sulla pagina c'è il messaggio da girare nel gruppo commerciale.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('agency_confirmed_td', 'mail', 'td',
+   '{{agenzia}} ha confermato la proposta {{human_ref}}',
+E'{{saluto}},\n\n{{agenzia}} ha confermato la proposta {{human_ref}}. Il viaggiatore l''ha appena ricevuta per mail, con il link per pagare l''acconto.\n\nSulla pagina dell''ordine trovi il messaggio pronto da girare nel gruppo commerciale, con il link della proposta:\n\n{{link_ordine}}\n\nQuesto link è personale: non inoltrarlo.\n\nPer qualunque dubbio il team è su WhatsApp al {{whatsapp}}.\n\nXPETIS',
+   array['saluto', 'human_ref', 'agenzia', 'link_ordine', 'whatsapp'],
+   'Parte quando l''agenzia conferma (o il team conferma da Studio per lei), 0047. Niente aggettivi con il genere.'),
+  ('agency_rejected_td', 'mail', 'td',
+   'Proposta {{human_ref}}: {{agenzia}} chiede una correzione',
+E'{{saluto}},\n\n{{agenzia}} non ha confermato la proposta {{human_ref}}. Ecco cosa ha scritto:\n\n{{nota}}\n\nLa proposta è tornata tua: la correggi dalla pagina dell''ordine e la rimandi, e l''agenzia la riceve di nuovo. Al viaggiatore non è arrivato niente.\n\n{{link_ordine}}\n\nSe serve chiarire, il posto è il gruppo tecnico.\n\nQuesto link è personale: non inoltrarlo.\n\nPer qualunque dubbio il team è su WhatsApp al {{whatsapp}}.\n\nXPETIS',
+   array['saluto', 'human_ref', 'agenzia', 'nota', 'link_ordine', 'whatsapp'],
+   'Parte quando l''agenzia risponde Non fattibile (0047). {{nota}} è il testo dell''agenzia. Niente aggettivi con il genere.')
+on conflict (key) do nothing;
+
+-- Al viaggiatore, alla conferma dell'agenzia. Flusso §8: «la mail al
+-- viaggiatore con la proposta allegata e il link per l'acconto». È lei che
+-- vende, come quella del su misura: il testo del designer sta nel corpo. Il
+-- documento si scarica dalla pagina — lo stesso che l'agenzia ha verificato.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('ai_proposal_traveler', 'mail', 'traveler',
+   'Il tuo viaggio con {{designer}}: la proposta ({{human_ref}})',
+E'{{saluto}},\n\necco la proposta di {{designer}} per il tuo viaggio All Inclusive ({{human_ref}}). È stata verificata da {{agenzia}}, l''agenzia che organizza il viaggio e ne è garante.\n\n{{descrizione}}\n\nTotale: {{totale}}\nPartenza: {{partenza}}\n\nSi paga in due momenti. Adesso l''acconto, il {{percentuale}} del totale: {{acconto}}. Con l''acconto l''agenzia comincia le prenotazioni vere. Il saldo, {{saldo}}, ti verrà chiesto più avanti, con i tempi di voli e strutture, e comunque prima della partenza.\n\nIl prezzo è quello finale: se c''era la consulenza da scalare, {{designer}} l''ha già fatto.\n\nLa proposta completa, con il documento da scaricare e il pagamento dell''acconto, è qui:\n\n{{link_pagina}}\n\nSe qualcosa non ti torna, dillo nel gruppo WhatsApp prima di pagare.\n\n{{firma}}',
+   array['saluto', 'designer', 'agenzia', 'human_ref', 'descrizione', 'totale', 'percentuale', 'acconto', 'saldo', 'partenza', 'link_pagina', 'firma'],
+   'Parte alla conferma dell''agenzia (0047). {{link_pagina}} porta alla pagina del viaggiatore, dove stanno il documento e la cassa dell''acconto. NON nominare cifre di credito. L''agenzia è una garanzia, non un interlocutore: si scrive nel gruppo.')
+on conflict (key) do nothing;
+
+-- Al viaggiatore, quando il team ha scritto i tempi del saldo.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('ai_balance_traveler', 'mail', 'traveler',
+   'Il saldo del tuo viaggio ({{human_ref}}), entro il {{data_saldo}}',
+E'{{saluto}},\n\nle prenotazioni del tuo viaggio con {{designer}} ({{human_ref}}) sono avviate, ed è il momento del saldo: {{saldo}}, da pagare entro il {{data_saldo}}. La data la dettano voli e strutture, ed è prima della partenza del {{partenza}}.\n\nSi paga dalla stessa pagina della proposta:\n\n{{link_pagina}}\n\nA saldo pagato, {{designer}} prepara il documento finale del viaggio, con biglietti, voucher e istruzioni.\n\nSe per quella data c''è un problema, scrivilo subito nel gruppo WhatsApp.\n\n{{firma}}',
+   array['saluto', 'designer', 'human_ref', 'saldo', 'data_saldo', 'partenza', 'link_pagina', 'firma'],
+   'Parte quando l''ordine entra in attesa del saldo: acconto pagato e tempi scritti dal team in orders.balance_due_at (0047). Una sola per ordine: se la data cambia dopo, lo si dice nel gruppo (la pagina la mostra sempre aggiornata).')
+on conflict (key) do nothing;
+
+-- Al designer, a saldo incassato: adesso il file finale.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('ai_balance_paid_td', 'mail', 'td',
+   'Saldato {{human_ref}}: si carica il documento finale',
+E'{{saluto}},\n\n{{nome_viaggiatore}} ha pagato il saldo dell''All Inclusive {{human_ref}}. Adesso tocca al documento finale: il documento di viaggio completo, con biglietti, voucher, contatti e istruzioni. La partenza è il {{partenza}}.\n\nLo carichi dalla pagina dell''ordine:\n\n{{link_ordine}}\n\nQuesto link è personale: non inoltrarlo.\n\nPer qualunque dubbio il team è su WhatsApp al {{whatsapp}}.\n\nXPETIS',
+   array['saluto', 'nome_viaggiatore', 'human_ref', 'partenza', 'link_ordine', 'whatsapp'],
+   'Parte quando il saldo è incassato (0047). Niente aggettivi con il genere.')
+on conflict (key) do nothing;
+
+-- Al viaggiatore, alla consegna del documento finale. ⚠️ Deve dire che per
+-- scaricarlo serve entrare con Google: il documento contiene biglietti e
+-- voucher, e dal link girato nel gruppo non si scarica (decisione del 27
+-- settembre). Senza questa riga la prima reazione è «il link non funziona».
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('ai_delivery_traveler', 'mail', 'traveler',
+   'Il tuo documento di viaggio è pronto ({{human_ref}})',
+E'{{saluto}},\n\n{{designer}} ha preparato il documento finale del tuo viaggio ({{human_ref}}): biglietti, voucher, contatti e istruzioni, tutto in un posto. La partenza è il {{partenza}}.\n\nLo trovi qui:\n\n{{link_pagina}}\n\nPer scaricarlo ti chiediamo di entrare con l''account Google con cui hai prenotato la consulenza: dentro ci sono i tuoi biglietti, e così li apri solo tu.\n\nBuon viaggio.\n\n{{firma}}',
+   array['saluto', 'designer', 'human_ref', 'partenza', 'link_pagina', 'firma'],
+   'Parte alla consegna del documento finale All Inclusive (0047). {{link_pagina}} è la pagina del viaggiatore: MAI un link al file. Il testo deve dire che per scaricare serve l''accesso con Google.')
+on conflict (key) do nothing;
+
+-- I due messaggi pronti per il gruppo commerciale, con la voce del designer.
+insert into message_templates (key, template_kind, audience, body_it, placeholders, notes) values
+  ('blocco_whatsapp_ai_proposta', 'blocco', 'td',
+E'Ecco la proposta per il nostro viaggio ({{human_ref}}), verificata dall''agenzia: {{link_pagina}}\n\nDentro trovi il documento completo, il totale e l''acconto, che si paga da lì. Il saldo arriverà più avanti, con i tempi di voli e strutture. Se qualcosa non ti torna scrivilo qui prima di pagare.',
+   array['human_ref', 'link_pagina'],
+   'Il messaggio che il designer copia nel gruppo commerciale dopo la conferma dell''agenzia (0047). Lo manda LUI, in prima persona sua.'),
+  ('blocco_whatsapp_ai_consegna', 'blocco', 'td',
+E'Il documento finale del viaggio ({{human_ref}}) è pronto: {{link_pagina}}\n\nDentro ci sono biglietti, voucher e istruzioni. Per scaricarlo si entra con l''account Google della prenotazione, così resta solo tuo.',
+   array['human_ref', 'link_pagina'],
+   'Il messaggio che il designer copia nel gruppo commerciale dopo la consegna del documento finale (0047). Il link è la pagina, mai il file: il file si scarica solo col login.')
+on conflict (key) do nothing;

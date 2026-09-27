@@ -1,0 +1,193 @@
+{
+  "schema_version": "1.0",
+  "description": "Quiz ispirazionale del viaggiatore XPETIS. Le domande 1-5 producono un punteggio 1-4 su un asse di matching, comparabile direttamente con i valori 1-4 dichiarati dai Travel Designer sugli stessi assi. La domanda 6 è invece a selezione singola ma di tipo categoriale/on-off, con 5 opzioni: non produce uno score numerico, filtra/pesa la compatibilità sulla configurazione umana del viaggio.",
+  "scoring_note": "Per le domande 1-5 (answer_type 'scale_1_4'), il punteggio è assegnato in base alla posizione dell'opzione mostrata all'utente, dall'alto (1) verso il basso (4) — 4 opzioni per domanda, coerente con la scala 1-4. Il polo 1 corrisponde sempre al valore più basso dell'asse corrispondente lato Travel Designer, il polo 4 al più alto. La domanda 6 ha invece 5 opzioni a scelta singola, di tipo on/off.",
+  "questions": [
+    {
+      "order": 1,
+      "id": "controllo",
+      "matching_axis": "controllo",
+      "axis_label": "Poco controllo (del TD) ↔ Molto controllo (del TD)",
+      "answer_type": "scale_1_4",
+      "text": "Quanto vuoi essere coinvolto nella progettazione del viaggio?",
+      "options": [
+        {
+          "id": "a",
+          "text": "Voglio decidere io, ho bisogno di un esperto che mi guidi",
+          "score": 1
+        },
+        {
+          "id": "b",
+          "text": "Mi piace co-progettarlo, costruiamolo insieme!",
+          "score": 2
+        },
+        {
+          "id": "c",
+          "text": "Voglio una proposta già pronta, poi la facciamo nostra insieme",
+          "score": 3
+        },
+        {
+          "id": "d",
+          "text": "Pensateci voi, io voglio solo viverlo",
+          "score": 4
+        }
+      ]
+    },
+    {
+      "order": 2,
+      "id": "ritmo",
+      "matching_axis": "ritmo",
+      "axis_label": "Slow ↔ Dynamic",
+      "answer_type": "scale_1_4",
+      "text": "Come vuoi che scorra il tuo tempo durante il viaggio?",
+      "options": [
+        {
+          "id": "a",
+          "text": "Lento: poche cose, vissute a fondo",
+          "score": 1
+        },
+        {
+          "id": "b",
+          "text": "Disteso: clima rilassato con qualche esplorazione nei posti vicini",
+          "score": 2
+        },
+        {
+          "id": "c",
+          "text": "Vivace: ritmo energico e curioso ma senza frenesia",
+          "score": 3
+        },
+        {
+          "id": "d",
+          "text": "Intenso: voglio fare e vedere il più possibile",
+          "score": 4
+        }
+      ]
+    },
+    {
+      "order": 3,
+      "id": "scomodita",
+      "matching_axis": "scomodita",
+      "axis_label": "Comfort ↔ Wild",
+      "answer_type": "scale_1_4",
+      "text": "Se un'esperienza straordinaria richiede un po' di fatica o disagio, tu...",
+      "options": [
+        {
+          "id": "a",
+          "text": "Cerco sempre l'alternativa più comoda",
+          "score": 1
+        },
+        {
+          "id": "b",
+          "text": "Valuto caso per caso, dipende da quanto ne vale la pena",
+          "score": 2
+        },
+        {
+          "id": "c",
+          "text": "Ci sto, se è organizzata bene",
+          "score": 3
+        },
+        {
+          "id": "d",
+          "text": "È proprio quello che voglio, la fatica fa parte del viaggio",
+          "score": 4
+        }
+      ]
+    },
+    {
+      "order": 4,
+      "id": "luogo",
+      "matching_axis": "luogo",
+      "axis_label": "Luxury/estetica ↔ Autenticità",
+      "answer_type": "scale_1_4",
+      "text": "Quale di queste immagini senti più tua?",
+      "options": [
+        {
+          "id": "a",
+          "text": "Un paesaggio perfetto, quasi da cartolina",
+          "score": 1
+        },
+        {
+          "id": "b",
+          "text": "Un posto bellissimo ma autentico, fuori dai circuiti turistici",
+          "score": 2
+        },
+        {
+          "id": "c",
+          "text": "Un'atmosfera viva fatta di dettagli, non di effetti speciali",
+          "score": 3
+        },
+        {
+          "id": "d",
+          "text": "Un luogo vero, anche grezzo, dove senti la vita scorrere",
+          "score": 4
+        }
+      ]
+    },
+    {
+      "order": 5,
+      "id": "sociale",
+      "matching_axis": "sociale",
+      "axis_label": "Intimità ↔ Nuovi incontri",
+      "answer_type": "scale_1_4",
+      "text": "In viaggio, cerchi più raccoglimento o connessione?",
+      "options": [
+        {
+          "id": "a",
+          "text": "Voglio stare con me stesso o con chi è con me in viaggio",
+          "score": 1
+        },
+        {
+          "id": "b",
+          "text": "Apprezzo i miei spazi, ma non mi dispiace qualche incontro",
+          "score": 2
+        },
+        {
+          "id": "c",
+          "text": "Mi piace aprirmi, a modo mio e con i miei tempi",
+          "score": 3
+        },
+        {
+          "id": "d",
+          "text": "Adoro incontrare persone e raccogliere le loro storie",
+          "score": 4
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "id": "con_chi",
+      "matching_axis": "conChi",
+      "axis_label": "Con chi viaggi",
+      "answer_type": "single_select_on_off",
+      "answer_type_note": "Selezione singola, ma trattata dall'algoritmo come segnale on/off (non una scala 1-4): filtra/pesa la compatibilità sulla configurazione umana del viaggio dichiarata dal TD (campo 'conChi', multi-selezione). Impatto sul punteggio complessivo minore rispetto alle domande 1-5. 5 opzioni, non 4.",
+      "text": "Con chi vivrai questo viaggio?",
+      "options": [
+        {
+          "id": "solo",
+          "text": "Da solo/a",
+          "td_value_match": "Viaggiatore solo"
+        },
+        {
+          "id": "coppia",
+          "text": "In coppia",
+          "td_value_match": "Coppia"
+        },
+        {
+          "id": "famiglia",
+          "text": "Famiglia con bambini/ragazzi",
+          "td_value_match": "Famiglia con bambini/ragazzi"
+        },
+        {
+          "id": "gruppo_amici",
+          "text": "Gruppo di amici / piccolo gruppo",
+          "td_value_match": "Gruppo di amici/piccolo gruppo"
+        },
+        {
+          "id": "gruppo_organizzato",
+          "text": "Gruppo organizzato con altri viaggiatori",
+          "td_value_match": "Gruppo organizzato"
+        }
+      ]
+    }
+  ]
+}

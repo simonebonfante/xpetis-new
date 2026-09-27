@@ -9,6 +9,202 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**27 settembre 2026 — la milestone 7: l'All Inclusive, con l'agenzia in mezzo**
+
+Il prompt: l'agenzia in `agencies`, la verifica con la sua pagina a token,
+acconto e saldo, il ponte Stripe che distingue le due rate, il file finale, le
+mail. È `0047_all_inclusive.sql`, la pagina `/agenzia/[token]`, la faccia All
+Inclusive di `/ordine/[token]` e `/proposta/[token]`, e `/documento/[id]`.
+Harness da 695 a **832 asserzioni**, build verde. Due rami dell'orologio in
+più, nessun workflow: il ponte Stripe è lo stesso endpoint, e n8n non si tocca.
+
+**La decisione su Stripe l'ha presa Simone, e semplifica.** Un conto solo,
+dell'agenzia, dedicato a XPETIS; niente Connect. Nel codice vuol dire che
+`payment_account()` guadagna una riga (`all_inclusive_stripe_account`) invece
+di sollevare su acconto e saldo, e che la chiave dipende dal conto: `sk_` della
+sandbox dall'ambiente per `xpetis`, chiave ristretta da Vault per `agency`
+(`agency_stripe_key()`, che rifiuta tutto ciò che non comincia per `rk_` — una
+`sk_` incollata per sbaglio avrebbe in mano i rimborsi). Una sessione già
+aperta si rilegge e si chiude **sul conto della sua riga**, non su quello che
+dice `app_config` adesso. Non avevo previsto due endpoint, quindi non c'era
+niente da far collassare.
+
+**Una domanda sola a Simone, e l'ha decisa lui: il documento finale si scarica
+col login.** La 0046 l'aveva lasciato scritto — per biglietti e voucher il link
+girato nel gruppo non basta. La prima idea era un parametro in più su
+`order_file_for_token` e un rinvio a `/accedi?next=` con la pagina a token: l'ho
+scartata perché il token avrebbe viaggiato dentro il giro del login (il
+`redirectTo` che Supabase conserva). Quindi un indirizzo **senza token**,
+`/documento/<id>`: l'id del file non è una credenziale, e senza la sessione
+giusta risponde come a un file che non esiste.
+
+**Il link dell'agenzia è monouso e scade, e l'ho deciso io.** Il prompt diceva
+«valgono le stesse regole» delle altre pagine a token, che non scadono. Ma la
+0043 aveva già scritto che la conferma dell'agenzia «nascerà `single_use` e con
+una scadenza», e la ragione regge: è l'unico controllo sui prezzi del Flusso, e
+chi trova il link conferma al posto dell'agenzia. Un token per invio (quello
+vecchio si revoca), consumato alla prima risposta, scadenza in
+`agency_confirm_valid_days` (7, una stima). Perché la scadenza non lasci una
+proposta ferma per sempre, l'orologio avvisa il team e c'è
+`rinnova_verifica_agenzia()`. «Il primo che clicca decide» non è un controllo
+in una funzione: è la chiave primaria di `agency_decisions`, una riga per
+proposta. Il link consumato mostra com'è andata invece di dire «già usato».
+
+**Riusare senza riscrivere, dove il codice lo permetteva.** Il caricamento del
+documento di proposta e del documento finale passa dalle stesse route e dallo
+stesso componente della consegna: `td_delivery_ticket` e `td_deliver` sono
+riemesse con uno smistamento in testa, e il ramo su misura è il loro corpo di
+prima. Per non risolvere il token due volte (risolvere scrive `use_count`) il
+controllo del token è uscito in `td_order_token()`, e `td_order_from_token()`
+della 0044 è diventato un involucro. `stripe_checkout_ordine` è riemessa con
+una sola differenza (l'All Inclusive va a `stripe_checkout_ai`); per non
+riemettere anche `stripe_webhook`, il ramo nuovo riusa gli esiti che il ponte
+già scrive nel diario, e scrive da sé i due che sono nuovi.
+
+**Cinque cose trovate strada facendo, nessuna dall'harness al primo colpo.**
+Un alias `dec` nelle query (è una parola chiave: rinominato). La percentuale
+nelle mail formattata con `trim(trailing '0')`, che su «30» dava «3%». Il
+trigger che porta da `deposit_paid` a `awaiting_balance` faceva un `update`
+annidato **prima** che `orders_log_status` scrivesse la riga dell'acconto, e la
+storia usciva in ordine sbagliato: rinominato perché giri dopo
+(`orders_soldi_all_inclusive`), e ora un'asserzione lo controlla. La regola
+dell'harness sugli importi (`/ 100.0` vietato in ogni funzione) ha preso anche
+il calcolo dell'acconto, dove non era un importo in un messaggio: riscritto
+`/ 100`. E una trappola vera, trovata scrivendo il caso «saldo prima
+dell'acconto»: `payments_one_paid_per_kind` conta anche i rimborsati, quindi il
+saldo giusto arrivato dopo uno anticipato e rimborsato avrebbe fatto sollevare
+il ponte, e Stripe avrebbe ritentato per sempre. Ora è un alert
+(`stripe_rata_gia_registrata`) con l'ordine fermo. Il su misura ha la stessa
+trappola in una forma più rara (proposta riaperta e ripagata): **non l'ho
+toccata**, perché non era nel prompt; lo dico qui.
+
+**`payments_one_pending_per_kind` regge, verificato e non dato per buono**: una
+cassa acconto e una saldo aperte insieme passano, due acconto no.
+
+**I sabotaggi.** Tolti uno per volta il controllo della decisione già presa, lo
+stato atteso della rata, l'obbligo dei tempi del saldo, il divieto del
+documento finale dal token e il consumo del token: tutti e cinque fanno
+diventare rosso il giro. Il secondo ha mostrato anche la difesa di fondo — la
+tabella delle transizioni della 0010 ferma lo stesso l'ordine — ma con un
+`errore` che Stripe ritenterebbe: è la ragione per cui il controllo nel ponte
+serve.
+
+**Quattro punti dell'harness vecchio aggiornati**, perché dicevano il mondo di
+prima: l'All Inclusive che «non riceve né token né mail» (ora li riceve, col suo
+testo); `payment_account('deposit')` che solleva (ora risponde); il pagamento
+su un All Inclusive «che il ramo non tratta» (ora non indovina la rata); e il
+test della 0009 che scriveva a mano acconto e saldo (ora li calcola il
+database, e il test lo verifica).
+
+**L'agenzia finta per lo staging c'era già**: `seed/0003_demo.sql` semina
+«Agenzia Partner XPETIS» come partner di default, e il seed demo è quello che
+in produzione si toglie. Non ne ho aggiunta un'altra.
+
+**Cosa non ho fatto, di proposito**: i rimborsi via API, la riconciliazione
+(punto aperto rosso, con Andrea), una seconda agenzia, e la chiusura di un All
+Inclusive consegnato — la transizione c'è dalla 0010, ma quando chiudere non lo
+dice nessuno. Fra i punti aperti anche la mail all'agenzia quando l'acconto è
+pagato, che il prompt non elencava. E niente è stato visto in un browser né
+contro Stripe e Storage veri: sono le prove 79-101 in `PIANO.md`, con la nota su
+come fabbricare a mano il token dell'agenzia.
+
+**Documenti**: `ACCESSI.md` (il conto dell'agenzia, la chiave ristretta, cosa si
+accetta), la deviazione 9 e S-11/S-12 in `PIANO.md`, `supabase/README.md`, due
+righe di `CLAUDE.md` che dicevano ancora «su misura sul conto XPETIS» e
+«Vault, n8n o Connect».
+
+---
+
+**27 settembre 2026, sera — il Figma nuovo, i tre event type, le tre reti, i viaggi di gruppo**
+
+Il prompt «A», base per i tre che seguono (destinazioni v2, quiz, pagine
+ridisegnate). Cinque cose: il file Figma nuovo, i servizi per la terza volta, le
+tre reti mai costruite, la deviazione 7 contro il file nuovo della tassonomia, e
+i viaggi di gruppo. `0048_tre_event_type_e_gruppi.sql`, harness da 832 a **860
+asserzioni**, tutte verdi. Nessuna riga di TypeScript: la vetrina non mostra
+ancora i viaggi di gruppo, e non era chiesto.
+
+**Il Figma.** File nuovo `Q9Krydv6xD8mFJCtU9NHzr`, non una revisione. In
+`CLAUDE.md` i tre nodi verificati (vetrina `2-743`, viaggi di gruppo `3-1121`,
+itinerario pronto `3-1386`), e per home, ricerca e quiz «da chiedere» con la
+spiegazione del perché i nodi vecchi non si riusano: puntano a un altro file.
+`ACCESSI.md` e l'intestazione di `scarica-asset-figma.sh`, che scarica ancora
+dal file vecchio e lo dice.
+
+**I servizi, e la deviazione 10 riscritta invece di una 11.** La vecchia riga
+resta barrata dentro la nuova, perché l'onboarding è partito con quella. In
+`ONBOARDING_CALCOM_TD.md` la tabella ha tre righe e la breve non è più
+condizionale; la sezione 8 nuova dice cosa ricontrollare sui tre designer già
+fatti. Il caso che conta è il designer che ha creato **solo** un
+`consulenza-xpetis-60` come base: con la regola nuova non è una breve, e il
+prezzo che ha scritto nel form era per quella. Ho scritto anche il vecchio URL
+dell'approfondita (`consulenza-xpetis-approfondita-60-min`), che la guida
+suggeriva e che ora è fuori elenco.
+
+**Le tre reti.** Verificato prima sul database di sviluppo, in sola lettura con
+la chiave secret: tre servizi con slug, nessuna coppia doppia. Ma
+l'approfondita di Giulia aveva `consulenza-xpetis-approfondita`, inventato
+nel seed quando gli event type erano due: con la rete nuova sarebbe stato un
+blocco, quindi il seed ora la porta a `consulenza-xpetis-60`, con un `update`
+esplicito perché l'insert ha `on conflict do nothing`.
+
+- *a.* `unique (td_id, cal_event_type_slug)`, preceduto da un blocco che, se
+  trova doppioni, **li nomina** invece di lasciare a Postgres «could not create
+  unique index». L'harness rigioca quel blocco su un doppione vero, col vincolo
+  tolto dentro una transazione che poi torna indietro.
+- *b.* Due righe di `app_config`, una per tipo e non un elenco unico: con un
+  elenco solo la breve sul `-60` passerebbe, ed è proprio l'errore che la
+  regola vecchia lascia in eredità. Il blocco sta in `td_publish_blockers`.
+  **Ho aggiunto una cosa che il prompt non chiedeva**, e la dico: il blocco
+  della 0020 scatta solo quando un profilo *diventa* pubblicato, quindi uno slug
+  cambiato dopo su un designer già in vetrina sarebbe passato. Un trigger su
+  `td_services` guarda la riga scritta e la rifiuta. Senza configurazione il
+  servizio è bloccato, non libero: un controllo che si spegne da solo quando
+  manca il suo parametro non è un controllo. I servizi spenti non si guardano,
+  per le prenotazioni in volo.
+- *c.* `calcom_webhook` riemessa dalla 0045, parola per parola salvo tre punti
+  marcati. Confronta `endTime - startTime` con `duration_minutes` solo al
+  `BOOKING_CREATED`: la riprogrammazione resta nello stesso event type. La
+  prenotazione si crea comunque; l'alert è critico, sulla prenotazione, col
+  prezzo pagato dentro.
+
+Tre prove vecchie usavano slug inventati (`'x'` due volte,
+`consulenza-xpetis-approfondita` una) e la rete nuova le ha giustamente
+fermate: riscritte con gli slug ammessi, stesso senso. La prova «servizio non
+del designer» ora usa il `-60` di Giulia contro Marco, che ha il `-90`.
+
+**La deviazione 7.** Il file v2 dice `italian_region` fra i selezionabili, come
+diceva il primo. Aggiornata la deviazione, e soprattutto l'avviso in
+`genera_geo.mjs`, dove l'import legge `selection_rules`, con una riga che
+finisce nell'intestazione del seed generato. Rigenerato il seed `0002`: cambia
+solo quel commento. Lo script legge ancora `xpetis_destinazioni.json`: il
+passaggio al v2 è il prompt successivo.
+
+**I viaggi di gruppo.** `td_group_trips`, gemella della 0026 con
+`dates_label` e `group_size_label`, tutto testo. Niente `slug` perché non c'è
+ancora una pagina per viaggio; se il nodo `3-1121` lo è, si aggiunge. Colonna
+`group_trips` in coda a `public_td_showcase`, `create or replace` come nella
+0040 per non perdere il `grant`. Sei viaggi finti, tre per Marco (Vietnam,
+Thailandia, Giappone) e tre per Giulia (Perù, Bolivia, Perù), **con date
+future di proposito**: una demo piena di partenze passate nasconderebbe la
+domanda che deve far vedere. Quattro immagini finte; il generatore ha
+riscritto anche le 23 esistenti (Pillow diverso, stessi disegni), e le ho
+riportate com'erano per non sporcare il diff.
+
+**Cosa non ho fatto, di proposito**: nessun campo per la scadenza dei viaggi di
+gruppo (domanda aperta), nessuna mappatura di `gruppoHaGia` e `gruppoTempi`
+(chiavi nuove del form che non so leggere), nessun controllo fra il numero
+nello slug e `duration_minutes` (è una convenzione di nomi: lo copre la rete
+*c*, sul fatto). E niente è stato applicato al progetto Supabase vero: sono le
+prove 102-108, con le due righe di `app_config` da inserire a mano.
+
+**Trovato strada facendo**: `scripts/carica-immagini-finte.sh` carica
+`.env.local` con `.`, e oggi fallisce sulla riga `RESEND_FROM`, che ha le
+parentesi angolate e non è fra virgolette. Non ho toccato il file: è tuo e
+contiene i segreti.
+
+---
+
 **26 settembre 2026 — la milestone 6 si chiude: il silenzio-conferma, e i due modi di romperlo**
 
 Il prompt: chiusura a 48 ore con i due tasti del designer, consegna con i file,

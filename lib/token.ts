@@ -162,8 +162,8 @@ export const SPIEGAZIONE: Record<Exclude<EsitoToken, 'valido' | 'gia_richiesto'>
     whatsapp: true,
   },
   // Anche questi due non dovrebbero capitare: un ordine cancellato dal
-  // database, o un token della pagina su misura su un ordine All Inclusive, la
-  // cui pagina è milestone 7.
+  // database, o un token su un servizio che nessuna pagina tratta. Dalla 0047
+  // l'All Inclusive ha le sue pagine, quindi oggi resta solo il secondo caso.
   ordine_sconosciuto: {
     titolo: 'Questo link non funziona',
     testo: 'Qualcosa non torna da parte nostra. Scrivici e lo sistemiamo.',

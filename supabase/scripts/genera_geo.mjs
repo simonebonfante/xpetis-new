@@ -21,7 +21,20 @@ L.push('-- xpetis_destinazioni.json. Non modificare a mano: rigenerare.')
 L.push(`-- Attese: ${tax.statistics.continents} continenti, ${tax.statistics.macro_areas} macro-aree, ` +
        `${tax.statistics.states} stati, ${tax.statistics.regions} regioni, ${tax.statistics.cities} città.`)
 L.push('')
-L.push('-- Regole di selezione dichiarate dalla tassonomia:')
+// ⚠️ DEVIAZIONE 7 DEL PIANO — NON È UN BUG, NON VA «SISTEMATA».
+// La tassonomia dichiara `selectable: [macro_area, state, italian_region]` e una
+// regola `italy_special` («cercando Italia il sistema suggerisce le 20 regioni,
+// tutte selezionabili»). Lo dice sia `xpetis_destinazioni.json` sia
+// `xpetis_destinazioni_v2.json`. **Noi le regioni italiane non le filtriamo**:
+// deciso l'8 agosto 2026, confermato da Simone il 27 settembre 2026 davanti al
+// file v2. Il valore della tassonomia si copia com'è in `is_selectable` (qui
+// sotto, `r.selectable`), e cosa filtra davvero lo dice `is_filterable` della
+// 0031, che sulle 20 regioni vale false. Le due colonne differiscono su quelle
+// 20 righe e solo lì, di proposito, e l'harness lo verifica. Chi rilegge questo
+// JSON e vede `italian_region` fra i selezionabili: la risposta è la
+// deviazione 7 in PIANO.md, non una migration.
+L.push('-- Regole di selezione dichiarate dalla tassonomia')
+L.push('-- (le regioni italiane NON filtrano: deviazione 7 del PIANO, confermata il 27/09/2026):')
 L.push(`--   selezionabili: ${tax.selection_rules.selectable.join(', ')}`)
 L.push(`--   solo cercabili: ${tax.selection_rules.searchable_only.join(', ')}`)
 L.push(`--   ${tax.selection_rules.italy_special}`)

@@ -38,7 +38,7 @@ Aggiornato all'8 settembre 2026. Se cambia qualcosa, si aggiorna qui.
 | **Dominio `xpetis.it`** | Sito e mail | — | 🟡 landing page attiva, DNS non toccato |
 | **Provider email** | Le 15 mail del funnel | Resend, Free | ✅ **esiste già** — account della landing page, `xpetis.it` verificato |
 | **WhatsApp** | Canale umano | — | 🟡 numero provvisorio, da sostituire |
-| **Stripe agenzia** | Incassi All Inclusive | — | ⚪ quando ci sarà un'agenzia |
+| **Stripe agenzia** | **Tutti gli incassi** (conto unico, 27 set 2026) | — | 🟡 da aprire insieme all'agenzia — vedi «Il conto dell'agenzia» |
 
 ---
 
@@ -323,6 +323,52 @@ il venditore" è aperta — vedi i rischi in `PIANO.md`.
 **Da non fare:** creare prodotti, prezzi o Payment Link. Il prezzo vive solo nel
 database; la cassa la apre il nostro server.
 
+### Il conto dell'agenzia (deciso il 27 settembre 2026)
+
+**Esiste un conto Stripe solo, ed è dell'agenzia.** Lo si apre insieme, nasce
+**dedicato a XPETIS**, e Simone ci ha un ruolo admin. Niente Stripe Connect:
+richiederebbe che XPETIS sia un'entità legale attivata su Stripe, e non lo è
+(deviazione 9 in `PIANO.md`). La sandbox qui sopra resta il posto delle prove.
+
+| Cosa | Dove vive | A cosa serve |
+|---|---|---|
+| **Chiave ristretta** `rk_live_…` (e `rk_test_…` per le prove) | Password manager **e** Supabase Vault, sotto il nome scritto in `agencies.stripe_credential_ref` (proposta: `stripe_key_agenzia_partner`) | Apre, rilegge e chiude le Checkout Session sul conto dell'agenzia |
+| Signing secret `whsec_…` dell'endpoint sul loro conto | Password manager **e** Vault sotto `stripe_webhook_secret` — lo stesso nome di oggi: **l'endpoint è uno** | Verifica la firma dei webhook, dentro `stripe_webhook()` |
+
+⚠️ **La chiave è ristretta, non la secret key.** Permessi: **Checkout Sessions
+in scrittura** (crea, rilegge, chiude) e nient'altro — in particolare **niente
+rimborsi**: si fanno a mano dalla dashboard, col ruolo admin. La funzione
+`agency_stripe_key()` rifiuta una chiave che non cominci per `rk_`, così una
+`sk_` incollata per sbaglio non passa. Da verificare in S-12, con un pagamento
+di prova, che quei permessi bastino davvero alle tre chiamate.
+
+```sql
+select vault.create_secret('<rk_live_…>', 'stripe_key_agenzia_partner',
+                           'Chiave ristretta Stripe del conto dell''agenzia');
+update agencies set stripe_credential_ref = 'stripe_key_agenzia_partner'
+ where is_default_partner;
+```
+
+La chiave non sta in una variabile d'ambiente perché **è dell'agenzia e la può
+revocare**: se succede, si sostituisce la riga in Vault e basta, senza deploy.
+Il passaggio al conto vero sono poi tre righe di `app_config` —
+`consultation_stripe_account`, `custom_itinerary_stripe_account`,
+`all_inclusive_stripe_account` — da `xpetis` ad `agency`, da Studio.
+
+**Cosa si accetta con questa scelta, da tenere a mente:**
+
+- l'accesso è **revocabile dall'agenzia** in qualunque momento, e con lui la
+  capacità del sito di aprire una cassa;
+- le **contestazioni** (chargeback) si pagano **dal loro saldo**, e i rimborsi
+  sono un gesto loro o del ruolo admin;
+- **ogni euro di XPETIS**, consulenze comprese, passa prima dal conto di
+  qualcun altro. La quota XPETIS arriva per fatturazione fra le parti.
+
+Da qui la **riconciliazione mensile**, che è un punto aperto vero e non un
+dettaglio: se un webhook si perde, il pagamento è sul loro conto e non nel
+nostro database, il buco è a nostro sfavore e nessuno se ne accorge. Non è
+costruita: va decisa con Andrea (`PIANO.md`, milestone 7).
+
 **L'endpoint webhook.** Punta al workflow n8n `stripe-pagamenti`
 (`https://<istanza n8n>/webhook/stripe-pagamenti`) e va iscritto a tre eventi:
 `checkout.session.completed`, `checkout.session.expired`, `charge.refunded`. La
@@ -336,8 +382,9 @@ nessun messaggio vero è ancora passato.
 
 | | |
 |---|---|
-| File | `x1DYYagZ2moagmpEHZHYYE` |
-| Nodi | elencati in `CLAUDE.md` |
+| File | **`Q9Krydv6xD8mFJCtU9NHzr`** («XPETIS - Def»), dal 27 settembre 2026 |
+| File superato | `x1DYYagZ2moagmpEHZHYYE`: le pagine costruite fino al 27 settembre vengono da qui. Non è più autorevole |
+| Nodi | elencati in `CLAUDE.md`. Home, ricerca e quiz non hanno ancora un nodo sul file nuovo |
 
 Gli asset esportati si riscaricano con `bash scripts/scarica-asset-figma.sh`.
 **Le URL degli asset scadono in circa 7 giorni**; la chiave del file no.
@@ -424,13 +471,16 @@ I gruppi si creano a mano: le API non permettono di crearli.
                                     ← anche in Supabase Vault: stripe_webhook_secret
 [ ] Resend · API key                           ← condivisa con la landing page: servirne una per XPETIS
                                     ← anche dentro n8n: credenziale Header Auth "Resend · invio transazionale"
-[ ] Stripe dell'agenzia · credenziali          (quando esisterà — e vedi sotto)
+[ ] Stripe dell'agenzia · chiave ristretta rk_  (quando il conto esisterà)
+                                    ← anche in Supabase Vault, sotto agencies.stripe_credential_ref
+[ ] Stripe dell'agenzia · whsec_ del suo endpoint
+                                    ← in Supabase Vault al posto di quello della sandbox: stripe_webhook_secret
 ```
 
-Le credenziali Stripe delle agenzie **non vanno in una colonna del database**:
-`agencies` contiene solo un riferimento alla credenziale custodita altrove. Ed è
-ancora aperta la valutazione di Stripe Connect, che otterrebbe lo stesso
-risultato senza che XPETIS detenga credenziali di terzi.
+Le credenziali Stripe dell'agenzia **non vanno in una colonna del database**:
+`agencies.stripe_credential_ref` porta solo il **nome** del segreto in Vault.
+Stripe Connect è stato scartato il 27 settembre 2026: vedi «Il conto
+dell'agenzia» qui sopra.
 
 ---
 
@@ -445,6 +495,7 @@ Vale la pena saperlo prima, non dopo.
 | Client secret di Google | **Sì**, *Add Secret* sul client: il nuovo nasce vivo accanto al vecchio, senza disservizio (massimo due) |
 | Chiave `sk_test_` di Stripe | **Sì**, si ruota |
 | Signing secret del webhook Stripe | **Sì**, si rigenera dall'endpoint — poi va riscritto in Vault |
+| Chiave ristretta del conto dell'agenzia | **Sì**, la rigenera chi ha il ruolo admin — poi va riscritta in Vault. Se è l'agenzia a revocarla, le casse smettono di aprirsi finché non ce n'è una nuova |
 | Parola segreta del webhook Cal.com | **Sì**, ma va riscritta su tutti i 25 account a mano |
 | Chiave API di Resend | **Sì**, si rigenera — ma finché è **una sola condivisa con la landing page**, ruotarla per un progetto rompe l'altro. È la ragione per cui serve una chiave separata prima della produzione |
 | Account proprietario di n8n | **Sì**, con accesso al database di n8n |

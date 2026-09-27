@@ -56,7 +56,20 @@ const nextConfig: NextConfig = {
     // Dalla 0046 anche le micro-pagine dei tasti del dopo-call, e i percorsi
     // `/…/file/[id]` stanno sotto `:token*`: la loro risposta è un redirect a
     // Storage, e senza `strict-origin` porterebbe con sé il token come Referer.
-    return ['/servizio/:token*', '/ordine/:token*', '/proposta/:token*', '/eccezione/:token*'].map((source) => ({
+    //
+    // Dalla 0047 la pagina dell'agenzia, il terzo destinatario: il suo form fa
+    // POST come quello del servizio, quindi vale anche per lei l'avvertenza su
+    // `no-referrer` qui sopra. E `/documento/[id]`, il documento finale dietro
+    // il login: non porta un token, ma risponde con un redirect a un link
+    // firmato di Storage, e non si mette in cache né si indicizza.
+    return [
+      '/servizio/:token*',
+      '/ordine/:token*',
+      '/proposta/:token*',
+      '/eccezione/:token*',
+      '/agenzia/:token*',
+      '/documento/:id*',
+    ].map((source) => ({
       source,
       headers: pagineToken,
     }))

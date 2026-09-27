@@ -1,7 +1,16 @@
 # Onboarding Cal.com · guida per i 25 Travel Designer
 
-**8 agosto 2026.** Da rifare identica per ogni designer. Circa 15 minuti a testa
-in condivisione schermo — quindi 6-7 ore in tutto per venticinque persone.
+**8 agosto 2026, riscritta il 27 settembre 2026 sugli event type.** Da rifare
+identica per ogni designer. Circa 15 minuti a testa in condivisione schermo —
+quindi 6-7 ore in tutto per venticinque persone.
+
+> ⚠️ **Il 27 settembre la regola degli event type è cambiata, per la terza e
+> ultima volta** (deviazione 10 in `PIANO.md`). Fino a quel giorno questa guida
+> diceva: *un* event type di consulenza, da 30 **oppure** da 60 secondo la
+> lista. Adesso: la **consulenza breve da 30 la crea chiunque**, e chi offre
+> l'**approfondita** ne crea una seconda da 60 **oppure** da 90. Tre designer
+> sono stati onboardati con la regola vecchia: cosa ricontrollare su di loro è
+> nella sezione **8**, in fondo.
 
 Tutte le impostazioni qui dentro sono state **provate sul campo**, non lette
 nella documentazione: l'account modello è stato costruito e ha già consegnato un
@@ -17,7 +26,7 @@ Tieni davanti tre cose per ogni designer:
 |---|---|---|
 | **Slug della vetrina** | la lista condivisa, poi `travel_designers.slug` | diventa lo username di Cal.com |
 | **Email del designer** | `travel_designers.email` | è l'indirizzo dell'account |
-| **Durata della consulenza** | la lista condivisa | decide quale event type creare |
+| **Consulenza approfondita: sì o no, e da quanto** | la lista condivisa | decide se creare il secondo event type, da 60 o da 90 |
 | **La parola segreta del webhook** | password manager, **una sola per tutti** | firma i messaggi verso di noi |
 
 E una cosa da dire al designer prima di iniziare: **se si registra con Google, il
@@ -102,33 +111,39 @@ comunque qualunque disallineamento fra i due.
 
 ---
 
-## 2. L'event type della consulenza
+## 2. Gli event type delle consulenze
 
 Crea un event type nuovo. **Non riusare** quello da 30 minuti che Cal.com genera
 da solo: ha già un URL suo e si finisce per litigarci.
 
 ### Impostazione evento
 
-⚠️ **Prima guarda in lista quanto dura la consulenza di questo designer.** Non
-sono tutti uguali: alcuni la fanno da 30 minuti, altri da 60. **Crea solo quello
-che è scritto in lista**, e usa la riga corrispondente:
+Gli event type ammessi sono **tre**, e per ogni designer se ne creano uno o due:
 
-| Durata | Titolo | **URL** (scritto a mano) |
-|---|---|---|
-| **30 minuti** | `Consulenza XPETIS · 30 min` | `consulenza-xpetis-30` |
-| **60 minuti** | `Consulenza XPETIS · 60 min` | `consulenza-xpetis-60` |
+| Servizio | Chi lo crea | Durata | Titolo | **URL** (scritto a mano) |
+|---|---|---|---|---|
+| **Consulenza breve** | **tutti**, sempre | **30 minuti** | `Consulenza XPETIS · 30 min` | `consulenza-xpetis-30` |
+| Consulenza approfondita | solo chi la offre, **se** in lista è da 60 | 60 minuti | `Consulenza XPETIS · 60 min` | `consulenza-xpetis-60` |
+| Consulenza approfondita | solo chi la offre, **se** in lista è da 90 | 90 minuti | `Consulenza XPETIS · 90 min` | `consulenza-xpetis-90` |
 
-Gli altri campi sono uguali per entrambi:
+La breve **non è condizionale**: la crea chiunque, e dura sempre 30 minuti. Un
+designer senza breve non si può pubblicare. L'approfondita è una sola per
+designer: da 60 **oppure** da 90, mai tutte e due. Si imposta al punto 3.
+
+Gli altri campi della breve:
 
 | Campo | Valore |
 |---|---|
-| Durata | quella della riga scelta: **30** oppure **60** minuti |
+| Durata | **30** minuti |
 | Luogo | **Cal Video** |
 
-> **La durata dev'essere la stessa in tre posti:** la lista, il titolo, e il
-> campo *Durata* di Cal.com. Se il titolo dice 60 e la durata è 30, il
-> viaggiatore paga un'ora e ne riceve mezza — e ce ne accorgiamo da un reclamo,
-> non da un errore.
+> **La durata dev'essere la stessa in quattro posti:** la lista, il titolo, il
+> campo *Durata* di Cal.com e l'URL. Se il titolo dice 60 e la durata è 30, il
+> viaggiatore paga un'ora e ne riceve mezza. Dal 27 settembre **il database se
+> ne accorge alla prima prenotazione** — confronta lo slot che arriva da Cal.com
+> con la durata a listino e alza un alert critico `calcom_durata_non_combacia`
+> — ma a quel punto c'è già un viaggiatore con lo slot sbagliato. Meglio
+> guardarla qui.
 
 > ⚠️ **L'errore più facile di tutta la procedura.** In Cal.com titolo e URL sono
 > due campi separati, e Cal.com genera l'URL dal titolo in modo imprevedibile: lo
@@ -137,6 +152,14 @@ Gli altri campi sono uguali per entrambi:
 > prima di salvare.** Se non è identico su tutti e venticinque, i link delle
 > vetrine non si possono più costruire a tavolino e ogni designer diventa un caso
 > particolare.
+>
+> Con tre titoli invece di uno la trappola triplica, quindi dal 27 settembre
+> c'è una rete: **un servizio attivo con un URL fuori dai tre ammessi blocca la
+> pubblicazione del designer** (`td_publish_readiness` dice quale e perché), e
+> su un designer già pubblicato non si può nemmeno scrivere. I tre URL ammessi
+> stanno in `app_config` (`calcom_slugs_consultation`,
+> `calcom_slugs_consultation_deep`). La rete ti ferma, ma ti ferma all'import:
+> è meglio non arrivarci.
 
 > **Perché Cal Video e non Google Meet.** Meet richiederebbe al designer di
 > collegare il proprio Google Calendar: una dipendenza in più, per venticinque
@@ -230,19 +253,28 @@ account, quindi va decisa e programmata, non aggiunta a metà.
 
 ## 3. La consulenza approfondita (solo per chi la offre)
 
-Identica alla precedente, con tre differenze:
+Se in lista il designer **non** offre l'approfondita, salta questo passo.
 
-| Campo | Valore |
-|---|---|
-| Titolo | `Consulenza XPETIS Approfondita 60 min` |
-| **URL** | `consulenza-xpetis-approfondita-60-min` |
-| Durata | 60 minuti |
+Altrimenti crea un secondo event type, identico alla breve salvo tre campi, e
+prendi **una** delle due righe secondo la durata scritta in lista:
+
+| Campo | Da 60 | Da 90 |
+|---|---|---|
+| Titolo | `Consulenza XPETIS · 60 min` | `Consulenza XPETIS · 90 min` |
+| **URL** (a mano) | `consulenza-xpetis-60` | `consulenza-xpetis-90` |
+| Durata | 60 minuti | 90 minuti |
 
 Buffer, preavviso, orizzonte, le tre impostazioni di cancellazione e il campo
-nascosto: **tutto uguale**.
+nascosto: **tutto uguale** alla breve.
 
-Oggi la offre un designer solo. Se non è nella lista di chi l'ha attivata, salta
-questo passo.
+> ⚠️ **Il prezzo dell'approfondita non è quello del form.** Il form della
+> vetrina chiede solo «Consulenza singola (30 min)», ed è bloccato: il prezzo
+> dell'approfondita va chiesto al designer e scritto nella lista condivisa,
+> insieme alla durata.
+
+> Fino al 27 settembre questo passo usava l'URL
+> `consulenza-xpetis-approfondita-60-min`. **Non è più ammesso**: se lo trovi su
+> un account, è uno dei designer della sezione 8.
 
 ---
 
@@ -285,6 +317,8 @@ Sul profilo del designer, in Supabase:
 | Colonna | Valore |
 |---|---|
 | `cal_username` | lo username scelto al punto 1 |
+| `td_services.cal_event_type_slug` | l'URL **esatto** di ciascun event type: `consulenza-xpetis-30` sulla breve, `-60` o `-90` sull'approfondita |
+| `td_services.duration_minutes` | 30 sulla breve; 60 o 90 sull'approfondita, **uguale all'URL** |
 | `cal_webhook_ok_at` | data e ora di adesso — **ma solo dopo il punto 5 della prova qui sotto** |
 
 La seconda serve alla checklist di pubblicazione: un designer senza account
@@ -366,15 +400,15 @@ Se al punto 5 la riga non c'è, nell'ordine:
 [ ] slug preso DALLA LISTA, non inventato
 [ ] username = slug + -xpetis  (o, se occupato, scritto in cal_username)
 [ ] disponibilità impostata dal designer
-[ ] durata controllata in lista: 30 oppure 60
-[ ] event type: titolo, URL scritto a mano, durata giusta, Cal Video
+[ ] consulenza breve: consulenza-xpetis-30, 30 minuti, Cal Video (TUTTI)
+[ ] approfondita in lista? se sì: -60 oppure -90, durata uguale all'URL
 [ ] buffer 10 min dopo · preavviso 12 ore · orizzonte 30 giorni
 [ ] disable rescheduling: attivo, 720 minuti, host and attendee
 [ ] disable cancelling: spento
 [ ] require cancellation reason: solo host
 [ ] campo nascosto xpetis_user_id
 [ ] redirect on booking LASCIATO VUOTO
-[ ] consulenza approfondita (se prevista per questo designer)
+[ ] prezzo dell'approfondita chiesto e scritto in lista (il form non lo ha)
 [ ] webhook verso n8n, 3 eventi, secret condiviso
 [ ] event type di fabbrica spenti
 [ ] cal_username e cal_webhook_ok_at scritti su Supabase
@@ -396,3 +430,44 @@ Se al punto 5 la riga non c'è, nell'ordine:
   conta per XPETIS è la nostra, che arriva dopo il pagamento.
 - **In call si aspetta almeno 15 minuti** prima di considerare il viaggiatore
   assente.
+
+---
+
+## 8. I tre designer onboardati con la regola vecchia
+
+Tre designer hanno fatto questa procedura **prima del 27 settembre 2026**,
+quando la guida diceva «un event type da 30 **oppure** da 60, secondo la
+lista». Niente di quello che hanno fatto va dato per buono: nessuno dei loro
+dati è ancora a database (l'import delle 25 vetrine è in coda), quindi oggi
+nessuna rete li ha guardati. La rete sugli slug li fermerebbe all'import, ma
+sistemarli **con il designer in chiamata** costa cinque minuti, scoprirlo dopo
+costa un giro in più per ciascuno.
+
+Per ciascuno dei tre, sul suo account Cal.com:
+
+1. **Ha un event type `consulenza-xpetis-30`, da 30 minuti?** È l'unico modo
+   di avere la breve, e senza breve il designer non si pubblica. Controlla l'URL
+   **carattere per carattere** (non `-30-min`) e il campo *Durata*.
+2. **Ha creato solo un `consulenza-xpetis-60` come consulenza base?** È il caso
+   che la regola vecchia permetteva e la nuova no: il 60 **non è più una
+   consulenza breve**. Due strade, e la sceglie il designer:
+   - vuole offrire l'approfondita da 60 → il 60 resta, **diventa la sua
+     approfondita**, e va creato anche il 30 come breve;
+   - non vuole l'approfondita → si crea il 30 e il 60 si spegne.
+   In tutti e due i casi **va richiamato sul prezzo**: quello che ha scritto nel
+   form era pensato per la sua consulenza base, e la breve adesso dura 30.
+3. **Ha un'approfondita col vecchio URL `consulenza-xpetis-approfondita-60-min`?**
+   Va rinominato in `consulenza-xpetis-60`. ⚠️ Solo se su quell'event type **non
+   ci sono prenotazioni vere in volo**: come Cal.com si comporta con l'URL
+   cambiato sotto una prenotazione esistente non l'abbiamo verificato, e nel
+   dubbio si chiede prima di toccare.
+4. **La lista condivisa** dice per ciascuno: breve sì (sempre), approfondita sì
+   o no, da 60 o da 90, e i due prezzi. Se una di queste celle è vuota, il
+   designer non è finito.
+5. **Rifai la prova del punto 7** su ciascun event type che hai toccato: la
+   riga deve arrivare in `bookings`, con la durata giusta e senza alert
+   `calcom_durata_non_combacia`.
+
+Quando i tre sono ricontrollati, segnalalo nella lista accanto al loro nome
+(«ricontrollato 30/60/90») e nella casella di `PIANO.md`.
+

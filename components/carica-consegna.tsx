@@ -19,6 +19,11 @@ import { createClient } from '@/lib/supabase/client'
  * `<form>` HTML manderebbe il file alla route, cioè al limite dei 4,5 MB. Il
  * client Supabase qui usa la chiave publishable e il biglietto, e basta: non
  * ha modo di leggere niente.
+ *
+ * Dalla 0047 lo usa anche l'All Inclusive, due volte: per il documento della
+ * proposta e per il documento finale. **Il meccanismo è lo stesso** — cosa si
+ * sta caricando lo decide il database dallo stato dell'ordine — e cambiano
+ * solo le parole, che arrivano da `testi`.
  */
 
 const BUCKET = 'order-documents'
@@ -29,7 +34,22 @@ type Stato =
   | { fase: 'in_corso'; passo: string }
   | { fase: 'errore'; testo: string }
 
-export function CaricaConsegna({ base, revisione }: { base: string; revisione: boolean }) {
+type Testi = { titolo: string; bottone: string; nota: string }
+
+export function CaricaConsegna({
+  base,
+  revisione = false,
+  testi,
+}: {
+  base: string
+  revisione?: boolean
+  testi?: Testi
+}) {
+  const t: Testi = testi ?? {
+    titolo: revisione ? 'La versione rivista' : 'L’itinerario',
+    bottone: revisione ? 'Consegna la revisione' : 'Consegna',
+    nota: 'Consegnando, il viaggiatore riceve la mail con il link alla sua pagina, da cui scarica il file.',
+  }
   const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
   const [stato, setStato] = useState<Stato>({ fase: 'pronto' })
@@ -73,7 +93,7 @@ export function CaricaConsegna({ base, revisione }: { base: string; revisione: b
   return (
     <div className="space-y-4">
       <label className="block space-y-2">
-        <span className="text-corpo-big">{revisione ? 'La versione rivista' : 'L’itinerario'}</span>
+        <span className="text-corpo-big">{t.titolo}</span>
         <span className="block text-corpo opacity-70">PDF, Word o immagine, fino a 50 MB.</span>
         <input
           type="file"
@@ -92,7 +112,7 @@ export function CaricaConsegna({ base, revisione }: { base: string; revisione: b
         disabled={!file || occupato}
         className="rounded-full bg-primario px-6 py-3 text-corpo-big text-neutro transition hover:brightness-110 disabled:opacity-50"
       >
-        {revisione ? 'Consegna la revisione' : 'Consegna'}
+        {t.bottone}
       </button>
       {stato.fase === 'in_corso' && <p role="status" className="text-corpo">{stato.passo}</p>}
       {stato.fase === 'errore' && (
@@ -100,9 +120,7 @@ export function CaricaConsegna({ base, revisione }: { base: string; revisione: b
           {stato.testo}
         </p>
       )}
-      <p className="text-corpo opacity-60">
-        Consegnando, il viaggiatore riceve la mail con il link alla sua pagina, da cui scarica il file.
-      </p>
+      <p className="text-corpo opacity-60">{t.nota}</p>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { CHIAVI, leggiContatto } from '@/lib/config'
-import { euro, leggiPaginaProposta, type PaginaProposta } from '@/lib/ordine'
+import { dataGiorno, euro, leggiPaginaProposta, type PaginaProposta, type PaginaPropostaAI } from '@/lib/ordine'
 import { Avviso, Guscio, ScriviciWhatsApp, Spiegazione } from '@/components/pagina-token'
 import { AttesaConferma } from '@/components/attesa-conferma'
 import { ElencoFile } from '@/components/elenco-file'
@@ -37,6 +37,15 @@ import { ElencoFile } from '@/components/elenco-file'
  * `puo_chiedere_revisione` lo dice (lo calcola il database con le stesse
  * regole di `request_revision`), e altrimenti la pagina dice perché — già
  * chiesta, o finestra chiusa — invece di mostrare un bottone che non fa niente.
+ *
+ * ## L'All Inclusive (0047)
+ *
+ * Stessa porta, un'altra faccia (`PropostaAllInclusive`, in fondo): la
+ * proposta confermata dall'agenzia, il documento, e le **due** casse — acconto
+ * e saldo — una alla volta, quella che il database dice. Il **documento
+ * finale non si scarica da qui**: contiene biglietti e voucher, e questa pagina
+ * si gira nel gruppo. Da qui si va a `/documento/<id>`, che vuole l'accesso con
+ * Google del viaggiatore dell'ordine (decisione del 27 settembre 2026).
  *
  * ## Cosa manca
  *
@@ -75,6 +84,17 @@ export default async function PaginaProposta({
 
   const designer = pagina.td_name ?? 'il designer'
   const base = `/proposta/${encodeURIComponent(token)}`
+
+  if (pagina.servizio === 'all_inclusive') {
+    return (
+      <Guscio>
+        <PropostaAllInclusive pagina={pagina} base={base} q={q} designer={designer} />
+        <div className="border-t border-scuro/20 pt-6">
+          <ScriviciWhatsApp numero={whatsapp} />
+        </div>
+      </Guscio>
+    )
+  }
 
   return (
     <Guscio>
@@ -297,4 +317,148 @@ function avvisoCassa(codice: string | undefined) {
         </Avviso>
       )
   }
+}
+
+/**
+ * La pagina All Inclusive del viaggiatore (0047). Come la gemella del su
+ * misura è fatta per essere girata nel gruppo commerciale: niente del
+ * viaggiatore, e il documento finale solo dietro il login.
+ */
+function PropostaAllInclusive({
+  pagina,
+  base,
+  q,
+  designer,
+}: {
+  pagina: PaginaPropostaAI
+  base: string
+  q: Query
+  designer: string
+}) {
+  const f = pagina.fase
+  const visibile = f !== 'in_aggiornamento' && f !== 'annullata' && f !== 'in_verifica'
+
+  return (
+    <>
+      <header className="space-y-2">
+        <p className="text-corpo opacity-70">All Inclusive · {pagina.human_ref}</p>
+        <h1 className="font-titoli text-h3">Il tuo viaggio con {designer}</h1>
+        {pagina.agenzia && visibile && (
+          <p className="text-corpo opacity-80">Organizzato e garantito da {pagina.agenzia}.</p>
+        )}
+      </header>
+
+      {q.file && (
+        <Avviso tono="errore">
+          {q.file === 'irraggiungibile'
+            ? 'Non riusciamo a preparare il file adesso. Riprova fra un minuto.'
+            : 'Questo file non si trova. Ricarica la pagina e riprova; se continua, scrivici.'}
+        </Avviso>
+      )}
+
+      {(f === 'da_pagare_acconto' || f === 'da_pagare_saldo') && pagina.cassa && (
+        <>
+          {q.ritorno ? <AttesaConferma /> : avvisoCassa(q.cassa)}
+          <p className="text-corpo-big">
+            {f === 'da_pagare_acconto'
+              ? `Si paga in due momenti. Adesso l’acconto: con quello l’agenzia comincia le prenotazioni vere. Il saldo ti verrà chiesto più avanti, prima della partenza.`
+              : `Le prenotazioni sono avviate: è il momento del saldo${pagina.saldo_entro ? `, entro il ${DATA.format(new Date(pagina.saldo_entro))}` : ''}.`}
+          </p>
+          <form action={`${base}/cassa`} method="post" className="space-y-3">
+            <button
+              type="submit"
+              className="rounded-full bg-primario px-6 py-3 text-corpo-big text-neutro transition hover:brightness-110"
+            >
+              {f === 'da_pagare_acconto' ? 'Paga l’acconto' : 'Paga il saldo'} · {euro(pagina.cassa.importo_cents)}
+            </button>
+            <p className="text-corpo opacity-60">
+              Il pagamento avviene su Stripe. Se qualcosa non ti torna, dillo nel gruppo WhatsApp prima di pagare.
+            </p>
+          </form>
+        </>
+      )}
+
+      {f === 'acconto_pagato' && (
+        <p className="text-corpo-big">
+          Acconto pagato, grazie. L&apos;agenzia sta facendo le prenotazioni: il saldo ti arriverà per mail,
+          con i tempi di voli e strutture.
+        </p>
+      )}
+      {f === 'saldata' && (
+        <p className="text-corpo-big">
+          Saldo pagato, grazie. {designer} sta preparando il documento finale del viaggio: ti arriva per mail.
+        </p>
+      )}
+
+      {(f === 'consegnata' || f === 'chiusa') && (
+        <section className="space-y-3">
+          <p className="text-corpo-big">
+            Il documento finale del tuo viaggio è pronto: biglietti, voucher, contatti e istruzioni. La partenza
+            è il {dataGiorno(pagina.partenza)}.
+          </p>
+          <ul className="space-y-2">
+            {pagina.file_finale.map((doc) => (
+              <li key={doc.id}>
+                {/* Un indirizzo SENZA token: il login non deve portarsi dietro una credenziale. */}
+                <a href={`/documento/${doc.id}`} className="text-corpo underline">
+                  {doc.nome}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="text-corpo opacity-70">
+            Per scaricarlo ti chiediamo di entrare con l&apos;account Google con cui hai prenotato: dentro ci
+            sono i tuoi biglietti, e così li apri solo tu.
+          </p>
+        </section>
+      )}
+
+      {visibile && (
+        <details open={f === 'da_pagare_acconto'}>
+          <summary className="cursor-pointer text-corpo underline">La proposta</summary>
+          <article className="mt-4 space-y-4 rounded-2xl border border-scuro/30 p-5">
+            {pagina.descrizione && <p className="whitespace-pre-line text-corpo">{pagina.descrizione}</p>}
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-corpo">
+              <dt className="opacity-60">Totale</dt>
+              <dd className="font-bold">{euro(pagina.totale_cents)}</dd>
+              <dt className="opacity-60">Acconto</dt>
+              <dd>{euro(pagina.acconto_cents)}</dd>
+              <dt className="opacity-60">Saldo</dt>
+              <dd>{euro(pagina.saldo_cents)}</dd>
+              <dt className="opacity-60">Partenza</dt>
+              <dd>{dataGiorno(pagina.partenza)}</dd>
+              {pagina.ritorno && (
+                <>
+                  <dt className="opacity-60">Rientro</dt>
+                  <dd>{dataGiorno(pagina.ritorno)}</dd>
+                </>
+              )}
+            </dl>
+            {pagina.documento && (
+              <p className="text-corpo">
+                <a href={`${base}/file/${pagina.documento.id}`} className="underline">
+                  Scarica la proposta · {pagina.documento.nome}
+                </a>
+              </p>
+            )}
+            <p className="text-corpo opacity-70">
+              Il prezzo è quello finale: se c&apos;era la consulenza da scalare, {designer} l&apos;ha già fatto.
+            </p>
+          </article>
+        </details>
+      )}
+
+      {f === 'in_aggiornamento' && (
+        <p className="text-corpo-big">
+          Questa proposta è in aggiornamento: {designer} ne sta preparando una nuova, e la riceverai per mail.
+        </p>
+      )}
+      {f === 'annullata' && (
+        <p className="text-corpo-big">Questo viaggio è stato annullato. Se non ti torna, scrivici.</p>
+      )}
+      {f === 'in_verifica' && (
+        <p className="text-corpo-big">Su questo viaggio il team sta guardando una cosa a mano, e ti scriverà.</p>
+      )}
+    </>
+  )
 }

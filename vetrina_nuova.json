@@ -1,0 +1,519 @@
+{
+  "brand": "XPETIS",
+  "nome": "Stella Sciamanna",
+  "nomeProfessionale": "",
+  "rating": "",
+  "fotoProfilo": "",
+  "competenze": "",
+  "esperienza": "4",
+  "membro": "1",
+  "callPrezzoLibero": false,
+  "lingue": "Italiano, Inglese",
+  "heroBio": "Credo che il viaggio più bello sia quello che più ti somiglia: scoperta, cibo, contatto umano, consapevolezza. Trasformiamoci da \"turisti\" a \"viaggiatori\".",
+  "storia": "Sono Stella, coordinatrice di viaggio e Travel Designer, ma ancora non lo sapevo quando sono salita su un camper a 6 anni appena compiuti. Per me,  da allora,  viaggiare significa collezionare momenti, non solo destinazioni.\nDa passione a lavoro, ora progetto viaggi per voi con lo stesso entusiasmo e curiosità con cui lo farei per me. Si parte sempre dall'ascolto: capire chi siete, cosa vi emoziona e quale è la vostra aspettativa mi aiuta a creare non un \"itinerario perfetto\", ma quello giusto per chi ho davanti. Ogni viaggio deve avere la sua personalità, proprio come chi lo intraprende.",
+  "callPrezzo": "",
+  "callDescrizione": "",
+  "callPunti": [
+    "",
+    "Analisi di itinerario, tempistiche, stile di viaggio",
+    "Raccolta dei tuoi dubbi e domande",
+    "Risposte alle tue domande, subito o nei giorni successivi ",
+    "Consigli utili e onesti"
+  ],
+  "viaggi": [
+    {
+      "titolo": "Norvegia - esperienza nel mare artico con orche e balene",
+      "descrizione": "IL viaggio che mi ha fatta rendere conto di tutto ciò che ero e che avevo raggiunto nella vita. Da appassionata di mondo marino, trovarmi a tu per tu con orche e balene, circondata da isole innevate, con i colori del cielo del nord è un'esperienza impossibile da dimenticare, difficile da raccontare, assolutamente da vivere",
+      "imgs": [
+        "images/viaggio-1-foto-1.png"
+      ]
+    },
+    {
+      "titolo": "Irlanda: la magia dell'isola verde",
+      "descrizione": "Il paese che mi ha cambiata, tra il suo cielo, il verde intenso e le scogliere che si aprono sul mare, non smette mai di affascinarmi, o di stupirmi, da 10 anni. Un road trip indimenticabile in Europa. Indovina? Le mie scogliere preferite non sono quelle di Moher...",
+      "imgs": []
+    },
+    {
+      "titolo": "Sudafrica: da Cape Twon, ai safari, alle immersioni in mare",
+      "descrizione": "Un paese che mi ha conquistata e affascinata. Un mix di storia da rispettare, paesaggi incredibili da attraversare, fino ad arrivare alle porte del Kruger National Park dove la magia del safari è pronta a cambiarti la vita. Il Sudafrica ha talmente tanto da offrire, che non mancano le esperienze per gli appassionati di immersioni.",
+      "imgs": []
+    }
+  ],
+  "itinerari": [
+    {
+      "titolo": "Irlanda: road trip tra pub, scogliere e atmosfere celtiche",
+      "giorni": "9",
+      "prezzo": "1100",
+      "img": ""
+    },
+    {
+      "titolo": "Mauritius e Sudafrica: dalle acque turchesi di Mauritius ai safari nel Kruger",
+      "giorni": "16",
+      "prezzo": "1800",
+      "img": ""
+    },
+    {
+      "titolo": "Norvegia expedition: spedizione artica alla ricerca delle orche",
+      "giorni": "7",
+      "prezzo": "5000",
+      "img": ""
+    },
+    {
+      "titolo": "Sudafrica explore: da Cape Town al Kruger",
+      "giorni": "10 giorni",
+      "prezzo": "1.700",
+      "img": ""
+    },
+    {
+      "titolo": "Sudafrica diving: safari a terra e safari in mare",
+      "giorni": "9",
+      "prezzo": "1.600",
+      "img": ""
+    },
+    {
+      "titolo": "Fuga in Irlanda: Dublino; Cork e Galway",
+      "giorni": "6",
+      "prezzo": "899",
+      "img": ""
+    },
+    {
+      "titolo": "Indonesia e Komodo diving: la perla rosa dell'Indonesia",
+      "giorni": "8 giorni",
+      "prezzo": "1.000€",
+      "img": ""
+    },
+    {
+      "titolo": "Indonesia diving: immersioni tra Komodo e Nusa Penida",
+      "giorni": "12 giorni",
+      "prezzo": "1.200€",
+      "img": ""
+    },
+    {
+      "titolo": "Kenya: dai safari al mare africano",
+      "giorni": "10 giorni",
+      "prezzo": "1.500€",
+      "img": ""
+    },
+    {
+      "titolo": "Cina: dalla muraglia cinese alle montagne di Avatar",
+      "giorni": "14 giorni",
+      "prezzo": "1.500€",
+      "img": ""
+    },
+    {
+      "titolo": "Giappone autentico: Tokyo, Kyoto, Osaka e le perle inesplorate",
+      "giorni": "15 giorni",
+      "prezzo": "2200",
+      "img": ""
+    },
+    {
+      "titolo": "Patagonia trekking: la Patagonia argentina e cilena fino a Ushuaia",
+      "giorni": "12 giorni",
+      "prezzo": "2200",
+      "img": ""
+    },
+    {
+      "titolo": "Belize diving: dalla Isla Bonita al Blue Hole",
+      "giorni": "8 giorni",
+      "prezzo": "1.200€",
+      "img": ""
+    },
+    {
+      "titolo": "Thailandia autentica: città, isole e esperienze con famiglie locali",
+      "giorni": "10 giorni",
+      "prezzo": "1.400",
+      "img": ""
+    },
+    {
+      "titolo": "Repubblica Dominicana: mare e avventura ai Caraibi",
+      "giorni": "10 giorni",
+      "prezzo": "1.000€",
+      "img": ""
+    },
+    {
+      "titolo": "Islanda in tenda: avventura indimenticabile in Islanda",
+      "giorni": "10 giorni",
+      "prezzo": "1.400€",
+      "img": ""
+    },
+    {
+      "titolo": "Nepal: da Kathmandu ai trekking sull'Himalaya ",
+      "giorni": "10 giorni",
+      "prezzo": "1.200€",
+      "img": ""
+    },
+    {
+      "titolo": "Cammino di Santiago: cosa sapere sul Cammino Francese",
+      "giorni": "30 giorni",
+      "prezzo": "1.000€",
+      "img": ""
+    },
+    {
+      "titolo": "Galizia: da Santiago de Compostela alle isole atlantiche",
+      "giorni": "7 giorni",
+      "prezzo": "600€",
+      "img": ""
+    },
+    {
+      "titolo": "Tunisia: Tunisi, il deserto e le medine",
+      "giorni": "9 giorni",
+      "prezzo": "900€",
+      "img": ""
+    }
+  ],
+  "gruppo": [
+    {
+      "titolo": "Argentina: Trekking in Patagonia",
+      "date": "14 – 25 set 2025",
+      "giorni": "12 giorni",
+      "persone": "10 persone",
+      "prezzo": "1.380€",
+      "img": ""
+    },
+    {
+      "titolo": "Marocco: tra deserto e medine",
+      "date": "9 – 18 ott 2025",
+      "giorni": "10 giorni",
+      "persone": "8 persone",
+      "prezzo": "1.250€",
+      "img": ""
+    },
+    {
+      "titolo": "Giappone in autunno",
+      "date": "3 – 16 nov 2025",
+      "giorni": "14 giorni",
+      "persone": "12 persone",
+      "prezzo": "2.900€",
+      "img": ""
+    }
+  ],
+  "recensioni": [],
+  "manifesto": "Il privilegio di aver vissuto qualcosa di meraviglioso.",
+  "instagram": "@stellisciami",
+  "coperturaLegale": "Non ho un'agenzia — vorrei un partner certificato XPETIS",
+  "gruppoHaGia": "Sì, sono pronti",
+  "gruppoTempi": "Entro il 2026",
+  "topDestinazioni": [
+    "Irlanda",
+    "Sudafrica",
+    "Giappone"
+  ],
+  "paesi": [
+    {
+      "paese": "Sudafrica",
+      "livello": "Base",
+      "aree": "Cape Town, Johannesburg, Kruger National Park, Durban",
+      "temi": [
+        "Food",
+        "Cultura, arte e storia",
+        "Natura e wildlife",
+        "Lusso"
+      ],
+      "temiCustom": [
+        "Safari",
+        "Esperienze locali",
+        "Immersioni",
+        "Cooking class"
+      ],
+      "contesti": [
+        "Città",
+        "Foresta e giungla",
+        "Aree estreme/polari"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Irlanda",
+      "livello": "Base",
+      "aree": "Dublino, Glendalough, Kilkenny, Waterford, Cork, West Cork, Ring of Kerry, Cliffs of Moher, Galway, Connemara, Donegal, Norther Ireland, Belfast",
+      "temi": [
+        "Cultura, arte e storia",
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Mare e isole",
+        "Campagna e aree rurali",
+        "Montagna"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Contenuto (<€1.500)"
+    },
+    {
+      "paese": "Thailandia",
+      "livello": "Base",
+      "aree": "Bangkok, Chan Rai, Chang Mai, Phuket, Krabi",
+      "temi": [
+        "Food",
+        "Cultura, arte e storia",
+        "Natura e wildlife"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Mare e isole",
+        "Città",
+        "Foresta e giungla",
+        "Campagna e aree rurali"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Tunisia",
+      "livello": "Base",
+      "aree": "Tunisi, Cartagine, Sidi bou said, deserto, villaggi trogloditi",
+      "temi": [
+        "Cultura, arte e storia",
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Deserto"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Contenuto (<€1.500)"
+    },
+    {
+      "paese": "Giappone",
+      "livello": "Base",
+      "aree": "Tokyo, Kyoto, Osaka, Nara, Hiroshima, Amanaoshidate, Ine",
+      "temi": [
+        "Food",
+        "Cultura, arte e storia"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Borghi e piccoli centri"
+      ],
+      "durata": "Lungo (15–30 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Indonesia",
+      "livello": "Base",
+      "aree": "Bali, Nusa Penida, Isole Gili, Komodo",
+      "temi": [
+        "Cultura, arte e storia",
+        "Natura e wildlife"
+      ],
+      "temiCustom": [
+        "Immersioni"
+      ],
+      "contesti": [
+        "Mare e isole",
+        "Foresta e giungla",
+        "Campagna e aree rurali"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Grecia",
+      "livello": "Base",
+      "aree": "Kos, Kalymnos, Leros, Corfù, Creta, Rodi, Skiathos, Hydra, Atene",
+      "temi": [
+        "Avventura e outdoor",
+        "Lusso"
+      ],
+      "temiCustom": [
+        "Escursioni in barca"
+      ],
+      "contesti": [
+        "Mare e isole"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Contenuto (<€1.500)"
+    },
+    {
+      "paese": "Islanda",
+      "livello": "Base",
+      "aree": "Road trip ",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [
+        "Campeggio",
+        "Road trip"
+      ],
+      "contesti": [],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Mauritius",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Lusso",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Mare e isole"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Patagonia",
+      "livello": "Base",
+      "aree": "Buenos Aires, Calafate, Torres del Paine, Ushuaya",
+      "temi": [
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [
+        "Trekking"
+      ],
+      "contesti": [
+        "Montagna"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Alto (€3.500–7.000)"
+    },
+    {
+      "paese": "Repubblica Dominicana",
+      "livello": "Base",
+      "aree": "",
+      "temi": [
+        "Natura e wildlife",
+        "Avventura e outdoor",
+        "Lusso"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Mare e isole"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Nepal",
+      "livello": "Base",
+      "aree": "Kathamandu, Pokhara, Annapurna, Chitwan",
+      "temi": [
+        "Cultura, arte e storia",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [
+        "Trekking"
+      ],
+      "contesti": [
+        "Città",
+        "Foresta e giungla",
+        "Montagna"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Cina",
+      "livello": "Base",
+      "aree": "Pechino, Zhangjiajie, Fenghuang, Guilin,  Xi An, Cheng Du",
+      "temi": [
+        "Cultura, arte e storia",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Montagna",
+        "Campagna e aree rurali"
+      ],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Galizia",
+      "livello": "Base",
+      "aree": "Cammino di Santiago, Santiago, Finisterre, Cammino dei fari, isole Cies, vigo",
+      "temi": [
+        "Food",
+        "Cultura, arte e storia",
+        "Avventura e outdoor"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Mare e isole"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Contenuto (<€1.500)"
+    },
+    {
+      "paese": "Cuba",
+      "livello": "Base",
+      "aree": "Havana, Trinidad, Santa Clara, Vinales",
+      "temi": [
+        "Cultura, arte e storia"
+      ],
+      "temiCustom": [],
+      "contesti": [
+        "Città",
+        "Mare e isole",
+        "Campagna e aree rurali"
+      ],
+      "durata": "",
+      "budget": ""
+    },
+    {
+      "paese": "Belize",
+      "livello": "Base",
+      "aree": "San Pedro, Blue Hole",
+      "temi": [
+        "Natura e wildlife"
+      ],
+      "temiCustom": [
+        "Immersioni"
+      ],
+      "contesti": [],
+      "durata": "Standard (8–14 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    },
+    {
+      "paese": "Maldive",
+      "livello": "Base",
+      "aree": "Maafushi",
+      "temi": [
+        "Natura e wildlife",
+        "Lusso"
+      ],
+      "temiCustom": [
+        "Immersioni"
+      ],
+      "contesti": [
+        "Mare e isole"
+      ],
+      "durata": "Breve (5–7 gg)",
+      "budget": "Medio (€1.500–3.500)"
+    }
+  ],
+  "assi": {
+    "conChi": [
+      "Viaggiatore solo",
+      "Coppia",
+      "Famiglia con bambini/ragazzi",
+      "Gruppo di amici/piccolo gruppo",
+      "Gruppo organizzato"
+    ],
+    "controllo": 2,
+    "ritmo": 3,
+    "scomodita": 3,
+    "luogo": 3,
+    "sociale": 2
+  },
+  "servizi": [
+    "Consulenza singola (30 min)",
+    "Itinerario su misura ALL INCLUSIVE",
+    "Itinerario su misura",
+    "Viaggio di gruppo a tua firma",
+    "Accompagnamento privato / presenza sul posto"
+  ]
+}

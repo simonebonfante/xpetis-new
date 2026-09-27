@@ -300,6 +300,59 @@ del dopo-call: è una riga a sé); la mail al viaggiatore dichiarato assente
 E, come sempre, **niente è stato visto in un browser né contro Storage vero**:
 sono le prove 64-78.
 
+**Aggiornamento del 27 settembre 2026 — la milestone 7, l'All Inclusive, è
+scritta.** `0047_all_inclusive.sql`, la pagina dell'agenzia (`/agenzia/[token]`),
+la faccia All Inclusive delle pagine del designer e del viaggiatore, le due rate
+nella stessa cassa, `/documento/[id]`. Harness a **832 asserzioni** (erano 695),
+`npm run build` verde. Due rami dell'orologio in più, **n8n non si tocca**: il
+ponte Stripe è lo stesso endpoint.
+
+1. 🔴 **Un conto Stripe solo, dell'agenzia** (decisione del 27 settembre).
+   Chiave **ristretta** in Vault, puntata da `agencies.stripe_credential_ref`;
+   un solo `whsec_`; niente rimborsi via API. Il passaggio alla produzione sono
+   tre righe di `app_config` a `agency`. ⚠️ Ogni euro di XPETIS passa dal conto di
+   un altro, e **la riconciliazione è un punto aperto vero**: in milestone 7.
+2. 🔴 **Il link dell'agenzia è monouso e scade.** È l'unico controllo sui prezzi
+   del Flusso, e vive in una casella inoltrabile: la prima risposta vince (per
+   chiave primaria, `agency_decisions`), una proposta rifatta ha un link nuovo e
+   il vecchio si annulla, e dopo `agency_confirm_valid_days` (7, stima) il team
+   riceve un alert e lo rinnova con una riga.
+3. ⚠️ **Il documento finale si scarica solo col login** (tua decisione di oggi):
+   da `/documento/<id>`, un indirizzo senza token, e solo se l'account Google è
+   quello del viaggiatore dell'ordine. Proposta e pagamenti restano sulla
+   pagina a token.
+4. ⚠️ **Acconto e saldo li calcola il database, i tempi li scrive il team.** Il
+   30% viene da `deposit_percent`; scritto `balance_due_at`, l'ordine passa da
+   solo in attesa del saldo e parte la mail. Senza la data il saldo non si
+   chiede, e il database lo rifiuta anche da Studio.
+
+**Cosa NON è stato fatto, di proposito**: i rimborsi via API, la
+riconciliazione, una seconda agenzia, la chiusura di un All Inclusive
+consegnato (resta al team: quando chiuderlo è un punto aperto). E niente è stato
+visto in un browser né contro Stripe e Storage veri: sono le prove 79-101.
+
+**Aggiornamento del 27 settembre 2026, sera — il Figma nuovo, i tre event type,
+i viaggi di gruppo.** È la base per i tre prompt che seguono (destinazioni v2,
+quiz, pagine ridisegnate). `0048_tre_event_type_e_gruppi.sql`, harness a **860
+asserzioni** (erano 832), tutte verdi. Nessuna riga di TypeScript toccata: la
+vetrina non mostra ancora i viaggi di gruppo, li mostrerà la pagina ridisegnata.
+
+1. **Il Figma è un file nuovo**, `Q9Krydv6xD8mFJCtU9NHzr`: il vecchio è
+   superato. Tre nodi verificati (vetrina, viaggi di gruppo, itinerario pronto);
+   ⏳ **home, ricerca e quiz aspettano il loro nodo da te**.
+2. **I servizi sono due, gli event type tre**: la deviazione 10 è riscritta, e
+   tiene scritto cosa diceva il 21 settembre. ⚠️ **Tre designer onboardati con
+   la regola vecchia vanno ricontrollati** (`ONBOARDING_CALCOM_TD.md` §8).
+3. **Le tre reti del 21 settembre, mai costruite, ora ci sono**: slug unico per
+   designer, slug fuori elenco che blocca la pubblicazione, durata dello slot
+   contro il listino con alert alla prima prenotazione (che si crea comunque).
+4. **La deviazione 7 resta**, anche se il file v2 della tassonomia dice il
+   contrario: scritto nella deviazione e dove l'import legge quel campo.
+5. **I viaggi di gruppo sono solo vetrina**, testo libero come il form. ❓ **Ma
+   scadono, e nessuno li toglie**: domanda aperta qui sotto, in milestone 3.
+
+Le prove sono la 102-108, in fondo alla milestone 3.
+
 
 ### Cosa resta a te
 
@@ -552,7 +605,7 @@ sono le prove 64-78.
 
 | Materiale | Serve per | Stato |
 |---|---|---|
-| Link Figma delle pagine | Milestone 3, 4, 6, 7, 8 | ✅ arrivati il 10 agosto — file `x1DYYagZ2moagmpEHZHYYE`, nodi in `CLAUDE.md` |
+| Link Figma delle pagine | Milestone 3, 4, 6, 7, 8 | ✅ arrivati il 10 agosto — file `x1DYYagZ2moagmpEHZHYYE`. **Superato il 27 settembre 2026 da un file nuovo, `Q9Krydv6xD8mFJCtU9NHzr`** («XPETIS - Def»): vetrina `2-743`, viaggi di gruppo `3-1121`, itinerario pronto `3-1386`. ⏳ **Mancano i nodi di home, ricerca e quiz** sul file nuovo |
 | Dataset geografico (129 stati, 244 regioni, 1.220 città) | Import geo, suggeritore, bande del match | ⏳ me lo incolli — versione normalizzata da Alessandro |
 | `GUIDA_PONTE_CALCOM.md` + fixture dei 7 messaggi veri | Nomi veri dei campi Cal.com e prove del ponte | ✅ arrivate — 7 fixture in `supabase/tests/fixtures/calcom/`, mappatura riscritta, ponte costruito |
 | JSON delle 25 vetrine compilate | Import profili TD | ⏳ da produrre dal form HTML |
@@ -577,10 +630,10 @@ tassonomia geografica.
 | 4 | Il TD non può cancellare una consulenza pagata, può solo riprogrammare (§5) | Il tasto *Request reschedule* di Cal.com **è** una cancellazione secca. Lo riconosciamo dai due segni (motivo che inizia per `Please reschedule.`, `cancelledBy` uguale alla mail del designer), blocchiamo l'ordine, alert critico al team, rimborso eseguito a mano | Cal.com non manda nessuna prenotazione nuova e non lega la vecchia alla nuova: su una call già pagata il viaggiatore resterebbe senza call e senza soldi | 4 ago |
 | 5 | Non ne parla | Le mail native di Cal.com restano accese e i testi XPETIS sono scritti per convivere con loro | Spegnerle potrebbe richiedere un piano a pagamento su 25 account. Costo zero e nessuna dipendenza dal piano | 4 ago |
 | 6 | "La barra di ricerca normalizza qualunque input a un paese" (§1) | Filtrano **paesi e macro-aree**. Città e continenti sono solo navigazione: la città porta al suo paese, il continente alle sue macro-aree | La tassonomia dichiara selezionabili anche le macro-aree, e cercare "Sud America" è una richiesta legittima | 8 ago |
-| 7 | *(deviazione dalla tassonomia)* Le 20 regioni italiane sono dichiarate selezionabili | **Non filtrano.** Nessun quinto livello di filtro: come trattarle si deciderà | Il dato della tassonomia non si perde: `is_selectable` conserva la sua intenzione, `is_filterable` dice cosa filtra oggi. Sono le uniche 20 righe su cui i due valori differiscono, e l'harness lo verifica | 8 ago |
+| 7 | *(deviazione dalla tassonomia)* Le 20 regioni italiane sono dichiarate selezionabili | **Non filtrano.** Nessun quinto livello di filtro: come trattarle si deciderà | Il dato della tassonomia non si perde: `is_selectable` conserva la sua intenzione, `is_filterable` dice cosa filtra oggi. Sono le uniche 20 righe su cui i due valori differiscono, e l'harness lo verifica. **27 set: il file nuovo della tassonomia (`xpetis_destinazioni_v2.json`) afferma il contrario** — `selectable: [macro_area, state, italian_region]` e una regola `italy_special` che fa suggerire le 20 regioni cercando «Italia» — esattamente come diceva già il primo file. **Simone conferma: le regioni italiane non sono un filtro.** Non è una svista da correggere: è la seconda conferma di una decisione deliberata. L'avviso è scritto anche in `supabase/scripts/genera_geo.mjs`, dove l'import legge quel campo, e finisce nell'intestazione del seed generato, così chi rilegge il JSON non la «sistema» | 8 ago, 27 set |
 | 8 | "Colore brand: verde `#1b5e24`" (§0) | La palette è **crema `#F0EEDF`, nero `#1C1C1A`, primario `#E53619`**, con Merriweather Bold sui titoli e Ronzino Regular sul testo | Sono i token del Figma, e concordano con il form Vetrina TD, che usa le stesse due tinte. Il verde non compare in nessuno dei due: è un dato più vecchio del design | 9 ago |
-| 9 | Consulenze e itinerario su misura incassano sul conto XPETIS; solo l'All Inclusive sul conto dell'agenzia (§4) | **Incassa l'agenzia affiliata su tutto.** È lei ad avere ragione sociale e partita IVA; XPETIS come entità legale non esiste e non esisterà nel primo periodo | Senza partita IVA Stripe non attiva i pagamenti veri, e costituire una società non è nei tempi. Conseguenza operativa: **il tasto "rimborsa" è in mano all'agenzia**, quindi rimborsi, no-show e arbitrati diventano richieste a qualcun altro, con i suoi tempi | 6 set |
-| 10 | La consulenza dura **30 minuti** (§3) | **30 oppure 60, a scelta del designer.** `consultation` è la consulenza base *qualunque sia la sua durata*; `consultation_deep` resta la *seconda* consulenza offerta in aggiunta, e nemmeno lei ha una durata fissa | Richiesta arrivata dai designer in fase di onboarding, 21 settembre 2026. Lo schema lo reggeva già (`td_services.duration_minutes` è per designer e per servizio) e la vetrina legge quel numero. ⚠️ Ma **il form della vetrina dice «Consulenza singola (30 min)» ed è bloccato**: i 25 hanno scritto il loro prezzo pensando a mezz'ora. Chi passa a 60 va **richiamato sul prezzo**, non solo sulla durata. Durata e prezzo rivisto vivono nella lista condivisa, non nel JSON | 21 set |
+| 9 | Consulenze e itinerario su misura incassano sul conto XPETIS; solo l'All Inclusive sul conto dell'agenzia (§4) | **Incassa l'agenzia affiliata su tutto.** È lei ad avere ragione sociale e partita IVA; XPETIS come entità legale non esiste e non esisterà nel primo periodo | Senza partita IVA Stripe non attiva i pagamenti veri, e costituire una società non è nei tempi. Conseguenza operativa: **il tasto "rimborsa" è in mano all'agenzia**, quindi rimborsi, no-show e arbitrati diventano richieste a qualcun altro, con i suoi tempi. **27 set: il conto Stripe è uno, dell'agenzia**, aperto insieme e dedicato a XPETIS, con un ruolo admin per Simone (così i rimborsi li fa il team, dalla dashboard). Chiave **ristretta** in Vault, un solo endpoint webhook. Niente Stripe Connect: vorrebbe XPETIS attivata su Stripe come entità legale, cioè lo stesso muro. Vedi `ACCESSI.md` | 6 set, 27 set |
+| 10 | La consulenza dura **30 minuti** (§3) | **Due servizi, tre event type** *(riscritta il 27 set)*: la **breve** `consultation` dura **sempre 30** (`consulenza-xpetis-30`) e ce l'ha **ogni** designer; l'**approfondita** `consultation_deep` dura **60 oppure 90** (`consulenza-xpetis-60` / `-90`) ed è **opzionale**, solo per chi la offre. ~~*21 set: «30 oppure 60, a scelta del designer, sulla base»: `consultation` era la consulenza base qualunque fosse la sua durata, e `consultation_deep` la seconda, anche lei senza durata fissa*~~ → **non è più vero: la base è tornata fissa a 30, la durata variabile sta sull'approfondita** | Richiesta dei designer in onboarding il 21 settembre, rivista il 27. Lo schema la regge (`td_services.duration_minutes` è per servizio). ⚠️ **L'onboarding è partito con la regola del 21**: tre designer hanno un event type da 30 *o* da 60 come consulenza base, e il 60 sulla breve oggi è un errore. Cosa ricontrollare su di loro è in `ONBOARDING_CALCOM_TD.md` §8, non va dato per fatto. ⚠️ **Il form della vetrina dice «Consulenza singola (30 min)» ed è bloccato**: il prezzo della breve regge, quello dell'approfondita il form non lo raccoglie e vive nella lista condivisa, con la durata. Con tre slug invece di due i modi di sbagliare triplicano: le tre reti della 0048 (slug unico per designer, slug fuori elenco che blocca la pubblicazione, durata dello slot confrontata col listino) | 21 set, 27 set |
 
 **Conseguenza della 5, da non perdere di vista.** Le mail native di Cal.com
 contengono i link *cancella* e *riprogramma*, e cancellare su Cal.com richiede
@@ -603,11 +656,14 @@ produzione. Non si cambia il default: **quale conto incassa una consulenza va in
 `app_config`**, così passare all'agenzia è una riga da Studio e non un deploy.
 Fino a lì i test girano sul nostro Stripe sandbox, cioè `xpetis`.
 
-Resta aperta la domanda che questa decisione rende urgente e che prima era
-rimandata: **come si tocca il conto Stripe dell'agenzia.** Le loro chiavi in
-mano nostra sono una responsabilità che non vogliamo (e `CLAUDE.md` vieta di
-metterle in colonna); **Stripe Connect** è la strada che non ce le fa mai
-vedere. Da chiarire con l'agenzia, non con il codice.
+~~Resta aperta la domanda: come si tocca il conto Stripe dell'agenzia~~ →
+**decisa il 27 settembre 2026.** Un conto solo, dell'agenzia, con chiave
+ristretta in Vault (`agencies.stripe_credential_ref` porta il nome del segreto,
+mai il valore). Stripe Connect è scartato per la stessa ragione della
+deviazione. Tre cose che questa scelta si porta dietro, e che non sono tecniche:
+**l'accesso è revocabile dall'agenzia**, **le contestazioni le paga il loro
+saldo**, e **ogni euro di XPETIS passa prima dal loro conto** — da cui la
+riconciliazione mensile, punto aperto in milestone 7.
 
 ---
 
@@ -622,7 +678,7 @@ vedere. Da chiarire con l'agenzia, non con il codice.
 | 4 | Prenotazione e pagamento consulenza | 🟡 **quasi chiusa** — i due ponti, il giro del pagamento e l'orologio sono dentro e provati. Restano le due mail di conferma (impalcatura pronta), il form della prenotazione, il calendario admin e il percorso "slot introvabile" | 2-3 sessioni | 3-4 h |
 | 5 | Prima della call: riprogrammazioni e reminder | ⚪ — ma le due mail che le servono adesso sono un ramo e una riga di seed | 2-3 sessioni | — |
 | 6 | Post-call e Itinerario su misura | 🟢 **chiusa lato codice il 26 settembre 2026** — dal dopo-call alla chiusura a 5 giorni. Restano le prove 64-78, il tasto «C'è un problema» della pagina ordine e i punti aperti del silenzio-conferma | — | 2-3 h di prove |
-| 7 | All Inclusive | ⚪ | 4-5 sessioni | 4-6 h |
+| 7 | All Inclusive | 🟢 **scritta il 27 settembre 2026** (`0047`) — restano le prove 79-101, l'attivazione del conto dell'agenzia (S-12) e i punti aperti, fra cui la riconciliazione | — | 4-6 h di prove e attivazione |
 | 8 | Recensioni e chiusura del ciclo | ⚪ | 2-3 sessioni | — |
 | 9 | Operatività e validazione Beta | ⚪ | 3-4 sessioni | 12-18 h |
 |   | **Totale** | | **29-35 sessioni** | **34-49 h** |
@@ -814,7 +870,13 @@ guidato da una coda di lavoro.
       cosa dichiara la tassonomia
 - [ ] **[S]** *Rimandato:* come trattare le regioni italiane nella ricerca
 - [ ] **[C]** Importatore fedele dei profili TD, idempotente e rilanciabile: non
-      normalizza, ma **segnala** ogni voce che non ha saputo agganciare
+      normalizza, ma **segnala** ogni voce che non ha saputo agganciare.
+      Dal 27 settembre il form ha una chiave in più, `gruppo` → `td_group_trips`
+      (0048): `titolo`, `date`, `giorni`, `persone`, `prezzo`, `img` diventano
+      `title`, `dates_label`, `duration_label`, `group_size_label`,
+      `price_label`, `image_path`, tutti testo. Nel JSON nuovo ci sono anche
+      `gruppoHaGia` e `gruppoTempi`, che **non ho mappato**: non erano nel
+      prompt e non so cosa significhino (❓ in milestone 3)
 - [ ] **[C]** Coda di correzione per il team: per ogni TD, cosa non è entrato e
       perché. I due casi che ci aspettano, già visti sui dati veri di un designer
       reale: **tutti i paesi dichiarati "Base"** (senza correzione quel TD non
@@ -1129,6 +1191,88 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       alla regione" il viaggiatore non sa quale paese di quell'area il designer
       copra. Se la lettura giusta è la stretta — solo la sezione `fallback` — è
       una riga in `app/ricerca/page.tsx`
+
+### Il Figma nuovo, i tre event type e i viaggi di gruppo (27 settembre 2026)
+
+- [x] **[C]** `CLAUDE.md` e `ACCESSI.md` puntano al file Figma nuovo
+      `Q9Krydv6xD8mFJCtU9NHzr`; i nodi vecchi sono dichiarati da non riusare
+- [x] **[C]** Deviazione 10 riscritta (due servizi, tre event type) e
+      `ONBOARDING_CALCOM_TD.md` con tre righe, la breve non più condizionale
+- [x] **[C]** `0048` — le tre reti: `td_services_one_service_per_slug`, lo slug
+      fuori elenco in `td_publish_blockers` (e vietato su un designer già
+      pubblicato), la durata vera contro il listino nel ponte Cal.com. Gli slug
+      attesi in `app_config` (`calcom_slugs_consultation`,
+      `calcom_slugs_consultation_deep`)
+- [x] **[C]** Deviazione 7 aggiornata, avviso in `genera_geo.mjs`
+- [x] **[C]** `td_group_trips` + colonna `group_trips` in coda a
+      `public_td_showcase`; tre viaggi finti per Marco e tre per Giulia, con
+      quattro immagini finte (`gruppo-*.jpg`, due per designer: il terzo di
+      ciascuno è senza immagine, come negli itinerari)
+- [ ] **[S]** ⚠️ **Ricontrollare i tre designer onboardati con la regola
+      vecchia**, seguendo `ONBOARDING_CALCOM_TD.md` §8. Nessuno dei loro dati è
+      ancora a database, quindi oggi nessuna rete li ha guardati
+- [ ] **[S]** I nodi di **home, ricerca e quiz** sul file Figma nuovo
+
+**❓ Domande aperte**
+
+- ❓ **Chi toglie dalla vetrina un viaggio di gruppo già partito?** Un
+  itinerario pronto è sempre valido, una partenza «14 – 25 set 2025» no — e i
+  tre esempi del form sono già passati. Con la data scritta come testo libero
+  **niente può nasconderla da sola**. Le strade, nessuna scelta: il team la
+  toglie a mano da Studio (routine, contro il principio 4); il form raccoglie
+  una data vera oltre a quella scritta (ma il form è bloccato); si prova a
+  leggere la data dal testo (fragile su 25 designer che scrivono ciascuno a modo
+  suo). Non ho inventato un campo che il form non dà. Per Alessandro, Andrea e
+  Chiara
+- ❓ **Il nodo `3-1121` è una pagina per viaggio o l'elenco?** Se ogni viaggio
+  di gruppo ha una pagina sua, serve uno `slug` come quello degli itinerari
+  (0033). Oggi `td_group_trips` non ce l'ha. Si vede quando si costruisce la
+  pagina
+- ❓ **`gruppoHaGia` e `gruppoTempi`** sono due chiavi nuove del form accanto a
+  `gruppo`. Non le ho mappate: sembrano rispondere al servizio «Viaggio di
+  gruppo a tua firma», ma è un'ipotesi. Cosa sono?
+- ❓ **Il viaggio di gruppo si compra?** Oggi no, per scelta del prompt: nessuna
+  cassa e nessun ordine. Se il Figma `3-1121` mostra un tasto d'acquisto, è
+  Figma che aggiunge comportamento, e vince il Flusso finché non si decide
+
+**🔴 Le prove (27 settembre 2026)**
+
+**Prima di cominciare, sul database di sviluppo** — applica la `0048`, poi le
+due righe di `app_config`: il seed `0001` ha `on conflict do nothing` e sul
+progetto vero non gira da solo. **Senza queste righe ogni consulenza attiva è
+bloccata**, per scelta:
+
+```sql
+insert into app_config (key, value, value_text, config_group, label_it) values
+  ('calcom_slugs_consultation', null, 'consulenza-xpetis-30', 'integrations',
+   'Slug Cal.com ammessi per la consulenza breve'),
+  ('calcom_slugs_consultation_deep', null, 'consulenza-xpetis-60, consulenza-xpetis-90', 'integrations',
+   'Slug Cal.com ammessi per la consulenza approfondita')
+on conflict (key) do nothing;
+
+-- l'approfondita di Giulia aveva uno slug inventato: il seed 0003 lo sistema,
+-- oppure questa riga
+update td_services set cal_event_type_slug = 'consulenza-xpetis-60'
+ where td_id = '22222222-2222-2222-2222-222222222222'
+   and service_type = 'consultation_deep'
+   and cal_event_type_slug = 'consulenza-xpetis-approfondita';
+```
+
+E i viaggi di gruppo: l'insert di `td_group_trips` dal seed `0003`, poi
+`bash scripts/carica-immagini-finte.sh` per le quattro immagini nuove.
+⚠️ **Lo script carica `.env.local` con `.`, e la riga `RESEND_FROM` oggi lo fa
+fallire** (`parse error near '>'`): il valore ha le parentesi angolate e non è
+fra virgolette. Mettilo fra virgolette prima di lanciarlo.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 102 | `select slug, blockers, can_publish from td_publish_readiness;` | Marco e Giulia `can_publish = true`, nessun blocco sugli slug | Se Giulia dice «fuori elenco» manca l'`update` sopra |
+| 103 | Da Studio, sul servizio `consultation` di Marco, scrivi `consulenza-xpetis-30-min` | Rifiutato: «non ammesso per consultation su un designer pubblicato (attesi: consulenza-xpetis-30)» | È la trappola di Cal.com che genera l'URL dal titolo |
+| 104 | Da Studio, prova a dare a un servizio di Giulia lo slug dell'altro (`consulenza-xpetis-30` sull'approfondita) | Rifiutato | Il vincolo di unicità sta sotto: su un designer in bozza fermerebbe lui |
+| 105 | Su `marco-rossi-xpetis`, nell'event type `consulenza-xpetis-30`, porta la durata a **60** e prenota dalla vetrina | La prenotazione **nasce** (`pending_payment`, il prezzo della breve) e in `team_alerts` c'è un `calcom_durata_non_combacia` critico: «il listino dice 30 minuti … lo slot su Cal.com ne dura 60» | ⚠️ **Rimetti la durata a 30** subito dopo, e cancella la prenotazione |
+| 106 | Prenota normalmente da 30 | Nessun alert di durata | — |
+| 107 | `select slug, jsonb_array_length(group_trips) from public_td_showcase;` | 3 e 3. Con la chiave publishable dal browser: `td_group_trips` risponde 401/permesso negato, la vista sì | La pagina non li mostra ancora: arriva con le pagine ridisegnate |
+| 108 | Apri `td-media/marco-rossi/gruppo-ha-giang.jpg` da Storage | L'immagine finta c'è | — |
 
 ---
 
@@ -2012,40 +2156,210 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
 
 ## Milestone 7 — All Inclusive
 
-- [ ] **[S]** Decidere come custodire le credenziali Stripe delle agenzie →
-      **S-11**
-- [ ] **[S]** Attivazione tecnica della prima agenzia → **S-12**
+- [x] **[S]** ~~Decidere come custodire le credenziali Stripe delle agenzie~~ →
+      **deciso il 27 settembre 2026**: un conto solo, dell'agenzia, chiave
+      ristretta in Vault (S-11)
+- [ ] **[S]** Attivazione tecnica del conto dell'agenzia → **S-12**
 - [ ] **[B]** Verifica fiscale del 74-ter con l'agenzia e della quota XPETIS per
       fatturazione tra le parti
-- [ ] **[C]** Assegnazione agenzia da Studio e workflow di verifica
-- [ ] **[C]** Pagina token di conferma dell'agenzia, che sblocca la cascata
-- [ ] **[C]** Acconto e saldo sul conto Stripe dell'agenzia, con i suoi webhook
-      che puntano al nostro n8n
-- [ ] **[C]** Inserimento dei tempi del saldo da parte del team e workflow
-      relativo
-- [ ] **[C]** Consegna del file finale
+- [ ] **[B]** 🔴 **La riconciliazione mensile**, con Andrea — vedi i punti aperti
+- [x] **[C]** Assegnazione agenzia da Studio e workflow di verifica. **Fatto il
+      27 settembre 2026** → `0047_all_inclusive.sql`. L'assegnazione è
+      `orders.agency_id`, scritta dal team; l'invio senza agenzia risponde
+      «manca l'agenzia» al designer, e da Studio lo ferma il trigger della 0009
+- [x] **[C]** Pagina token di conferma dell'agenzia, che sblocca la cascata →
+      `app/agenzia/[token]/`, `agency_page()`, `agency_decide()`. Monouso, a
+      scadenza, la prima risposta vince (`agency_decisions`)
+- [x] **[C]** Acconto e saldo sul conto Stripe dell'agenzia → la stessa cassa
+      (`lib/cassa.ts`) con `deposit` e `balance`; il ponte le distingue in
+      `stripe_checkout_ai()`. Un solo endpoint webhook
+- [x] **[C]** Inserimento dei tempi del saldo da parte del team e workflow
+      relativo → il team scrive `orders.balance_due_at` da Studio; l'ordine passa
+      da solo in `awaiting_balance` e parte la mail. Nessun workflow: un trigger
+- [x] **[C]** Consegna del file finale → lo stesso meccanismo della 0046
+      (`td_delivery_ticket`, `td_deliver`, `CaricaConsegna`), e lo scaricamento
+      col login da `/documento/[id]`
+- [ ] **[C]** La chiusura di un All Inclusive consegnato — **punto aperto**, qui
+      sotto
 
-**Cosa la 0044 (proposta su misura, 23 settembre 2026) lascia pronto e cosa
-no**, perché nessuna scelta di là venga scoperta dopo:
+### Le decisioni del 27 settembre 2026
 
-- **La pagina ordine e la sua mail nascono solo per il su misura.** Un ordine
-  All Inclusive oggi non riceve né il token `td_order_page` né la mail al
-  designer: la pagina non lo saprebbe trattare. Il trigger
-  `on_custom_order_created()` è il punto da allargare.
-- **Il congelamento della proposta vale solo per il su misura.** L'All
-  Inclusive va all'agenzia e torna in `in_definition` se lei non conferma: le
-  sue regole si scrivono qui, e probabilmente vogliono lo stesso principio
-  (una proposta confermata dall'agenzia non si tocca più).
-- **`payment_account()` solleva su `deposit` e `balance`.** L'agenzia che
-  incassa è quella assegnata all'ordine, non un parametro globale.
-- **Il ponte Stripe risponde a un pagamento su un ordine All Inclusive con un
-  alert critico** (`stripe_pagamento_ordine_non_gestito`) e non tocca l'ordine.
-  Il ramo va scritto accanto a `stripe_checkout_ordine()`, e a quel punto i
-  webhook arriveranno dal conto dell'agenzia.
-- **`my_orders` maschera già la proposta in `proposal_pending_agency`**: il
-  Flusso vuole che una proposta non verificata dall'agenzia non raggiunga il
-  viaggiatore, e la vista della 0019 gliela mostrava. È stato corretto oggi,
-  insieme alle bozze del su misura, perché era lo stesso difetto.
+- **Un conto Stripe solo, dell'agenzia.** Lo si apre insieme, dedicato a
+  XPETIS, con un ruolo admin per te. Chiave **ristretta** in Vault
+  (`agency_stripe_key()` rifiuta una `sk_`), un solo `whsec_`, nessun rimborso
+  via API. `payment_account()` resta, e risponde dalle righe di `app_config`:
+  `all_inclusive_stripe_account` si aggiunge alle due che c'erano. In sandbox
+  dicono `xpetis`, in produzione diranno tutte `agency`.
+- **In agenzia risponde una persona sola, e il primo clic decide.** Chi ha
+  risposto resta scritto: `agency_decisions` (una riga per proposta),
+  `orders.agency_confirmed_at`, `orders.agency_rejection_note`, la storia degli
+  stati con `actor = 'agency'`.
+- **L'acconto è il 30%**, `deposit_percent` in `app_config`, calcolato dal
+  database all'invio all'agenzia; il saldo è il residuo, al centesimo.
+- **Il documento finale si scarica solo col login** del viaggiatore dell'ordine.
+
+### Cosa ho scelto io, e perché
+
+- **Il link dell'agenzia scade** (`agency_confirm_valid_days`, 7 giorni) oltre
+  a essere monouso. La 0043 l'aveva promesso, e il perché è che quel link è
+  l'unico controllo sui prezzi del Flusso: se lo trova qualcun altro, conferma
+  una proposta che nessuno ha verificato. Allo scadere la proposta **resta in
+  verifica** e l'orologio avvisa il team (`verifica_agenzia_scaduta`), che manda
+  un link nuovo con `select rinnova_verifica_agenzia('<id ordine>');`. Il
+  numero è una stima: va sentita l'agenzia.
+- **«Non fattibile» vuole una nota.** Senza, il designer non sa cosa correggere.
+- **La conferma da Studio fa partire la cascata.** Se l'agenzia conferma al
+  telefono e il team porta l'ordine a `awaiting_deposit`, il viaggiatore riceve
+  la proposta come se avesse cliccato lei; la decisione è scritta con
+  `actor = 'team'`.
+- **Il saldo non si chiede senza i suoi tempi**, e i tempi hanno tre regole: nel
+  futuro, non dopo la partenza, non su un ordine già saldato.
+- **Saldo scaduto: il sistema non annulla niente.** Sono prenotazioni reali di
+  un'agenzia con le loro penali: l'orologio scrive un alert critico
+  (`saldo_scaduto`) e basta.
+- **Un saldo vero dopo uno anticipato e rimborsato non manda in tilt il ponte.**
+  L'indice `payments_one_paid_per_kind` conta anche i rimborsati; invece di
+  un errore che Stripe ritenterebbe per sempre, alert `stripe_rata_gia_registrata`
+  e ordine fermo, da portare avanti a mano. È una trappola che il su misura ha
+  in forma più rara (una proposta riaperta e ripagata): non l'ho toccata là.
+
+### ⏸ Rimandate al prompt D — dalle prove del 27 settembre
+
+- **La sezione «viaggi di gruppo» non compare in vetrina.** Non è un difetto: la
+  `0048` ha fatto tabella, seed, immagini ed esposizione nella vista
+  (`public_td_showcase.group_trips`, 18ª colonna), ma **il TypeScript non è
+  stato toccato** — dichiarato da chi l'ha scritta. Quella sezione ha un disegno
+  (Figma `3-1121`), quindi appartiene al prompt delle pagine ridisegnate.
+- **Da verificare quando ci sarà:** un designer **senza** viaggi di gruppo non
+  deve vedere un titolo sopra il nulla. È il caso che conta più degli altri due,
+  perché su venticinque designer sarà il più comune.
+
+### ❓ Domande aperte nate dall'All Inclusive (27 settembre 2026)
+
+| Domanda | Perché è aperta | Chi decide |
+|---|---|---|
+| 🔴 **La riconciliazione mensile.** Ogni euro, consulenze comprese, passa dal conto dell'agenzia. Se un webhook si perde, il pagamento esiste su Stripe e non nel nostro database: il buco è a nostro sfavore e nessuno se ne accorge. Oggi niente confronta i due | Serve decidere chi la fa, con che strumento (un export mensile di Stripe contro `payments`? una vista?) e cosa succede sugli scarti. Non l'ho costruita, come chiedeva il prompt | Andrea, con Simone |
+| **Quando si chiude un All Inclusive consegnato?** Il su misura si chiude a 5 giorni dalla consegna; per l'All Inclusive il Flusso non lo dice. Dopo la consegna? Al rientro? Oggi resta `delivered` finché il team non lo porta a `completed` da Studio | Da lì dipendono il compenso del designer e la recensione di viaggio (milestone 8) | Simone |
+| **All'acconto pagato l'agenzia non riceve niente.** Il Flusso: «pagato l'acconto, l'agenzia procede con le prenotazioni reali». Lo vede sulla dashboard Stripe (è il suo conto) e il team riceve `acconto_pagato` se è negli eventi; una mail al suo indirizzo operativo sarebbe una riga di testo e una chiamata | Il prompt elencava le mail da fare e questa non c'era | Simone |
+| **Quanto vale il link dell'agenzia?** 7 giorni è una stima | Dipende da quanto ci mette l'agenzia a rispondere | Andrea, con l'agenzia |
+| **«L'agenzia del TD, se ce l'ha».** Il Flusso §8 fa assegnare al team l'agenzia del designer, se ne ha una. Con un conto solo, un'altra agenzia non potrebbe incassare: la cassa si rifiuta e lo dice | Oggi l'agenzia è una. Il giorno che un designer ne portasse una sua, è una decisione di contratto prima che di codice | Alessandro, Andrea |
+| **Se l'agenzia revoca la chiave**, le casse smettono di aprirsi: il viaggiatore vede «non siamo riusciti ad aprire il pagamento» e il team non riceve un alert | Un alert sulla cassa che fallisce per la chiave è piccolo; non l'ho fatto perché nessuno l'ha chiesto | Simone |
+| **Le pagine non hanno un disegno.** Il Flusso chiede a Chiara la pagina ordine All Inclusive e la pagina di conferma dell'agenzia; il Figma non le ha. Usano il guscio delle altre pagine a token, come la pagina del viaggiatore | Serve un disegno, o un ok a quello che c'è | Chiara |
+| **I dieci testi nuovi** sono una prima stesura, in coda a `seed/0005_testi_mail.sql` | Li riscrive Gaia da Studio. Una regola in più: l'agenzia non parla mai col viaggiatore, nelle sue mail è una garanzia | Gaia |
+
+### 🔴 Le prove dell'All Inclusive (27 settembre 2026)
+
+Tutte con **`email_enabled = 0`**, o dirottata su di te: la mail all'agenzia va
+all'indirizzo operativo dell'agenzia finta del seed (`ops@agenziapartner.example`,
+che non esiste). Stripe in sandbox: `all_inclusive_stripe_account = 'xpetis'`,
+carta `4242 4242 4242 4242`.
+
+**Prima di cominciare, sul database di sviluppo:**
+
+```sql
+-- le due righe di app_config e i dieci testi: si rigirano i due seed, che sono
+-- idempotenti (seed/0001_config.sql e seed/0005_testi_mail.sql), oppure a mano.
+select key from message_templates order by key;           -- ventotto
+select * from payment_account('deposit');                 -- xpetis
+
+-- l'agenzia finta c'è dal seed 0003; controlla che sia la partner di default
+select id, name, operational_email, is_default_partner, is_active from agencies;
+```
+
+⚠️ **Gli ordini All Inclusive nati prima della 0047 non hanno il link del
+designer** (la 0044 lo dava solo al su misura). Per ciascuno:
+`select accoda_mail_ordine_td('<id ordine>');` — crea il token e accoda la mail.
+
+#### Come si fabbrica a mano il token dell'agenzia
+
+Di norma non serve: il token **nasce all'invio** della proposta, insieme alla
+mail. Per prenderlo, o per fabbricarne uno in uno stato preciso:
+
+```sql
+-- un ordine All Inclusive su una tua prenotazione di prova, con l'agenzia
+insert into orders (traveler_id, td_id, service_type, source_booking_id, agency_id, last_actor)
+select b.traveler_id, b.td_id, 'all_inclusive', b.id,
+       (select id from agencies where is_default_partner), 'team'
+  from bookings b where b.id = '<id della prenotazione>'
+returning id, human_ref;
+
+-- il link del designer (nasce con l'ordine)
+select '<site_base_url>/ordine/' || token
+  from access_tokens where purpose = 'td_order_page' and order_id = '<id ordine>';
+
+-- il link dell'agenzia (nasce all'invio): quando scade, se è già stato usato
+select '<site_base_url>/agenzia/' || token, expires_at, used_at
+  from access_tokens
+ where purpose = 'agency_proposal_confirm' and order_id = '<id ordine>' and revoked_at is null;
+
+-- un link nuovo per la stessa proposta, con la sua mail (il vecchio si annulla)
+select rinnova_verifica_agenzia('<id ordine>');
+
+-- fabbricarlo a mano SENZA mail, per provare solo la pagina. Prima si spegne
+-- quello attivo (ce n'è uno per ordine), poi se ne crea uno legato all'ultima
+-- proposta partita:
+update access_tokens set revoked_at = now()
+ where purpose = 'agency_proposal_confirm' and order_id = '<id ordine>' and revoked_at is null;
+insert into access_tokens (purpose, audience, order_id, agency_id, payload, single_use, expires_at)
+select 'agency_proposal_confirm', 'agency', o.id, o.agency_id,
+       jsonb_build_object('proposta', pr.id, 'invio', gen_random_uuid()),
+       true, now() + interval '7 days'
+  from orders o
+  join lateral (select id from order_proposals where order_id = o.id
+                 order by round desc limit 1) pr on true
+ where o.id = '<id ordine>'
+returning token;
+
+-- uno SCADUTO: expires_at nel passato. Uno GIÀ USATO: used_at = now().
+update access_tokens set expires_at = now() - interval '1 minute' where token = '<token>';
+
+-- il link della pagina del viaggiatore (nasce alla conferma dell'agenzia)
+select '<site_base_url>/proposta/' || token
+  from access_tokens where purpose = 'traveler_public_proposal' and order_id = '<id ordine>';
+```
+
+⚠️ Il token dell'agenzia è la credenziale che sblocca la cascata verso un
+cliente. Non incollarlo in una chat, e non girarlo «per far vedere».
+
+| # | Cosa fai | Cosa deve succedere | Esito |
+|---|---|---|---|
+| 79 | Applicata la `0047` e rigirati i seed: `select * from clock_tick(10);` | Nessun errore, nessun `orologio_ramo_non_configurato`. Ventotto testi; `payment_account('deposit')` e `('balance')` rispondono `xpetis` | Se c'è l'alert, elenca le righe che mancano |
+| 80 | Crea un ordine All Inclusive (bottone della mail post-call, o SQL sopra) | In coda una `order_new_td_ai` al designer, col link `/ordine/<token>`, che dice che la proposta passa dall'agenzia | — |
+| 81 | Apri il link del designer **dal telefono**, prima di assegnare l'agenzia | «All Inclusive», agenzia «non ancora assegnata dal team», il caricamento del documento e il form con partenza e rientro | Se compare cognome, mail o telefono del viaggiatore, fermati |
+| 82 | Salva una bozza con la partenza di ieri, poi una giusta. Carica un PDF **sopra i 5 MB** | Prima un avviso sulla data; poi il riepilogo. Il documento compare in elenco; l'ordine è `in_definition`, attore `td` | Il PDF grande prova ancora una volta i byte diretti a Storage |
+| 83 | Dal riepilogo, senza agenzia | Il bottone *Invia* è spento, e la pagina dice che manca l'agenzia. Da Studio: `update orders set status='proposal_pending_agency' where human_ref='<XP-…>';` → **errore** «senza agenzia assegnata» | È il caso storto del prompt: lo ferma il trigger |
+| 84 | Da Studio assegna l'agenzia (`update orders set agency_id = (select id from agencies where is_default_partner) where human_ref='<XP-…>';`), poi *Invia all'agenzia* | «Proposta inviata all'agenzia». In `orders`: `proposal_pending_agency`, **acconto = 30% del totale** e saldo = il resto. In coda una `agency_proposal_confirm` all'indirizzo operativo, con totale, acconto, saldo, date, nome del documento e il link `/agenzia/<token>`; **niente del viaggiatore** | Se l'acconto non torna al centesimo, fermati |
+| 85 | Da Studio: `update orders set proposal_price_cents = 100 where human_ref='<XP-…>';` | **Errore**: «già partita verso l'agenzia» | — |
+| 86 | Apri il link dell'agenzia **in una finestra anonima, dal telefono** | Totale, rate, date, il documento da scaricare, *Confermo* e *Non fattibile*. Scarica il documento: si apre | — |
+| 87 | *Non fattibile* senza nota (il browser la chiede), poi con una nota | «Ricevuto». Ordine `in_definition`, attore `agency`; in coda una `agency_rejected_td` al designer con la tua nota. Al viaggiatore **niente** | — |
+| 88 | Riapri lo stesso link dell'agenzia, poi torna indietro col browser e premi *Confermo* dalla pagina vecchia | «Avete risposto non fattibile», con la nota e senza documento. Il *Confermo* risponde «avevate già risposto»: l'ordine **non** si muove | È «il primo che clicca decide» |
+| 89 | Dalla pagina del designer: la nota dell'agenzia in cima. Correggi, carica un documento nuovo, reinvia | Invio n. 2: una seconda `agency_proposal_confirm`. Il link del primo invio risponde «annullato» | — |
+| 90 | Dal link nuovo, *Confermo* | Ordine `awaiting_deposit`. In coda la `ai_proposal_traveler` (proposta, totale, acconto, link `/proposta/<token>`, **nessuna cifra di credito**) e la `agency_confirmed_td`. Sulla pagina del designer il messaggio pronto per il gruppo commerciale | — |
+| 91 | Ripremi *Confermo* (tasto indietro) | «Avevate già risposto»; **una** `ai_proposal_traveler` in coda | È «l'agenzia che conferma due volte» |
+| 92 | Apri la pagina del viaggiatore **in una finestra anonima**, scarica la proposta, poi *Paga l'acconto* con la carta di prova | Il documento è **quello del secondo invio**. Su Stripe l'importo è l'acconto e la descrizione dice l'agenzia. Al ritorno l'ordine è `deposit_paid` attore `traveler`; in `payments` una riga `deposit` pagata; nella dashboard sandbox la sessione ha `metadata.xpetis = deposit` | Se resta «Stiamo registrando», guarda l'esecuzione n8n e l'`esito` |
+| 93 | Metti `acconto_pagato` in `team_notify_events` (e un indirizzo tuo in `team_notify_recipients`) prima della 92 | In coda una `team_acconto_pagato` che dice anche «mancano i tempi del saldo» | — |
+| 94 | Da Studio, i tempi del saldo: prima una data passata, poi una dopo la partenza, poi una giusta (`update orders set balance_due_at = '<AAAA-MM-GG> 18:00' where human_ref='<XP-…>';`) | Le prime due: **errore**, con la ragione. La terza: l'ordine passa **da solo** in `awaiting_balance` (storia: attore `system`), e in coda la `ai_balance_traveler` con importo e data | È anche «balance_due_at mancante quando serve»: prima di scriverla, `update orders set status='awaiting_balance' …` dà errore |
+| 95 | Dalla pagina del viaggiatore, *Paga il saldo* | `balance_paid`; in coda la `ai_balance_paid_td` al designer | — |
+| 96 | Dalla pagina del designer, *Consegna il documento finale* | `delivered` attore `td`; in coda la `ai_delivery_traveler`, che dice di entrare con Google; sulla pagina del designer il messaggio per il gruppo | — |
+| 97 | Dalla pagina del viaggiatore clicca il documento finale: prima in una finestra anonima, poi con **un altro** account Google, poi con quello del viaggiatore | Anonima: «entra con l'account Google con cui hai prenotato». Altro account: «questo documento non è collegato al tuo account», con *Esci*. Account giusto: si scarica | ⚠️ È la decisione di oggi: se il documento si scarica senza login, fermati |
+| 98 | Costruisci a mano `/proposta/<token>/file/<id del documento finale>` | «Questo file non si trova»: dal link girato nel gruppo il documento finale non esce | — |
+| 99 | **L'acconto su una proposta rifiutata.** Un secondo ordine fino a `awaiting_deposit`, apri la cassa dell'acconto e **fermati** su Stripe. Da Studio: `disputed`, poi `in_definition`. Poi paga | L'ordine **resta** `in_definition`; la riga `deposit` è pagata; in `team_alerts` uno `stripe_pagamento_su_ordine_non_in_attesa` critico che dice «ACCONTO SU UNA PROPOSTA NON CONFERMATA» e di rimborsare dalla dashboard | Il saldo pagato prima dell'acconto non si prova a mano (la pagina non apre quella cassa): lo prova l'harness |
+| 100 | **Il link scaduto.** Su un ordine in verifica, fai scadere il token dell'agenzia (SQL sopra) e un giro dell'orologio | Un `verifica_agenzia_scaduta` con la riga `rinnova_verifica_agenzia(…)`; il link dice «scaduto». Lancia la riga: link nuovo, mail nuova, il vecchio «annullato» | — |
+| 101 | **Il saldo scaduto.** Su un ordine in `awaiting_balance`: `alter table orders disable trigger orders_regole_all_inclusive; update orders set balance_due_at = now() - interval '1 hour' where human_ref='<XP-…>'; alter table orders enable trigger orders_regole_all_inclusive;` poi un giro | Un `saldo_scaduto` **critico**, uno solo anche dopo più giri; l'ordine non si muove | ⚠️ Riaccendi il trigger subito: è quello che congela le proposte |
+
+⚠️ **Pulizia** delle prove 79-101:
+
+```sql
+delete from outbound_messages
+ where message_kind in ('order_new_td_ai', 'agency_proposal_confirm', 'agency_confirmed_td',
+                        'agency_rejected_td', 'ai_proposal_traveler', 'ai_balance_traveler',
+                        'ai_balance_paid_td', 'ai_delivery_traveler')
+   and status = 'queued';
+delete from team_alerts where kind in ('verifica_agenzia_scaduta', 'saldo_scaduto',
+                                       'stripe_pagamento_su_ordine_non_in_attesa');
+-- order_proposals, agency_decisions, order_files e i token vanno via per
+-- cascata con l'ordine; i file in Storage NO: pannello Storage, ordini/<id>.
+```
 
 ---
 
@@ -2156,15 +2470,19 @@ un'impostazione dell'event type se serve.
 Guidata dalla coda di correzione prodotta dall'import. I due casi noti: paesi
 tutti dichiarati "Base" e voci che non sono stati.
 
-**S-11 · Come custodire le credenziali Stripe delle agenzie** (2 h di
-valutazione)
-Vale la pena guardare Stripe Connect prima di attivare la prima agenzia: stesso
-risultato (agenzia merchant of record, compatibile col 74-ter) senza che XPETIS
-custodisca credenziali di terzi.
-*Blocca:* milestone 7.
+~~**S-11 · Come custodire le credenziali Stripe delle agenzie**~~ → **deciso il
+27 settembre 2026**: un conto solo, dell'agenzia, chiave ristretta in Vault.
+Stripe Connect scartato (vorrebbe XPETIS entità legale). Vedi deviazione 9 e
+`ACCESSI.md`.
 
-**S-12 · Attivazione tecnica della prima agenzia** (2-3 h)
-Chiavi, webhook verso n8n, prova di un pagamento di test.
+**S-12 · Attivazione tecnica del conto dell'agenzia** (2-3 h)
+Aprire il conto insieme, dedicato a XPETIS, col tuo ruolo admin. Creare la
+**chiave ristretta** (Checkout Sessions in scrittura, nient'altro) e metterla in
+Vault; creare l'endpoint webhook verso lo stesso workflow n8n
+(`checkout.session.completed`, `checkout.session.expired`, `charge.refunded`) e
+mettere il suo `whsec_` in Vault al posto di quello della sandbox. Poi un
+pagamento di prova con `all_inclusive_stripe_account = 'agency'` su un database
+di sviluppo. La procedura è in `ACCESSI.md`, «Il conto dell'agenzia».
 
 **S-13 · Onboarding Cal.com dei 25 TD** (6-7 h con il team)
 **La procedura completa e provata sul campo è in `ONBOARDING_CALCOM_TD.md`**, con
@@ -2185,7 +2503,7 @@ viaggiatore accetta al pagamento. Serve un legale, i tempi non li controlliamo.
 |---|---|---|
 | Il verso di un asse è girato: un designer *wild* risulta amante del comfort, prende la frase sbagliata e finisce nel posto sbagliato | Alto, e **nessuna prova tecnica lo intercetta** | Confronto a vista foglio-database su 3-4 designer all'import (milestone 1). È già successo nel lavoro di Alessandro: due assi su sei erano invertiti |
 | **Non esiste un'entità legale XPETIS, e non esisterà nel primo periodo** (8 ago) | **Alto: è il nuovo percorso critico.** Senza partita IVA non si incassa, quindi la Beta con soldi veri non dipende più dalla tecnica. Blocca anche S-14, perché non si scrivono condizioni generali senza sapere chi è la controparte | Lo sviluppo prosegue in test mode senza differenze. La decisione "chi è il venditore" va portata ad Alessandro e Andrea subito: costituire una ditta individuale, far incassare l'agenzia partner anche su consulenze e su misura, oppure far incassare i designer con XPETIS che fattura una commissione. **La terza cambia l'architettura**: il denaro andrebbe verso 25 destinatari e servirebbe Stripe Connect molto prima |
-| Detenere le chiavi Stripe delle agenzie | Alto | Valutare Stripe Connect prima della prima agenzia (S-11) |
+| Detenere la chiave Stripe dell'agenzia, e dipendere dal suo conto per **ogni** incasso (27 set) | Alto: l'agenzia può revocare l'accesso, le contestazioni le paga il suo saldo, e un webhook perso è un pagamento che il nostro database non conosce | Chiave **ristretta** in Vault (niente rimborsi, `agency_stripe_key()` rifiuta una `sk_`); un solo endpoint; **la riconciliazione mensile, da decidere con Andrea** (milestone 7) |
 | Le mail finiscono in spam | Alto: il funnel vive di mail. **Ridotto il 20 settembre:** il dominio spedisce da mesi per la landing page, SPF/DKIM/Return-Path sono verificati, e la settimana di riscaldamento non serve più. Resta il rovescio del riuso: la reputazione è **condivisa**, quindi una newsletter da `xpetis.it` trascinerebbe giù anche le transazionali | Spostare le transazionali su un sottodominio (`mail.xpetis.it`) **prima** del primo invio di massa, non dopo. Verificare che DMARC su `_dmarc.xpetis.it` esista, almeno `p=none` |
 | Un giro storto brucia il tetto di 100 mail al giorno, **condiviso con la landing page** | Medio, ma si manifesta in minuti | Tre freni indipendenti: il vincolo di unicità di `outbound_messages` (una mail per tipo, entità e destinatario), `email_max_per_tick`, e `email_enabled` che nasce spento |
 | Il link della pagina ordine del designer è permanente e **fissa un prezzo** | Medio | Chi lo trova può scrivere e mandare una proposta, non cambiarne una partita: il congelamento è un trigger che vale anche per Studio. L'invio ridichiara il prezzo riletto; ogni proposta finisce in `team_spot_check_proposte`; il denaro lo muove il viaggiatore su una cassa che ridichiara l'importo. Se il team riassegna l'ordine, il link del primo designer smette di funzionare |

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Scarica gli asset esportati dal Figma. File: x1DYYagZ2moagmpEHZHYYE
 # https://www.figma.com/design/x1DYYagZ2moagmpEHZHYYE/XPETIS
+#
+# ⚠️ DAL 27 SETTEMBRE 2026 QUESTO FILE È SUPERATO. Il Figma autorevole è
+# Q9Krydv6xD8mFJCtU9NHzr («XPETIS - Def»), un file diverso, non una revisione.
+# Le URL qui sotto sono degli asset delle pagine costruite dal file vecchio:
+# vanno sostituite quando quelle pagine si ricostruiscono dal file nuovo.
 # I nodi di ogni pagina sono elencati in CLAUDE.md, sezione "Design".
 #
 # ATTENZIONE: le URL degli asset Figma scadono dopo circa 7 giorni. Se lo script

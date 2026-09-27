@@ -1,4 +1,5 @@
 import 'server-only'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
  * Il minimo indispensabile per parlare con Stripe, e niente di più.
@@ -36,10 +37,41 @@ export const STRIPE_API_VERSION = '2026-07-29.dahlia'
 export const CASSA_MIN_SECONDI = 30 * 60
 export const CASSA_MAX_SECONDI = 24 * 60 * 60
 
-function chiave(): string {
-  const k = process.env.STRIPE_SECRET_KEY
-  if (!k) throw new Error('STRIPE_SECRET_KEY non impostata: la cassa non si può aprire.')
-  return k
+/**
+ * Su quale conto Stripe si parla: la risposta di `payment_account()` per le
+ * casse nuove, le colonne `stripe_account` / `agency_id` della riga di
+ * `payments` per quelle già aperte. Una sessione si rilegge e si chiude **sul
+ * conto su cui è nata**, non su quello che dice `app_config` adesso.
+ */
+export type ContoStripe = { stripe_account: 'xpetis' | 'agency'; agency_id: string | null }
+
+/**
+ * La chiave con cui si parla a quel conto.
+ *
+ * **Deciso il 27 settembre 2026: il conto Stripe è uno, ed è dell'agenzia.**
+ * La sua chiave è **ristretta** (`rk_…`, niente rimborsi) e vive in Supabase
+ * Vault, sotto il nome scritto in `agencies.stripe_credential_ref`: la legge
+ * `agency_stripe_key()` (migration 0047), che rifiuta una `sk_`. Non sta in una
+ * variabile d'ambiente perché è dell'agenzia, e l'agenzia la può revocare: il
+ * giorno che succede si cambia una riga in Vault, non un deploy.
+ *
+ * `xpetis` è la nostra sandbox, con `STRIPE_SECRET_KEY` dall'ambiente: è così
+ * che si prova, e in produzione nessuna riga di `app_config` dirà più `xpetis`.
+ */
+async function chiave(conto: ContoStripe): Promise<string> {
+  if (conto.stripe_account === 'xpetis') {
+    const k = process.env.STRIPE_SECRET_KEY
+    if (!k) throw new Error('STRIPE_SECRET_KEY non impostata: la cassa non si può aprire.')
+    return k
+  }
+  if (!conto.agency_id) throw new Error('Conto agenzia senza agency_id: la cassa non si può aprire.')
+  const { data, error } = await createAdminClient().rpc('agency_stripe_key', { p_agency_id: conto.agency_id })
+  // Il messaggio del database dice cosa manca (riferimento, segreto, prefisso)
+  // e non contiene la chiave: si può scrivere nei log.
+  if (error || typeof data !== 'string') {
+    throw new Error(`chiave Stripe dell'agenzia non disponibile: ${error?.message ?? 'risposta vuota'}`)
+  }
+  return data
 }
 
 /**
@@ -87,10 +119,11 @@ export class ErroreStripe extends Error {
 
 async function chiama(
   percorso: string,
+  conto: ContoStripe,
   opzioni: { corpo?: Record<string, unknown>; idempotenza?: string } = {},
 ): Promise<Record<string, unknown>> {
   const intestazioni: Record<string, string> = {
-    Authorization: `Bearer ${chiave()}`,
+    Authorization: `Bearer ${await chiave(conto)}`,
     'Stripe-Version': STRIPE_API_VERSION,
   }
   if (opzioni.corpo) intestazioni['Content-Type'] = 'application/x-www-form-urlencoded'
@@ -131,8 +164,11 @@ export type CassaStripe = {
   expires_at: number
 }
 
-/** A chi appartiene una cassa: una prenotazione (consulenza) o un ordine (su misura). */
+/** A chi appartiene una cassa: una prenotazione (consulenza) o un ordine (su misura, All Inclusive). */
 export type RiferimentoCassa = { booking_id: string } | { order_id: string }
+
+/** Il `payment_kind` di una cassa. `deposit` e `balance` sono le due rate dell'All Inclusive (0047). */
+export type TipoPagamento = 'consultation' | 'full' | 'deposit' | 'balance'
 
 /**
  * Apre una Checkout Session ospitata.
@@ -158,15 +194,20 @@ export async function apriCassa(parametri: {
   titolo: string
   descrizione?: string
   riferimento: RiferimentoCassa
-  /** Il `payment_kind` della riga: finisce in `metadata.xpetis`, per chi guarda la dashboard. */
-  tipo: 'consultation' | 'full'
+  /**
+   * Il `payment_kind` della riga: finisce in `metadata.xpetis`. Per l'All
+   * Inclusive **non è decorativo**: è il secondo modo, dopo la riga di
+   * `payments`, in cui il ponte (0047) sa se sta arrivando l'acconto o il saldo.
+   */
+  tipo: TipoPagamento
+  conto: ContoStripe
   scadenzaUnix: number
   urlSuccesso: string
   urlAnnullamento: string
   emailCliente?: string
   idempotenza: string
 }): Promise<CassaStripe> {
-  const dati = await chiama('/checkout/sessions', {
+  const dati = await chiama('/checkout/sessions', parametri.conto, {
     idempotenza: parametri.idempotenza,
     corpo: {
       mode: 'payment',
@@ -204,9 +245,9 @@ function idDi(r: RiferimentoCassa): string {
 }
 
 /** Rilegge una sessione: serve a sapere se è ancora aperta prima di riusarla. */
-export async function leggiCassa(id: string): Promise<CassaStripe | null> {
+export async function leggiCassa(id: string, conto: ContoStripe): Promise<CassaStripe | null> {
   try {
-    const dati = await chiama(`/checkout/sessions/${encodeURIComponent(id)}`)
+    const dati = await chiama(`/checkout/sessions/${encodeURIComponent(id)}`, conto)
     return dati as unknown as CassaStripe
   } catch (e) {
     // Una sessione che Stripe non conosce più non è un guasto: è una cassa da
@@ -222,9 +263,9 @@ export async function leggiCassa(id: string): Promise<CassaStripe | null> {
  * viva vorrebbe dire un indirizzo di pagamento buono per una prenotazione che
  * non lo aspetta.
  */
-export async function scadiCassa(id: string): Promise<void> {
+export async function scadiCassa(id: string, conto: ContoStripe): Promise<void> {
   try {
-    await chiama(`/checkout/sessions/${encodeURIComponent(id)}/expire`, {})
+    await chiama(`/checkout/sessions/${encodeURIComponent(id)}/expire`, conto, {})
   } catch (e) {
     // Il chiamante sta già gestendo un problema: se anche questa fallisce, la
     // sessione scadrà da sola entro `expires_at`. Non vale un errore in più.

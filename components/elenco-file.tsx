@@ -9,6 +9,13 @@ import type { FileOrdine } from '@/lib/ordine'
  */
 const DATA = new Intl.DateTimeFormat('it-IT', { dateStyle: 'long', timeZone: 'Europe/Rome' })
 
+const TIPO: Record<FileOrdine['tipo'], string> = {
+  itinerary: 'itinerario',
+  revision: 'versione rivista',
+  proposal_document: 'documento di proposta',
+  final_document: 'documento finale',
+}
+
 export function ElencoFile({ file, base, titolo }: { file: FileOrdine[]; base: string; titolo: string }) {
   if (file.length === 0) return null
   return (
@@ -23,7 +30,7 @@ export function ElencoFile({ file, base, titolo }: { file: FileOrdine[]; base: s
               {f.nome}
             </a>{' '}
             <span className="text-corpo opacity-60">
-              · {f.tipo === 'revision' ? 'versione rivista' : 'itinerario'}, {DATA.format(new Date(f.caricato_il))}
+              · {TIPO[f.tipo]}, {DATA.format(new Date(f.caricato_il))}
             </span>
           </li>
         ))}

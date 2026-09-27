@@ -72,9 +72,20 @@ values
    'consulenza-xpetis-30', 'https://buy.stripe.com/test_giulia_consulenza',
    'Cosa faremo durante la call.', 'Cosa potrai fare dopo.', 1),
   ('22222222-2222-2222-2222-222222222222', 'consultation_deep', true, 15000, 60,
-   'consulenza-xpetis-approfondita', 'https://buy.stripe.com/test_giulia_deep',
+   'consulenza-xpetis-60', 'https://buy.stripe.com/test_giulia_deep',
    'Cosa faremo durante la call lunga.', 'Cosa potrai fare dopo.', 2)
 on conflict do nothing;
+
+-- Fino al 27 settembre 2026 lo slug dell'approfondita di Giulia era
+-- `consulenza-xpetis-approfondita`, inventato quando gli event type erano due.
+-- Dalla 0048 gli slug ammessi sono tre e stanno in `app_config`: quello vecchio
+-- bloccherebbe la pubblicazione. L'insert sopra ha `on conflict do nothing`,
+-- quindi su un database già seminato non basta: questo update lo porta al nome
+-- giusto anche lì.
+update td_services set cal_event_type_slug = 'consulenza-xpetis-60'
+ where td_id = '22222222-2222-2222-2222-222222222222'
+   and service_type = 'consultation_deep'
+   and cal_event_type_slug = 'consulenza-xpetis-approfondita';
 
 -- L'All Inclusive è sempre attivo per tutti; l'itinerario su misura dipende dal TD.
 insert into td_services (td_id, service_type, is_active, sort_order)
@@ -307,6 +318,36 @@ insert into td_ready_itineraries (td_id, position, title, duration_label, price_
    '8 giorni', '1.450€', 'td-media/giulia-neri/itinerario-uyuni.jpg'),
   ('22222222-2222-2222-2222-222222222222', 3, 'Valle Sacra e Ausangate, senza Machu Picchu',
    '11 giorni', '1.780€', null)
+on conflict do nothing;
+
+-- I viaggi di gruppo (0048), chiave `gruppo` del form nuovo. Gli esempi del form
+-- sono Patagonia, Marocco e Giappone; qui ciascuno resta nelle sue
+-- destinazioni — Marco nel Sud-est asiatico, Giulia sulle Ande. Tutto testo,
+-- com'è nel form, date comprese.
+--
+-- Le date sono **future di proposito**: i tre esempi del form sono già passati,
+-- e una vetrina demo piena di partenze finite nasconderebbe proprio la domanda
+-- aperta che questi dati devono far vedere (chi toglie una partenza scaduta?).
+-- Il terzo di ciascuno è senza immagine, come negli itinerari: la pagina deve
+-- reggere il buco.
+insert into td_group_trips (td_id, position, title, dates_label, duration_label,
+                            group_size_label, price_label, image_path) values
+  ('11111111-1111-1111-1111-111111111111', 1, 'Vietnam: il Nord in moto, da Hanoi a Ha Giang',
+   '7 – 18 mar 2027', '12 giorni', '8 persone', '1.690€',
+   'td-media/marco-rossi/gruppo-ha-giang.jpg'),
+  ('11111111-1111-1111-1111-111111111111', 2, 'Thailandia: Isan e Mekong, la provincia che nessuno visita',
+   '10 – 20 nov 2026', '11 giorni', '10 persone', '1.450€',
+   'td-media/marco-rossi/gruppo-isan.jpg'),
+  ('11111111-1111-1111-1111-111111111111', 3, 'Giappone in autunno, lungo il Nakasendō',
+   '2 – 15 nov 2027', '14 giorni', '12 persone', '2.900€', null),
+  ('22222222-2222-2222-2222-222222222222', 1, 'Perù: trekking dell''Huayhuash',
+   '5 – 18 giu 2027', '14 giorni', '8 persone', '2.100€',
+   'td-media/giulia-neri/gruppo-huayhuash.jpg'),
+  ('22222222-2222-2222-2222-222222222222', 2, 'Bolivia: dal Salar di Uyuni al Sud Lípez',
+   '20 – 29 ago 2027', '10 giorni', '10 persone', '1.580€',
+   'td-media/giulia-neri/gruppo-uyuni.jpg'),
+  ('22222222-2222-2222-2222-222222222222', 3, 'Perù: Valle Sacra e Ausangate a piedi',
+   '12 – 23 mag 2027', '12 giorni', '10 persone', '1.850€', null)
 on conflict do nothing;
 
 -- Le recensioni che il designer porta da fuori (0027). **Nessuna vista le

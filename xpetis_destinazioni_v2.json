@@ -1,0 +1,4221 @@
+{
+  "schema_version": "1.0",
+  "description": "Tassonomia destinazioni XPETIS.",
+  "selection_rules": {
+    "selectable": [
+      "macro_area",
+      "state",
+      "italian_region"
+    ],
+    "searchable_only": [
+      "continent",
+      "city",
+      "foreign_region"
+    ],
+    "italy_special": "Cercando 'Italia' il sistema suggerisce le 20 regioni italiane (tutte selezionabili)."
+  },
+  "continents": [
+    {
+      "id": "europa",
+      "name": "Europa",
+      "type": "continent",
+      "selectable": false,
+      "macro_areas": [
+        {
+          "id": "europa_est_e_caucaso",
+          "name": "Europa Est e Caucaso",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "armenia",
+              "name": "Armenia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "armenia",
+                  "name": "Armenia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "yerevan",
+                      "name": "Yerevan",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "azerbaijan",
+              "name": "Azerbaijan",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "azerbaijan",
+                  "name": "Azerbaijan",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "baku",
+                      "name": "Baku",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "bielorussia",
+              "name": "Bielorussia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "bielorussia",
+                  "name": "Bielorussia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "minsk",
+                      "name": "Minsk",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "georgia",
+              "name": "Georgia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "georgia",
+                  "name": "Georgia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "tbilisi",
+                      "name": "Tbilisi",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "moldavia",
+              "name": "Moldavia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "moldavia",
+                  "name": "Moldavia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "chișinău",
+                      "name": "Chișinău",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "russia",
+              "name": "Russia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "russia_europea",
+                  "name": "Russia Europea",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "mosca",
+                      "name": "Mosca",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "san_pietroburgo",
+                      "name": "San Pietroburgo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "siberia_e_estremo_oriente",
+                  "name": "Siberia e Estremo Oriente",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "ucraina",
+              "name": "Ucraina",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "ucraina",
+                  "name": "Ucraina",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "kiev",
+                      "name": "Kiev",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "europa_nord",
+          "name": "Europa Nord",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "austria",
+              "name": "Austria",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "vienna",
+                  "name": "Vienna",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "vienna",
+                      "name": "Vienna",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "tirolo",
+                  "name": "Tirolo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "salisburghese",
+                  "name": "Salisburghese",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "belgio",
+              "name": "Belgio",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "fiandre",
+                  "name": "Fiandre",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "vallonia",
+                  "name": "Vallonia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "bruxelles",
+                  "name": "Bruxelles",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "bruxelles",
+                      "name": "Bruxelles",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "danimarca",
+              "name": "Danimarca",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "selandia",
+                  "name": "Selandia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "copenaghen",
+                      "name": "Copenaghen",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "jutland",
+                  "name": "Jutland",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "estonia",
+              "name": "Estonia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "estonia",
+                  "name": "Estonia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "tallinn",
+                      "name": "Tallinn",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "finlandia",
+              "name": "Finlandia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "finlandia_meridionale",
+                  "name": "Finlandia Meridionale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "helsinki",
+                      "name": "Helsinki",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "lapponia_finlandese",
+                  "name": "Lapponia Finlandese",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "francia",
+              "name": "Francia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "île_de_france",
+                  "name": "Île-de-France",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "parigi",
+                      "name": "Parigi",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "provenza_costa_azzurra",
+                  "name": "Provenza-Costa Azzurra",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "nizza",
+                      "name": "Nizza",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "normandia",
+                  "name": "Normandia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "bretagna",
+                  "name": "Bretagna",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "alvernia_rodano_alpi",
+                  "name": "Alvernia-Rodano-Alpi",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "nuova_aquitania",
+                  "name": "Nuova Aquitania",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "germania",
+              "name": "Germania",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "baviera",
+                  "name": "Baviera",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "monaco",
+                      "name": "Monaco",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "berlino",
+                  "name": "Berlino",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "berlino",
+                      "name": "Berlino",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "renania_settentrionale_vestfalia",
+                  "name": "Renania Settentrionale-Vestfalia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "amburgo",
+                  "name": "Amburgo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "sassonia",
+                  "name": "Sassonia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "irlanda",
+              "name": "Irlanda",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "leinster",
+                  "name": "Leinster",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "dublino",
+                      "name": "Dublino",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "munster",
+                  "name": "Munster",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "connacht",
+                  "name": "Connacht",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "islanda",
+              "name": "Islanda",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "reykjavik_e_sud",
+                  "name": "Reykjavik e Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "reykjavik",
+                      "name": "Reykjavik",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "nord_e_ovest",
+                  "name": "Nord e Ovest",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "lettonia",
+              "name": "Lettonia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "lettonia",
+                  "name": "Lettonia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "riga",
+                      "name": "Riga",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "lituania",
+              "name": "Lituania",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "lituania",
+                  "name": "Lituania",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "vilnius",
+                      "name": "Vilnius",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "lussemburgo",
+              "name": "Lussemburgo",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "lussemburgo",
+                  "name": "Lussemburgo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "lussemburgo_citta",
+                      "name": "Lussemburgo Città",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "norvegia",
+              "name": "Norvegia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "norvegia_meridionale",
+                  "name": "Norvegia Meridionale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "oslo",
+                      "name": "Oslo",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "bergen",
+                      "name": "Bergen",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "fiordi_occidentali",
+                  "name": "Fiordi Occidentali",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "norvegia_settentrionale",
+                  "name": "Norvegia Settentrionale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "paesi_bassi",
+              "name": "Paesi Bassi",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "olanda_settentrionale",
+                  "name": "Olanda Settentrionale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "amsterdam",
+                      "name": "Amsterdam",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "olanda_meridionale",
+                  "name": "Olanda Meridionale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "utrecht",
+                  "name": "Utrecht",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "polonia",
+              "name": "Polonia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "masovia",
+                  "name": "Masovia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "varsavia",
+                      "name": "Varsavia",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "piccola_polonia",
+                  "name": "Piccola Polonia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "cracovia",
+                      "name": "Cracovia",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "pomerania",
+                  "name": "Pomerania",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "regno_unito",
+              "name": "Regno Unito",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "inghilterra",
+                  "name": "Inghilterra",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "londra",
+                      "name": "Londra",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "scozia",
+                  "name": "Scozia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "edimburgo",
+                      "name": "Edimburgo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "galles",
+                  "name": "Galles",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "irlanda_del_nord",
+                  "name": "Irlanda del Nord",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "repubblica_ceca",
+              "name": "Repubblica Ceca",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "boemia",
+                  "name": "Boemia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "praga",
+                      "name": "Praga",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "moravia",
+                  "name": "Moravia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "slovacchia",
+              "name": "Slovacchia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "bratislava",
+                  "name": "Bratislava",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "bratislava",
+                      "name": "Bratislava",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "alti_tatra",
+                  "name": "Alti Tatra",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "svezia",
+              "name": "Svezia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "stoccolma",
+                  "name": "Stoccolma",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "stoccolma",
+                      "name": "Stoccolma",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "lapponia_svedese",
+                  "name": "Lapponia Svedese",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "götaland",
+                  "name": "Götaland",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "svizzera",
+              "name": "Svizzera",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "romandia",
+                  "name": "Romandia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "ginevra",
+                      "name": "Ginevra",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "svizzera_tedesca",
+                  "name": "Svizzera Tedesca",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "zurigo",
+                      "name": "Zurigo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "ticino",
+                  "name": "Ticino",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "grigioni",
+                  "name": "Grigioni",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "ungheria",
+              "name": "Ungheria",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "budapest",
+                  "name": "Budapest",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "budapest",
+                      "name": "Budapest",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "transdanubio",
+                  "name": "Transdanubio",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "europa_sud",
+          "name": "Europa Sud",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "albania",
+              "name": "Albania",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "albania",
+                  "name": "Albania",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "tirana",
+                      "name": "Tirana",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "bosnia_ed_erzegovina",
+              "name": "Bosnia ed Erzegovina",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "bosnia_ed_erzegovina",
+                  "name": "Bosnia ed Erzegovina",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "sarajevo",
+                      "name": "Sarajevo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "bulgaria",
+              "name": "Bulgaria",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "bulgaria",
+                  "name": "Bulgaria",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "sofia",
+                      "name": "Sofia",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "cipro",
+              "name": "Cipro",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "cipro",
+                  "name": "Cipro",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "nicosia",
+                      "name": "Nicosia",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "croazia",
+              "name": "Croazia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "dalmazia",
+                  "name": "Dalmazia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "dubrovnik",
+                      "name": "Dubrovnik",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "istria",
+                  "name": "Istria",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "zagabria_e_continentale",
+                  "name": "Zagabria e Continentale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "grecia",
+              "name": "Grecia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "attica",
+                  "name": "Attica",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "atene",
+                      "name": "Atene",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "isole_cicladi",
+                  "name": "Isole Cicladi",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "santorini",
+                      "name": "Santorini",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "creta",
+                  "name": "Creta",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "isole_ionie",
+                  "name": "Isole Ionie",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "peloponneso",
+                  "name": "Peloponneso",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "italia",
+              "name": "Italia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "abruzzo",
+                  "name": "Abruzzo",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "laquila",
+                      "name": "L'Aquila",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "basilicata",
+                  "name": "Basilicata",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "matera",
+                      "name": "Matera",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "calabria",
+                  "name": "Calabria",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "reggio_calabria",
+                      "name": "Reggio Calabria",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "campania",
+                  "name": "Campania",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "napoli",
+                      "name": "Napoli",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "emilia_romagna",
+                  "name": "Emilia-Romagna",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "bologna",
+                      "name": "Bologna",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "friuli_venezia_giulia",
+                  "name": "Friuli-Venezia Giulia",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "trieste",
+                      "name": "Trieste",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "lazio",
+                  "name": "Lazio",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "roma",
+                      "name": "Roma",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "liguria",
+                  "name": "Liguria",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "genova",
+                      "name": "Genova",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "lombardia",
+                  "name": "Lombardia",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "milano",
+                      "name": "Milano",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "marche",
+                  "name": "Marche",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "ancona",
+                      "name": "Ancona",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "molise",
+                  "name": "Molise",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "campobasso",
+                      "name": "Campobasso",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "piemonte",
+                  "name": "Piemonte",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "torino",
+                      "name": "Torino",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "puglia",
+                  "name": "Puglia",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "bari",
+                      "name": "Bari",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "sardegna",
+                  "name": "Sardegna",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "cagliari",
+                      "name": "Cagliari",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "sicilia",
+                  "name": "Sicilia",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "palermo",
+                      "name": "Palermo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "toscana",
+                  "name": "Toscana",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "firenze",
+                      "name": "Firenze",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "trentino_alto_adige",
+                  "name": "Trentino-Alto Adige",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "trento",
+                      "name": "Trento",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "umbria",
+                  "name": "Umbria",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "perugia",
+                      "name": "Perugia",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "valle_daosta",
+                  "name": "Valle d'Aosta",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "aosta",
+                      "name": "Aosta",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "veneto",
+                  "name": "Veneto",
+                  "type": "italian_region",
+                  "selectable": true,
+                  "cities": [
+                    {
+                      "id": "venezia",
+                      "name": "Venezia",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "kosovo",
+              "name": "Kosovo",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "kosovo",
+                  "name": "Kosovo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "pristina",
+                      "name": "Pristina",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "macedonia_del_nord",
+              "name": "Macedonia del Nord",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "macedonia_del_nord",
+                  "name": "Macedonia del Nord",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "skopje",
+                      "name": "Skopje",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "malta",
+              "name": "Malta",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "malta",
+                  "name": "Malta",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "la_valletta",
+                      "name": "La Valletta",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "gozo",
+                  "name": "Gozo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "montenegro",
+              "name": "Montenegro",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "montenegro",
+                  "name": "Montenegro",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "kotor",
+                      "name": "Kotor",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "portogallo",
+              "name": "Portogallo",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "lisbona_e_centro",
+                  "name": "Lisbona e Centro",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "lisbona",
+                      "name": "Lisbona",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "porto_e_nord",
+                  "name": "Porto e Nord",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "porto",
+                      "name": "Porto",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "algarve",
+                  "name": "Algarve",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "madeira",
+                  "name": "Madeira",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "azzorre",
+                  "name": "Azzorre",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "romania",
+              "name": "Romania",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "transilvania",
+                  "name": "Transilvania",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "bucarest_e_sud",
+                  "name": "Bucarest e Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "bucarest",
+                      "name": "Bucarest",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "moldavia_rumena",
+                  "name": "Moldavia rumena",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "serbia",
+              "name": "Serbia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "serbia",
+                  "name": "Serbia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "belgrado",
+                      "name": "Belgrado",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "slovenia",
+              "name": "Slovenia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "slovenia",
+                  "name": "Slovenia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "lubiana",
+                      "name": "Lubiana",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "spagna",
+              "name": "Spagna",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "catalogna",
+                  "name": "Catalogna",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "barcellona",
+                      "name": "Barcellona",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "andalusia",
+                  "name": "Andalusia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "madrid",
+                  "name": "Madrid",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "madrid",
+                      "name": "Madrid",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "paesi_baschi",
+                  "name": "Paesi Baschi",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "isole_baleari",
+                  "name": "Isole Baleari",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "isole_canarie",
+                  "name": "Isole Canarie",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "galizia",
+                  "name": "Galizia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "turchia",
+              "name": "Turchia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "istanbul_e_marmara",
+                  "name": "Istanbul e Marmara",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "istanbul",
+                      "name": "Istanbul",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "egeo",
+                  "name": "Egeo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "mediterraneo",
+                  "name": "Mediterraneo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "cappadocia_e_anatolia_centrale",
+                  "name": "Cappadocia e Anatolia Centrale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "africa",
+      "name": "Africa",
+      "type": "continent",
+      "selectable": false,
+      "macro_areas": [
+        {
+          "id": "africa_sub_sahariana",
+          "name": "Africa Sub-Sahariana",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "botswana",
+              "name": "Botswana",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "botswana",
+                  "name": "Botswana",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "okavango_delta",
+                      "name": "Okavango Delta",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "capo_verde",
+              "name": "Capo Verde",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "capo_verde",
+                  "name": "Capo Verde",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "praia",
+                      "name": "Praia",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "costa_davorio",
+              "name": "Costa d'Avorio",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "costa_davorio",
+                  "name": "Costa d'Avorio",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "abidjan",
+                      "name": "Abidjan",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "etiopia",
+              "name": "Etiopia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "etiopia",
+                  "name": "Etiopia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "addis_abeba",
+                      "name": "Addis Abeba",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ghana",
+              "name": "Ghana",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "ghana",
+                  "name": "Ghana",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "accra",
+                      "name": "Accra",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "kenya",
+              "name": "Kenya",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "costa",
+                  "name": "Costa",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "safari_e_interno",
+                  "name": "Safari e Interno",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "nairobi",
+                      "name": "Nairobi",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "mozambico",
+              "name": "Mozambico",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "mozambico",
+                  "name": "Mozambico",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "maputo",
+                      "name": "Maputo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "namibia",
+              "name": "Namibia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "namibia",
+                  "name": "Namibia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "windhoek",
+                      "name": "Windhoek",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nigeria",
+              "name": "Nigeria",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "nigeria",
+                  "name": "Nigeria",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "lagos",
+                      "name": "Lagos",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "rwanda",
+              "name": "Rwanda",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "rwanda",
+                  "name": "Rwanda",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "kigali",
+                      "name": "Kigali",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "senegal",
+              "name": "Senegal",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "senegal",
+                  "name": "Senegal",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "dakar",
+                      "name": "Dakar",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "sudafrica",
+              "name": "Sudafrica",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "capo",
+                  "name": "Capo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "citta_del_capo",
+                      "name": "Città del Capo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "nord_est",
+                  "name": "Nord-Est",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "johannesburg",
+                      "name": "Johannesburg",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "kwazulu_natal",
+                  "name": "KwaZulu-Natal",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "tanzania",
+              "name": "Tanzania",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "continentale",
+                  "name": "Continentale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "dar_es_salaam",
+                      "name": "Dar es Salaam",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "zanzibar",
+                  "name": "Zanzibar",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "stone_town",
+                      "name": "Stone Town",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "uganda",
+              "name": "Uganda",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "uganda",
+                  "name": "Uganda",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "kampala",
+                      "name": "Kampala",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "zimbabwe",
+              "name": "Zimbabwe",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "zimbabwe",
+                  "name": "Zimbabwe",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "harare",
+                      "name": "Harare",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "victoria_falls",
+                      "name": "Victoria Falls",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "isole_delloceano_indiano",
+          "name": "Isole dell'Oceano Indiano",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "madagascar",
+              "name": "Madagascar",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "madagascar",
+                  "name": "Madagascar",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "antananarivo",
+                      "name": "Antananarivo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "mauritius",
+              "name": "Mauritius",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "mauritius",
+                  "name": "Mauritius",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "port_louis",
+                      "name": "Port Louis",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "riunione",
+              "name": "Riunione",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "riunione",
+                  "name": "Riunione",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "saint_denis",
+                      "name": "Saint-Denis",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "seychelles",
+              "name": "Seychelles",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "seychelles",
+                  "name": "Seychelles",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "victoria",
+                      "name": "Victoria",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "nord_africa",
+          "name": "Nord Africa",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "algeria",
+              "name": "Algeria",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "algeria",
+                  "name": "Algeria",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "algeri",
+                      "name": "Algeri",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "egitto",
+              "name": "Egitto",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "cairo_e_nilo",
+                  "name": "Cairo e Nilo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "il_cairo",
+                      "name": "Il Cairo",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "luxor",
+                      "name": "Luxor",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "mar_rosso",
+                  "name": "Mar Rosso",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "libia",
+              "name": "Libia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "libia",
+                  "name": "Libia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "tripoli",
+                      "name": "Tripoli",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "marocco",
+              "name": "Marocco",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "marocco_imperiale",
+                  "name": "Marocco Imperiale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "marrakech",
+                      "name": "Marrakech",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "casablanca",
+                      "name": "Casablanca",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "sahara_e_sud",
+                  "name": "Sahara e Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "costa_atlantica",
+                  "name": "Costa Atlantica",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "tunisia",
+              "name": "Tunisia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "tunisia",
+                  "name": "Tunisia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "tunisi",
+                      "name": "Tunisi",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "asia",
+      "name": "Asia",
+      "type": "continent",
+      "selectable": false,
+      "macro_areas": [
+        {
+          "id": "asia_centrale_e_subcontinente_indiano",
+          "name": "Asia Centrale e Subcontinente Indiano",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "bhutan",
+              "name": "Bhutan",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "bhutan",
+                  "name": "Bhutan",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "thimphu",
+                      "name": "Thimphu",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "india",
+              "name": "India",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "india_del_nord",
+                  "name": "India del Nord",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "delhi",
+                      "name": "Delhi",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "agra",
+                      "name": "Agra",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "rajasthan",
+                  "name": "Rajasthan",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "india_del_sud",
+                  "name": "India del Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "goa_e_kerala",
+                  "name": "Goa e Kerala",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "kazakistan",
+              "name": "Kazakistan",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "kazakistan",
+                  "name": "Kazakistan",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "almaty",
+                      "name": "Almaty",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "kirghizistan",
+              "name": "Kirghizistan",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "kirghizistan",
+                  "name": "Kirghizistan",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "bishkek",
+                      "name": "Bishkek",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "maldive",
+              "name": "Maldive",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "maldive",
+                  "name": "Maldive",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "male",
+                      "name": "Malé",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nepal",
+              "name": "Nepal",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "nepal",
+                  "name": "Nepal",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "kathmandu",
+                      "name": "Kathmandu",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "sri_lanka",
+              "name": "Sri Lanka",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "sri_lanka",
+                  "name": "Sri Lanka",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "colombo",
+                      "name": "Colombo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "uzbekistan",
+              "name": "Uzbekistan",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "uzbekistan",
+                  "name": "Uzbekistan",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "samarcanda",
+                      "name": "Samarcanda",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "asia_orientale_e_sud_est_asiatico",
+          "name": "Asia Orientale e Sud-Est Asiatico",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "cambogia",
+              "name": "Cambogia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "cambogia",
+                  "name": "Cambogia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "phnom_penh",
+                      "name": "Phnom Penh",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "siem_reap",
+                      "name": "Siem Reap",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "cina",
+              "name": "Cina",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "cina_orientale",
+                  "name": "Cina Orientale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "pechino",
+                      "name": "Pechino",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "shanghai",
+                      "name": "Shanghai",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "cina_del_sud",
+                  "name": "Cina del Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "hong_kong",
+                      "name": "Hong Kong",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "cina_dellovest",
+                  "name": "Cina dell'Ovest",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "corea_del_sud",
+              "name": "Corea del Sud",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "corea_del_sud",
+                  "name": "Corea del Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "seoul",
+                      "name": "Seoul",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "filippine",
+              "name": "Filippine",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "filippine",
+                  "name": "Filippine",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "manila",
+                      "name": "Manila",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "giappone",
+              "name": "Giappone",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "honshu",
+                  "name": "Honshu",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "tokyo",
+                      "name": "Tokyo",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "kyoto",
+                      "name": "Kyoto",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "osaka",
+                      "name": "Osaka",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "hokkaido",
+                  "name": "Hokkaido",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "kyushu_e_okinawa",
+                  "name": "Kyushu e Okinawa",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "indonesia",
+              "name": "Indonesia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "bali_e_nusa_tenggara",
+                  "name": "Bali e Nusa Tenggara",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "ubud",
+                      "name": "Ubud",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "giava",
+                  "name": "Giava",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "jakarta",
+                      "name": "Jakarta",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "sumatra_e_borneo",
+                  "name": "Sumatra e Borneo",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "sulawesi_e_papua",
+                  "name": "Sulawesi e Papua",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "laos",
+              "name": "Laos",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "laos",
+                  "name": "Laos",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "luang_prabang",
+                      "name": "Luang Prabang",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "malesia",
+              "name": "Malesia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "malesia_peninsulare",
+                  "name": "Malesia Peninsulare",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "kuala_lumpur",
+                      "name": "Kuala Lumpur",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "borneo_malese",
+                  "name": "Borneo Malese",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "mongolia",
+              "name": "Mongolia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "mongolia",
+                  "name": "Mongolia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "ulaanbaatar",
+                      "name": "Ulaanbaatar",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "myanmar",
+              "name": "Myanmar",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "myanmar",
+                  "name": "Myanmar",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "yangon",
+                      "name": "Yangon",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "singapore",
+              "name": "Singapore",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "singapore",
+                  "name": "Singapore",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "marina_bay",
+                      "name": "Marina Bay",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "taiwan",
+              "name": "Taiwan",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "taiwan",
+                  "name": "Taiwan",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "taipei",
+                      "name": "Taipei",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "thailandia",
+              "name": "Thailandia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "thailandia_del_nord",
+                  "name": "Thailandia del Nord",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "thailandia_centrale",
+                  "name": "Thailandia Centrale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "bangkok",
+                      "name": "Bangkok",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "thailandia_del_sud",
+                  "name": "Thailandia del Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "phuket",
+                      "name": "Phuket",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "vietnam",
+              "name": "Vietnam",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "vietnam_del_nord",
+                  "name": "Vietnam del Nord",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "hanoi",
+                      "name": "Hanoi",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "vietnam_centrale",
+                  "name": "Vietnam Centrale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "vietnam_del_sud",
+                  "name": "Vietnam del Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "ho_chi_minh_city",
+                      "name": "Ho Chi Minh City",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "medio_oriente",
+          "name": "Medio Oriente",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "arabia_saudita",
+              "name": "Arabia Saudita",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "arabia_saudita",
+                  "name": "Arabia Saudita",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "riad",
+                      "name": "Riad",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "jeddah",
+                      "name": "Jeddah",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "emirati_arabi_uniti",
+              "name": "Emirati Arabi Uniti",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "emirati_arabi_uniti",
+                  "name": "Emirati Arabi Uniti",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "dubai",
+                      "name": "Dubai",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "abu_dhabi",
+                      "name": "Abu Dhabi",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "giordania",
+              "name": "Giordania",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "giordania",
+                  "name": "Giordania",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "amman",
+                      "name": "Amman",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "iran",
+              "name": "Iran",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "iran",
+                  "name": "Iran",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "teheran",
+                      "name": "Teheran",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "israele",
+              "name": "Israele",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "israele",
+                  "name": "Israele",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "gerusalemme",
+                      "name": "Gerusalemme",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "tel_aviv",
+                      "name": "Tel Aviv",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "libano",
+              "name": "Libano",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "libano",
+                  "name": "Libano",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "beirut",
+                      "name": "Beirut",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "oman",
+              "name": "Oman",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "oman",
+                  "name": "Oman",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "muscat",
+                      "name": "Muscat",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "qatar",
+              "name": "Qatar",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "qatar",
+                  "name": "Qatar",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "doha",
+                      "name": "Doha",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "americhe",
+      "name": "Americhe",
+      "type": "continent",
+      "selectable": false,
+      "macro_areas": [
+        {
+          "id": "centro_america_e_caraibi",
+          "name": "Centro America e Caraibi",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "belize",
+              "name": "Belize",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "belize",
+                  "name": "Belize",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "belize_city",
+                      "name": "Belize City",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "costa_rica",
+              "name": "Costa Rica",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "costa_rica",
+                  "name": "Costa Rica",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "san_jose",
+                      "name": "San José",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "cuba",
+              "name": "Cuba",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "cuba",
+                  "name": "Cuba",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "lavana",
+                      "name": "L'Avana",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "giamaica",
+              "name": "Giamaica",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "giamaica",
+                  "name": "Giamaica",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "kingston",
+                      "name": "Kingston",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "guatemala",
+              "name": "Guatemala",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "guatemala",
+                  "name": "Guatemala",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "citta_del_guatemala",
+                      "name": "Città del Guatemala",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "honduras",
+              "name": "Honduras",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "honduras",
+                  "name": "Honduras",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "tegucigalpa",
+                      "name": "Tegucigalpa",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "messico",
+              "name": "Messico",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "yucatán_e_caraibi",
+                  "name": "Yucatán e Caraibi",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "cancún",
+                      "name": "Cancún",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "messico_centrale",
+                  "name": "Messico Centrale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "citta_del_messico",
+                      "name": "Città del Messico",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "bassa_california",
+                  "name": "Bassa California",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "nicaragua",
+              "name": "Nicaragua",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "nicaragua",
+                  "name": "Nicaragua",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "managua",
+                      "name": "Managua",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "panama",
+              "name": "Panama",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "panama",
+                  "name": "Panama",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "panama_city",
+                      "name": "Panama City",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "repubblica_dominicana",
+              "name": "Repubblica Dominicana",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "repubblica_dominicana",
+                  "name": "Repubblica Dominicana",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "santo_domingo",
+                      "name": "Santo Domingo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "nord_america",
+          "name": "Nord America",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "canada",
+              "name": "Canada",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "canada_orientale",
+                  "name": "Canada Orientale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "toronto",
+                      "name": "Toronto",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "canada_occidentale",
+                  "name": "Canada Occidentale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "vancouver",
+                      "name": "Vancouver",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "stati_uniti",
+              "name": "Stati Uniti",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "costa_est",
+                  "name": "Costa Est",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "new_york",
+                      "name": "New York",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "washington_dc",
+                      "name": "Washington DC",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "miami",
+                      "name": "Miami",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "costa_ovest",
+                  "name": "Costa Ovest",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "los_angeles",
+                      "name": "Los Angeles",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "san_francisco",
+                      "name": "San Francisco",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "las_vegas",
+                      "name": "Las Vegas",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "sud",
+                  "name": "Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "midwest_e_montagne",
+                  "name": "Midwest e Montagne",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "chicago",
+                      "name": "Chicago",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "hawaii_e_alaska",
+                  "name": "Hawaii e Alaska",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "honolulu",
+                      "name": "Honolulu",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sud_america",
+          "name": "Sud America",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "argentina",
+              "name": "Argentina",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "argentina_del_nord",
+                  "name": "Argentina del Nord",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "buenos_aires",
+                      "name": "Buenos Aires",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "patagonia_argentina",
+                  "name": "Patagonia Argentina",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "bolivia",
+              "name": "Bolivia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "bolivia",
+                  "name": "Bolivia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "la_paz",
+                      "name": "La Paz",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "brasile",
+              "name": "Brasile",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "sud_est",
+                  "name": "Sud-Est",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "rio_de_janeiro",
+                      "name": "Rio de Janeiro",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "san_paolo",
+                      "name": "San Paolo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "nord_est",
+                  "name": "Nord-Est",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "amazzonia_e_pantanal",
+                  "name": "Amazzonia e Pantanal",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "cile",
+              "name": "Cile",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "cile_del_nord_e_centro",
+                  "name": "Cile del Nord e Centro",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "santiago",
+                      "name": "Santiago",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "patagonia_cilena",
+                  "name": "Patagonia Cilena",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "isola_di_pasqua",
+                  "name": "Isola di Pasqua",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "colombia",
+              "name": "Colombia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "colombia",
+                  "name": "Colombia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "bogotá",
+                      "name": "Bogotá",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "cartagena",
+                      "name": "Cartagena",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ecuador",
+              "name": "Ecuador",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "ecuador_continentale",
+                  "name": "Ecuador continentale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "quito",
+                      "name": "Quito",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "galápagos",
+                  "name": "Galápagos",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "paraguay",
+              "name": "Paraguay",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "paraguay",
+                  "name": "Paraguay",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "asunción",
+                      "name": "Asunción",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "peru",
+              "name": "Perù",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "peru",
+                  "name": "Perù",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "lima",
+                      "name": "Lima",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "cusco",
+                      "name": "Cusco",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "uruguay",
+              "name": "Uruguay",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "uruguay",
+                  "name": "Uruguay",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "montevideo",
+                      "name": "Montevideo",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "venezuela",
+              "name": "Venezuela",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "venezuela",
+                  "name": "Venezuela",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "caracas",
+                      "name": "Caracas",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "oceania",
+      "name": "Oceania",
+      "type": "continent",
+      "selectable": false,
+      "macro_areas": [
+        {
+          "id": "oceania",
+          "name": "Oceania",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "australia",
+              "name": "Australia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "australia_orientale",
+                  "name": "Australia Orientale",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "sydney",
+                      "name": "Sydney",
+                      "type": "city",
+                      "selectable": false
+                    },
+                    {
+                      "id": "melbourne",
+                      "name": "Melbourne",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "australia_centrale_e_ovest",
+                  "name": "Australia Centrale e Ovest",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                },
+                {
+                  "id": "tasmania",
+                  "name": "Tasmania",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "fiji",
+              "name": "Fiji",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "fiji",
+                  "name": "Fiji",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "nadi",
+                      "name": "Nadi",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "isole_cook",
+              "name": "Isole Cook",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "isole_cook",
+                  "name": "Isole Cook",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "rarotonga",
+                      "name": "Rarotonga",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nuova_zelanda",
+              "name": "Nuova Zelanda",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "isola_del_nord",
+                  "name": "Isola del Nord",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "auckland",
+                      "name": "Auckland",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "isola_del_sud",
+                  "name": "Isola del Sud",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "queenstown",
+                      "name": "Queenstown",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "polinesia_francese",
+              "name": "Polinesia Francese",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "polinesia_francese",
+                  "name": "Polinesia Francese",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "bora_bora",
+                      "name": "Bora Bora",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "samoa",
+              "name": "Samoa",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "samoa",
+                  "name": "Samoa",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "apia",
+                      "name": "Apia",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "tonga",
+              "name": "Tonga",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "tonga",
+                  "name": "Tonga",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": [
+                    {
+                      "id": "nukualofa",
+                      "name": "Nuku'alofa",
+                      "type": "city",
+                      "selectable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "antartide",
+      "name": "Antartide",
+      "type": "continent",
+      "selectable": false,
+      "macro_areas": [
+        {
+          "id": "antartide",
+          "name": "Antartide",
+          "type": "macro_area",
+          "selectable": true,
+          "states": [
+            {
+              "id": "antartide",
+              "name": "Antartide",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "antartide",
+                  "name": "Antartide",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "statistics": {
+    "continents": 6,
+    "macro_areas": 14,
+    "states": 129,
+    "regions": 244,
+    "cities": 188
+  }
+}

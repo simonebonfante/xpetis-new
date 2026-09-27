@@ -43,8 +43,8 @@ Niente backend classico: si tiene tutto insieme con servizi gestiti.
 | **Supabase** | Database (fonte di verità), Auth (solo Google), Storage (documenti di viaggio). Progetto di sviluppo: `rsgyxbqzsxahsbdfgtbm` |
 | **Supabase Studio** | Pannello operativo del team |
 | **n8n** | Tutte le automazioni: webhook Cal.com e Stripe, mail, timer, alert |
-| **Cal.com** (piano gratuito, un account per TD) | Calendario delle consulenze. È un ponte: il motore proprietario è la destinazione futura |
-| **Stripe** | Pagamenti. Consulenze e su misura sul conto XPETIS; All Inclusive sul conto dell'agenzia (merchant of record, regime 74-ter) |
+| **Cal.com** (piano gratuito, un account per TD) | Calendario delle consulenze. È un ponte: il motore proprietario è la destinazione futura. **Tre event type ammessi** (deviazione 10, 27 settembre 2026): `consulenza-xpetis-30` per la breve (`consultation`, sempre 30, la crea chiunque), `consulenza-xpetis-60` o `-90` per l'approfondita (`consultation_deep`, solo chi la offre). L'elenco sta in `app_config`, e uno slug fuori elenco blocca la pubblicazione (0048) |
+| **Stripe** | Pagamenti. **Un conto solo, dell'agenzia**, su tutto (deviazione 9, decisione del 27 settembre 2026): chiave ristretta in Vault, un solo endpoint webhook. In sandbox le righe `*_stripe_account` di `app_config` dicono `xpetis` |
 | **WhatsApp** | Canale umano. I gruppi si creano a mano: le API non permettono di crearli |
 
 Colore brand: verde `#1b5e24`. Mobile first su tutte le pagine dei TD.
@@ -112,21 +112,34 @@ Due corollari che è facile sbagliare:
 - **Il Figma che aggiunge contenuto non previsto dal Flusso** (un filtro nuovo,
   una riga di dati) non si costruisce di iniziativa: si segnala.
 
-File unico: **`x1DYYagZ2moagmpEHZHYYE`**, `https://www.figma.com/design/x1DYYagZ2moagmpEHZHYYE/XPETIS?node-id=<nodo>`
+**Dal 27 settembre 2026 il Figma è un file nuovo, e questo è l'unico
+autorevole:** **`Q9Krydv6xD8mFJCtU9NHzr`** («XPETIS - Def»),
+`https://www.figma.com/design/Q9Krydv6xD8mFJCtU9NHzr/XPETIS---Def?node-id=<nodo>`.
+Non è una revisione del vecchio: è un altro file.
 
-| Pagina | Nodo |
+| Pagina | Nodo sul file nuovo |
 |---|---|
-| Homepage | `160-77` |
-| Ricerca / risultati | `177-262` |
-| Vetrina del designer | `171-17` |
-| Itinerario pronto da vivere | `261-1068` |
-| Quiz | `346-932` e `346-896` |
+| Vetrina del designer | `2-743` |
+| Viaggi di gruppo | `3-1121` |
+| Itinerario pronto da vivere | `3-1386` |
+| Homepage | **da chiedere** |
+| Ricerca / risultati | **da chiedere** |
+| Quiz | **da chiedere** |
+
+Solo i tre nodi con un numero sono verificati. Home, ricerca e quiz Simone li
+dice «praticamente identiche» e si revisionano dopo: **il loro nodo sul file
+nuovo va chiesto**, non ricavato. I nodi vecchi (`160-77`, `177-262`,
+`346-932`, `346-896`…) puntano al file superato `x1DYYagZ2moagmpEHZHYYE` e **non
+vanno riusati** sul file nuovo, dove non significano niente. Le pagine già
+costruite fino al 27 settembre vengono dal file vecchio.
 
 Pagamento: **plugin Stripe**, niente pagina disegnata. Prenotazione: **iframe
 Cal.com** della pagina del designer. (Deciso da Simone il 10 agosto 2026.)
 
 Gli asset si riscaricano con `bash scripts/scarica-asset-figma.sh`: le URL degli
-asset scadono in 7 giorni, la chiave del file no.
+asset scadono in 7 giorni, la chiave del file no. ⚠️ Lo script oggi scarica
+ancora dal **file vecchio**: va riscritto quando le pagine si ricostruiscono dal
+file nuovo.
 
 ## Decisioni architetturali già prese
 
@@ -162,7 +175,11 @@ resta occupato al massimo 35 minuti.
 
 **Cal.com identifica il designer con `cal_username` + slug.** I 25 designer
 copiano lo stesso event type modello, quindi lo slug da solo non identifica
-nessuno. E lo slug sta in `payload.type`, non in `eventType.slug`.
+nessuno. E lo slug sta in `payload.type`, non in `eventType.slug`. La coppia
+(designer, slug) è **unica per vincolo** (0048): due servizi sullo stesso slug
+farebbero scegliere il prezzo a caso. E il ponte confronta la durata dello slot
+vero con quella a listino: se non combaciano crea comunque la prenotazione e
+alza `calcom_durata_non_combacia`.
 
 **Le pagine token sono server-side.** `resolve_access_token(token)` valida e
 restituisce il contesto. Il token non arriva mai al browser come credenziale
@@ -260,8 +277,9 @@ Elenco completo con i riferimenti nei commenti del codice in
 
 1. Le tre verifiche sul piano gratuito di Cal.com (webhook per account, API di
    cancellazione, prefill di un campo custom nell'embed).
-2. Come custodire le credenziali Stripe delle agenzie: Vault, n8n o Stripe
-   Connect.
+2. ~~Come custodire le credenziali Stripe delle agenzie~~ → deciso il 27
+   settembre 2026: un conto solo, dell'agenzia, chiave ristretta in Vault
+   (`ACCESSI.md`). Resta aperta, e non è tecnica, la riconciliazione mensile.
 3. Il provider di invio email transazionali, che il documento di flusso non
    nomina: senza di lui n8n non manda niente.
 

@@ -8,13 +8,16 @@ import {
   CASSA_MIN_SECONDI,
   CASSA_MAX_SECONDI,
   ErroreStripe,
+  type ContoStripe,
   type RiferimentoCassa,
+  type TipoPagamento,
 } from '@/lib/stripe'
 
 /**
  * Aprire una cassa Stripe, o riusare quella già aperta: il pezzo comune alla
  * cassa della consulenza (`app/prenotazione/[id]/cassa`) e a quella della
- * proposta su misura (`app/proposta/[token]/cassa`).
+ * pagina del viaggiatore (`app/proposta/[token]/cassa`), che apre la proposta
+ * su misura e, dalla 0047, l'acconto e il saldo dell'All Inclusive.
  *
  * ## Perché è estratto, e non copiato
  *
@@ -55,12 +58,15 @@ export type EsitoCassa =
   | { esito: 'attendi'; motivo: string }
   | { esito: 'errore'; stato: number; motivo: string }
 
-type Conto = { stripe_account: 'xpetis' | 'agency'; agency_id: string | null }
-
 export async function apriOriusaCassa(p: {
   riferimento: RiferimentoCassa
-  /** Il `payment_kind`: `consultation` per le prenotazioni, `full` per il su misura. */
-  tipo: 'consultation' | 'full'
+  /**
+   * Il `payment_kind`: `consultation` per le prenotazioni, `full` per il su
+   * misura, `deposit` e `balance` per le due rate dell'All Inclusive. Due rate
+   * di tipo diverso sullo stesso ordine possono essere aperte insieme:
+   * `payments_one_pending_per_kind` è su (entità, tipo), e l'harness lo prova.
+   */
+  tipo: TipoPagamento
   /** Letto dal database dalla route. Il browser non manda mai un importo. */
   importoCents: number
   /**
@@ -74,6 +80,13 @@ export async function apriOriusaCassa(p: {
   urlSuccesso: string
   urlAnnullamento: string
   emailCliente?: string
+  /**
+   * L'agenzia **assegnata all'ordine**, per l'All Inclusive. Se incassa
+   * l'agenzia deve essere lei: abbiamo la chiave di un conto solo, e una cassa
+   * aperta su quel conto per l'ordine di un'altra agenzia incasserebbe al posto
+   * sbagliato. Con un'agenzia sola coincidono sempre (0047).
+   */
+  agenziaOrdine?: string | null
 }): Promise<EsitoCassa> {
   const admin = createAdminClient()
   const [colonna, id] =
@@ -84,14 +97,16 @@ export async function apriOriusaCassa(p: {
   // ------------------------------------------------------- una cassa già aperta
   const { data: inCorso } = await admin
     .from('payments')
-    .select('id, stripe_checkout_session_id, created_at')
+    .select('id, stripe_checkout_session_id, created_at, stripe_account, agency_id')
     .eq(colonna, id)
     .eq('kind', p.tipo)
     .eq('status', 'pending')
     .maybeSingle()
 
   if (inCorso) {
-    const cassa = await statoCassa(inCorso.stripe_checkout_session_id, inCorso.created_at, p.importoCents)
+    // La sessione si rilegge sul conto su cui è nata, che dice la sua riga.
+    const contoRiga = inCorso as ContoStripe
+    const cassa = await statoCassa(inCorso.stripe_checkout_session_id, inCorso.created_at, p.importoCents, contoRiga)
 
     if (cassa.esito === 'aperta') return { esito: 'aperta', url: cassa.url, riusata: true }
     if (cassa.esito === 'pagata') return { esito: 'in_conferma' }
@@ -108,7 +123,7 @@ export async function apriOriusaCassa(p: {
       // Stripe prima di liberare la riga. Se la chiusura fallisce, la sessione
       // vecchia scade da sola in mezz'ora, e se qualcuno ci paga dentro il ponte
       // trova un importo che non combacia e non conferma niente.
-      await scadiCassa(cassa.sessione)
+      await scadiCassa(cassa.sessione, contoRiga)
     }
     // `morta` o `superata`: solo adesso la riga si libera e si riparte.
     await admin.from('payments').update({ status: 'expired' }).eq('id', inCorso.id)
@@ -117,13 +132,21 @@ export async function apriOriusaCassa(p: {
   // ---------------------------------------------------------- su quale conto
   // Non nel codice: `app_config`, una riga per tipo di pagamento, letta dalla
   // stessa funzione che usa il ponte Stripe quando deve ricostruire una riga
-  // (0044). Oggi `xpetis`, in produzione `agency` (deviazione 9).
+  // (0044). Oggi `xpetis`, in produzione `agency` su tutto: dal 27 settembre il
+  // conto Stripe è uno, ed è dell'agenzia (deviazione 9).
   const { data: conti, error: erroreConto } = await admin.rpc('payment_account', {
     p_kind: p.tipo,
   })
-  const conto = (conti as Conto[] | null)?.[0]
+  const conto = (conti as ContoStripe[] | null)?.[0]
   if (erroreConto || !conto) {
     return { esito: 'errore', stato: 500, motivo: 'non è configurato su quale conto incassare' }
+  }
+  if (conto.stripe_account === 'agency' && p.agenziaOrdine && conto.agency_id !== p.agenziaOrdine) {
+    return {
+      esito: 'errore',
+      stato: 409,
+      motivo: 'l\'agenzia che incassa non è quella assegnata all\'ordine: la cassa non si apre',
+    }
   }
 
   // ------------------------------------------------------------- prima la riga
@@ -150,7 +173,7 @@ export async function apriOriusaCassa(p: {
     if (erroreInserimento.code === '23505') {
       const { data: altrui } = await admin
         .from('payments')
-        .select('stripe_checkout_session_id, created_at')
+        .select('stripe_checkout_session_id, created_at, stripe_account, agency_id')
         .eq(colonna, id)
         .eq('kind', p.tipo)
         .eq('status', 'pending')
@@ -159,6 +182,7 @@ export async function apriOriusaCassa(p: {
         altrui?.stripe_checkout_session_id ?? null,
         altrui?.created_at ?? null,
         p.importoCents,
+        (altrui as ContoStripe | null) ?? conto,
       )
       if (cassa.esito === 'aperta') return { esito: 'aperta', url: cassa.url, riusata: true }
       // Qui non si tocca mai niente: la riga è di un'altra richiesta, che
@@ -176,6 +200,7 @@ export async function apriOriusaCassa(p: {
       descrizione: p.descrizione,
       riferimento: p.riferimento,
       tipo: p.tipo,
+      conto,
       scadenzaUnix: scadenzaPerStripe(p.scadenzaNostra ? new Date(p.scadenzaNostra).getTime() : null),
       urlSuccesso: p.urlSuccesso,
       urlAnnullamento: p.urlAnnullamento,
@@ -287,6 +312,7 @@ async function statoCassa(
   sessione: string | null,
   creataIl: string | null,
   importoCents: number,
+  conto: ContoStripe,
 ): Promise<StatoCassa> {
   if (!sessione) {
     const eta = creataIl ? Date.now() - new Date(creataIl).getTime() : Number.POSITIVE_INFINITY
@@ -294,7 +320,7 @@ async function statoCassa(
   }
 
   try {
-    const cassa = await leggiCassa(sessione)
+    const cassa = await leggiCassa(sessione, conto)
     // `leggiCassa` torna null solo sul 404: è Stripe che dichiara di non
     // conoscere quella sessione, non noi che non siamo riusciti a chiedere.
     if (!cassa) return { esito: 'morta' }

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CHIAVI, leggiContatto } from '@/lib/config'
 import { euro, euroPerCampo, FORMA_IMPORTO, leggiPaginaOrdine, type PaginaOrdine, type StatoOrdine } from '@/lib/ordine'
+import { OrdineAllInclusive } from '@/components/ordine-all-inclusive'
 import { Avviso, Guscio, ScriviciWhatsApp, Spiegazione } from '@/components/pagina-token'
 import { CopiaTesto } from '@/components/copia-testo'
 import { RicordaModulo } from '@/components/ricorda-modulo'
@@ -45,6 +46,14 @@ import { ElencoFile } from '@/components/elenco-file'
  * da un indirizzo nostro che firma un link di un minuto al clic: nessun link
  * di Storage sta in questa pagina.
  *
+ * ## L'All Inclusive (0047)
+ *
+ * Stessa porta, un'altra faccia: `td_order_page` risolve il token e dice
+ * `servizio`, e l'All Inclusive va a `components/ordine-all-inclusive.tsx`.
+ * Le sue azioni hanno route loro (`/all-inclusive/bozza`, `/all-inclusive/invia`);
+ * i file passano dalle stesse `/consegna/biglietto` e `/consegna`, perché il
+ * meccanismo è lo stesso e cosa si carica lo decide il database dallo stato.
+ *
  * ## Cosa manca, di proposito
  *
  * Il tasto «C'è un problema» in fondo alla pagina ordine, che il Flusso §7
@@ -63,7 +72,7 @@ export const metadata: Metadata = {
 
 const DATA = new Intl.DateTimeFormat('it-IT', { dateStyle: 'long', timeZone: 'Europe/Rome' })
 
-const STATO: Record<StatoOrdine, string> = {
+const STATO: Partial<Record<StatoOrdine, string>> = {
   requested: 'Richiesta ricevuta',
   in_definition: 'In definizione',
   proposal_sent: 'Proposta inviata, in attesa di pagamento',
@@ -93,10 +102,29 @@ export default async function PaginaOrdineTd({
     return <Spiegazione esito={pagina.esito} whatsapp={whatsapp} />
   }
 
+  const base = `/ordine/${encodeURIComponent(token)}`
+
+  if (pagina.servizio === 'all_inclusive') {
+    return (
+      <Guscio>
+        <OrdineAllInclusive pagina={pagina} base={base} q={q} />
+        {q.file && (
+          <Avviso tono="errore">
+            {q.file === 'irraggiungibile'
+              ? 'Non riusciamo a preparare il file adesso. Riprova fra un minuto.'
+              : 'Questo file non si trova. Ricarica la pagina e riprova.'}
+          </Avviso>
+        )}
+        <div className="border-t border-scuro/20 pt-6">
+          <ScriviciWhatsApp numero={whatsapp} etichetta="Scrivi al team" />
+        </div>
+      </Guscio>
+    )
+  }
+
   const stato = pagina.status!
   const bozzaCompleta = !!(pagina.descrizione && pagina.prezzo_cents != null && pagina.giorni)
   const avviso = testoAvviso(q, pagina)
-  const base = `/ordine/${encodeURIComponent(token)}`
 
   return (
     <Guscio>
@@ -179,7 +207,7 @@ function Intestazione({ pagina, stato }: { pagina: PaginaOrdine; stato: StatoOrd
       <p className="text-corpo opacity-70">
         Itinerario su misura · {pagina.human_ref}
       </p>
-      <h1 className="font-titoli text-h3">{STATO[stato]}</h1>
+      <h1 className="font-titoli text-h3">{STATO[stato] ?? stato}</h1>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-corpo">
         {pagina.nome_viaggiatore && (
           <>

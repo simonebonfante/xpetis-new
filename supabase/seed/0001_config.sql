@@ -124,8 +124,7 @@ on conflict (key) do nothing;
 -- una riga sua, perché non è detto che l'agenzia cominci a incassare le due
 -- cose lo stesso giorno. La legge `payment_account('full')`, la stessa funzione
 -- che dalla 0044 risponde anche per le consulenze: la regola è una, le righe
--- sono due. L'All Inclusive non passa di qui: incassa l'agenzia assegnata
--- all'ordine, milestone 7.
+-- sono due. L'All Inclusive ha la sua riga, in fondo al file (0047).
 insert into app_config (key, value, value_text, config_group, label_it, notes) values
   ('custom_itinerary_stripe_account', null, 'xpetis', 'payments',
    'Conto Stripe che incassa gli itinerari su misura',
@@ -356,4 +355,55 @@ insert into app_config (key, value, value_text, config_group, label_it, notes) v
   ('team_notify_events', null, 'ordine_pagato', 'integrations',
    'Di quali eventi si avvisa il team per mail (nomi separati da virgola)',
    'Un nome è il kind di un alert di team_alerts (es. ordine_richiesto) oppure ordine_pagato. Aggiungerne uno è tutto quello che serve: nessun deploy. NON metterci gli alert di igiene operativa: una mail per ogni anomalia insegna al team a ignorarle. Vuota = nessun evento.')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- L'All Inclusive (migration 0047)
+-- ---------------------------------------------------------------------------
+-- La sorella delle due righe del conto, per acconto e saldo. **Deciso il 27
+-- settembre 2026: esiste un conto Stripe solo, ed è dell'agenzia.** In
+-- produzione questa riga dice `agency` come le altre due; in sandbox `xpetis`,
+-- ed è così che si prova il giro senza il conto vero. Una riga sola per le due
+-- rate: il merchant of record dell'All Inclusive è uno.
+--
+-- `deposit_percent` (più su, gruppo `orders`) c'è dalla prima ora: è la
+-- percentuale dell'acconto, oggi 30, e la usa `ai_order_rules()` all'invio
+-- della proposta all'agenzia.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('all_inclusive_stripe_account', null, 'xpetis', 'payments',
+   'Conto Stripe che incassa acconto e saldo All Inclusive',
+   'xpetis oppure agency. In produzione agency (conto unico dell''agenzia, 27 settembre 2026): la cassa legge la chiave ristretta da Vault, sotto il nome in agencies.stripe_credential_ref.')
+on conflict (key) do nothing;
+
+-- Quanto vale il link con cui l'agenzia conferma una proposta. È una
+-- credenziale che sblocca una cascata e vive in una casella inoltrabile:
+-- scade, e si consuma alla prima risposta. Allo scadere la proposta resta in
+-- verifica e l'orologio lo dice al team (`verifica_agenzia_scaduta`), che ne
+-- manda uno nuovo con `select rinnova_verifica_agenzia('<id ordine>')`.
+insert into app_config (key, value, config_group, label_it, notes) values
+  ('agency_confirm_valid_days', 7, 'orders',
+   'Giorni di validità del link di verifica dell''agenzia',
+   'Oltre, il link risponde «scaduto» e il team riceve un alert verifica_agenzia_scaduta. ATTENZIONE: i 7 giorni NON sono una decisione di prodotto — li ha scelti chi ha scritto la 0047 perché serviva un numero, e Simone non li ha mai confermati. Vanno sentiti con l''agenzia su quanto ci mette davvero a rispondere: se ci mette dieci giorni, ogni verifica scade da sola e il team rincorre.')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Gli slug Cal.com attesi (migration 0048)
+-- ---------------------------------------------------------------------------
+-- Tre event type, due servizi (deviazione 10 del PIANO, riscritta il 27
+-- settembre 2026): la breve sempre da 30, l'approfondita da 60 oppure 90. Un
+-- servizio attivo con uno slug che non è in questa lista **blocca la
+-- pubblicazione** del designer (`td_publish_blockers`) e non si può scrivere su
+-- un designer già pubblicato: Cal.com genera lo slug dal titolo in modo
+-- imprevedibile, e uno slug sbagliato fa scartare le prenotazioni in silenzio.
+--
+-- Una riga per tipo, valori separati da virgola. **Senza la riga il servizio è
+-- bloccato**, non libero: sul progetto vero vanno inserite a mano dal SQL Editor
+-- insieme alla 0048, come le altre righe di questo file.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('calcom_slugs_consultation', null, 'consulenza-xpetis-30', 'integrations',
+   'Slug Cal.com ammessi per la consulenza breve',
+   'Sempre 30 minuti, la crea ogni designer. Separati da virgola. Uno slug fuori elenco blocca la pubblicazione: le prenotazioni verrebbero scartate come appuntamenti privati del designer.'),
+  ('calcom_slugs_consultation_deep', null, 'consulenza-xpetis-60, consulenza-xpetis-90', 'integrations',
+   'Slug Cal.com ammessi per la consulenza approfondita',
+   'Da 60 oppure 90 minuti, solo per chi la offre. Separati da virgola. Lo slug deve corrispondere alla durata scritta nel servizio: se non combacia, lo dice il ponte alla prima prenotazione (alert calcom_durata_non_combacia).')
 on conflict (key) do nothing;

@@ -74,8 +74,9 @@ if not percorsi:
 
 for percorso in percorsi:
     nome = percorso.rsplit('/', 1)[-1].rsplit('.', 1)[0]
-    # Gli itinerari sono card orizzontali, i viaggi firma foto di galleria.
-    misure = (800, 600) if nome.startswith('itinerario-') else (1200, 800)
+    # Itinerari e viaggi di gruppo sono card orizzontali, i viaggi firma foto
+    # di galleria.
+    misure = (800, 600) if nome.startswith(('itinerario-', 'gruppo-')) else (1200, 800)
     destinazione = os.path.join(BASE, percorso)
     os.makedirs(os.path.dirname(destinazione), exist_ok=True)
     segnaposto(percorso, *misure, nome.replace('-', ' ').title()).save(

@@ -351,12 +351,15 @@ await expectFail('tag su un paese non coperto dal TD', `
 // inventare 25 URL finte per pubblicare 25 profili. Restano le tre condizioni
 // che contano — senza prezzo la cassa non si apre, senza durata ed event type la
 // prenotazione non nasce.
+//
+// Dalla 0048 lo slug non può più essere una stringa qualunque su un designer
+// pubblicato: le due prove usano gli slug ammessi, e restano quello che erano.
 await expectOk('consulenza attiva senza Payment Link: ora si può', `
   insert into td_services (td_id, service_type, is_active, price_cents, duration_minutes, cal_event_type_slug)
-  values ('11111111-1111-1111-1111-111111111111','consultation_deep',true,9000,45,'x')`)
+  values ('11111111-1111-1111-1111-111111111111','consultation_deep',true,9000,90,'consulenza-xpetis-90')`)
 await expectFail('consulenza attiva senza prezzo', `
   insert into td_services (td_id, service_type, is_active, duration_minutes, cal_event_type_slug)
-  values ('22222222-2222-2222-2222-222222222222','consultation_deep',true,45,'x')`, 'bookable_complete')
+  values ('22222222-2222-2222-2222-222222222222','consultation_deep',true,60,'consulenza-xpetis-60')`, 'bookable_complete')
 await expectFail('livello paese diverso da 1 o 2', `
   insert into td_countries (td_id, country_code, level)
   values ('22222222-2222-2222-2222-222222222222','tanzania',3)`, 'level')
@@ -872,9 +875,16 @@ await expectOk('proposta all\'agenzia con documento e prezzo', `
   insert into order_files (order_id, kind, storage_path, filename)
   values ('77777777-7777-7777-7777-777777777777','proposal_document','order-documents/77/prop.pdf','proposta.pdf');
   update orders set status='proposal_pending_agency', proposal_price_cents=450000,
-         total_price_cents=450000, deposit_cents=135000, balance_cents=315000,
-         departure_date=current_date + 90, last_actor='td'
+         proposal_description='Giappone 15 giorni', departure_date=current_date + 90, last_actor='td'
    where id='77777777-7777-7777-7777-777777777777'`)
+{
+  // Dalla 0047 acconto e saldo non si scrivono: li calcola il database
+  // all'invio, dal 30% di app_config.deposit_percent.
+  const r = (await q(`select total_price_cents t, deposit_cents d, balance_cents b
+                        from orders where id='77777777-7777-7777-7777-777777777777'`)).rows[0]
+  r.t === 450000 && r.d === 135000 && r.b === 315000
+    ? ok('acconto 30% e saldo per residuo, calcolati dal sistema') : fail(JSON.stringify(r))
+}
 await expectOk('agenzia conferma → acconto', `
   update orders set status='awaiting_deposit', agency_confirmed_at=now(), last_actor='agency'
    where id='77777777-7777-7777-7777-777777777777'`)
@@ -1482,9 +1492,9 @@ console.log('\n== Il ponte Cal.com → bookings ==')
       : fail('designer sconosciuto: ' + JSON.stringify(e))
   }
   {
-    // marco-rossi non ha la consulenza approfondita: giulia-neri sì, quindi lo
-    // slug è dei nostri ma non di questo designer.
-    const e = await chiama(variante(fx.created, { 'payload.type': 'consulenza-xpetis-approfondita' }))
+    // marco-rossi ha l'approfondita da 90, giulia-neri quella da 60: lo slug da
+    // 60 è dei nostri ma non di questo designer.
+    const e = await chiama(variante(fx.created, { 'payload.type': 'consulenza-xpetis-60' }))
     e.esito === 'servizio_non_del_designer' && await nAlert('calcom_servizio_non_configurato') === 1
       ? ok('slug nostro ma non di questo designer: alert critico, nessuna riga')
       : fail('servizio non del designer: ' + JSON.stringify(e))
@@ -2543,14 +2553,18 @@ console.log('\n== I testi delle mail ==')
   {
     const r = (await db.query(
       `select key, template_kind from message_templates where key not like 'prova_%' order by key`)).rows
-    const attesi = ['blocco_firma', 'blocco_intro_servizi', 'blocco_servizio_all_inclusive',
+    const attesi = ['agency_confirmed_td', 'agency_proposal_confirm', 'agency_rejected_td',
+                    'ai_balance_paid_td', 'ai_balance_traveler', 'ai_delivery_traveler',
+                    'ai_proposal_traveler',
+                    'blocco_firma', 'blocco_intro_servizi', 'blocco_servizio_all_inclusive',
                     'blocco_servizio_custom_itinerary', 'blocco_td_no_show', 'blocco_td_problema',
+                    'blocco_whatsapp_ai_consegna', 'blocco_whatsapp_ai_proposta',
                     'blocco_whatsapp_consegna', 'blocco_whatsapp_proposta', 'delivery_traveler',
-                    'order_new_td', 'order_paid_td', 'postcall_td', 'postcall_traveler',
+                    'order_new_td', 'order_new_td_ai', 'order_paid_td', 'postcall_td', 'postcall_traveler',
                     'proposal_traveler', 'revision_delivered_traveler', 'revision_requested_td',
                     'team_notifica', 'unpaid_cancelled_traveler']
     JSON.stringify(r.map(x => x.key)) === JSON.stringify(attesi)
-      ? ok('le diciotto righe del seed ci sono (sei della 0043, tre della 0044, due della 0045, sette della 0046)')
+      ? ok('le ventotto righe del seed ci sono (sei della 0043, tre della 0044, due della 0045, sette della 0046, dieci della 0047)')
       : fail('righe: ' + JSON.stringify(r.map(x => x.key)))
   }
   {
@@ -3087,13 +3101,15 @@ console.log('\n== L\'ordine su misura: proposta e pagamento ==')
       : fail('prezzo della call assente: ' + m[0]?.body_text)
   }
   {
-    // Un All Inclusive non riceve questo link: la sua pagina è milestone 7.
+    // Dalla 0047 anche l'All Inclusive riceve il suo link, con il suo testo:
+    // la pagina ordine lo sa trattare. La mail del su misura non parte.
     await creaOrdine(9, B(3), 'all_inclusive')
     const t = await tokenDi('td_order_page', O(9))
     const m = await posta('order_new_td', O(9))
-    !t && m.length === 0
-      ? ok('un ordine All Inclusive non riceve né token né mail: la sua pagina non esiste ancora')
-      : fail('All Inclusive con token o mail della pagina su misura')
+    const mAI = await posta('order_new_td_ai', O(9))
+    t && m.length === 0 && mAI.length === 1
+      ? ok('un ordine All Inclusive riceve il token e la sua mail (0047), non quella del su misura')
+      : fail('All Inclusive: ' + JSON.stringify([!!t, m.length, mAI.length]))
   }
 
   // --------------------------------------------------- la pagina del designer
@@ -3256,8 +3272,14 @@ console.log('\n== L\'ordine su misura: proposta e pagamento ==')
       ? ok('e il default della colonna payments.stripe_account non è stato toccato')
       : fail('default cambiato: ' + def.column_default)
   }
-  await expectFail('payment_account non indovina il conto di un acconto All Inclusive',
-    `select * from payment_account('deposit')`, 'milestone 7')
+  {
+    // Dalla 0047 acconto e saldo hanno la loro riga, una per le due rate.
+    const d = (await db.query(`select * from payment_account('deposit')`)).rows[0]
+    const b = (await db.query(`select * from payment_account('balance')`)).rows[0]
+    d.stripe_account === 'xpetis' && b.stripe_account === 'xpetis'
+      ? ok('payment_account(deposit/balance) legge all_inclusive_stripe_account: xpetis in sandbox')
+      : fail(JSON.stringify([d, b]))
+  }
 
   // --------------------------------------------------- il ponte Stripe
   console.log('  -- il ponte Stripe riconosce un ordine --')
@@ -3359,8 +3381,10 @@ console.log('\n== L\'ordine su misura: proposta e pagamento ==')
   {
     const e = await webhook(evento('cs_test_sumisura_05', O(9), 50000))
     const o = await ordine(O(9))
-    e.esito === 'ordine_di_altro_tipo' && o.status === 'requested'
-      ? ok('pagamento su un All Inclusive: il ramo non lo tratta, e lo dice') : fail(JSON.stringify(e))
+    // Dalla 0047 il ramo All Inclusive c'è, ma senza riga né metadata.xpetis
+    // non sa se è l'acconto o il saldo: non indovina.
+    e.esito === 'rata_non_riconosciuta' && o.status === 'requested'
+      ? ok('pagamento su un All Inclusive senza rata riconoscibile: ordine fermo, e lo dice') : fail(JSON.stringify(e))
   }
   {
     // La cassa scaduta: solo la riga, l'ordine resta pagabile.
@@ -4109,6 +4133,921 @@ console.log('\n== Il silenzio-conferma: 48 ore, consegna, revisione ==')
               has_table_privilege('authenticated', 'booking_exceptions', 'SELECT') as u`)).rows[0]
     !r.a && !r.u ? ok('booking_exceptions: non leggibile dal browser') : fail(JSON.stringify(r))
   }
+}
+
+// ===========================================================================
+// L'All Inclusive: l'agenzia entra nel flusso (migration 0047)
+// ===========================================================================
+console.log('\n== L\'All Inclusive: agenzia, acconto, saldo, documento finale ==')
+{
+  const TD   = '11111111-1111-1111-1111-111111111111'   // Marco
+  const ANNA = '44444444-4444-4444-4444-444444444444'
+  const ALTRO_UTENTE = '99999999-9999-4999-8999-999999999999'
+  const B = (n) => `a1a1a1a1-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`
+  const O = (n) => `a7a7a7a7-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`
+  const giorno = (fra) => new Date(Date.now() + fra * 86400e3).toISOString().slice(0, 10)
+  const PARTENZA = giorno(90)
+
+  const rpc      = async (sql, params) => (await db.query(sql, params)).rows[0].r
+  const tick     = async () => (await db.query('select * from clock_tick(100)')).rows
+  const ordine   = async (id) => (await db.query('select * from orders where id=$1', [id])).rows[0]
+  const tokenDi  = async (purpose, orderId) => (await db.query(
+    `select token from access_tokens where purpose=$1 and order_id=$2 and revoked_at is null`,
+    [purpose, orderId])).rows[0]?.token
+  const posta    = async (kind, entity) => (await db.query(
+    `select * from outbound_messages where message_kind=$1 and entity_id=$2`, [kind, entity])).rows
+  const postaOrdine = async (kind, orderId) => (await db.query(
+    `select m.* from outbound_messages m
+      where m.message_kind = $1
+        and (m.entity_id = $2
+             or m.entity_id in (select id from order_proposals where order_id = $2)
+             or m.entity_id in (select id from order_files where order_id = $2)
+             or m.entity_id in (select (payload->>'invio')::uuid from access_tokens
+                                 where order_id = $2 and purpose = 'agency_proposal_confirm'))`,
+    [kind, orderId])).rows
+  const nAlert   = async (kind, entity) => Number((await db.query(
+    `select count(*) from team_alerts where kind=$1 and resolved_at is null
+       and ($2::uuid is null or entity_id = $2)`, [kind, entity ?? null])).rows[0].count)
+  const alert    = async (kind, entity) => (await db.query(
+    `select * from team_alerts where kind=$1 and entity_id=$2 order by created_at desc limit 1`,
+    [kind, entity])).rows[0]
+  const ultimaStoria = async (id) => (await db.query(
+    `select from_status, to_status, actor from order_status_history where order_id=$1 order by id desc limit 1`,
+    [id])).rows[0]
+
+  const pagina   = (t) => rpc('select td_order_page($1) as r', [t])
+  const bozza    = (t, desc, prezzo, partenza = PARTENZA, ritorno = null, credito = 0) =>
+    rpc('select ai_save_draft($1,$2,$3,$4::date,$5::date,$6) as r', [t, desc, prezzo, partenza, ritorno, credito])
+  const invia    = (t, prezzo) => rpc('select ai_send_to_agency($1,$2) as r', [t, prezzo])
+  const biglietto = (t, nome = 'Proposta Giappone.pdf') =>
+    rpc(`select td_delivery_ticket($1,$2,1000,'application/pdf') as r`, [t, nome])
+  const carica   = (t, path, nome = 'Proposta Giappone.pdf') =>
+    rpc(`select td_deliver($1,$2,$3,1000,'application/pdf') as r`, [t, path, nome])
+  const caricaDoc = async (t, nome) => {
+    const b = await biglietto(t, nome)
+    return { b, e: await carica(t, b.path, nome) }
+  }
+  const pagAg    = (t) => rpc('select agency_page($1) as r', [t])
+  const decidi   = (t, d, nota = null) => rpc('select agency_decide($1,$2,$3) as r', [t, d, nota])
+  const pagV     = (t) => rpc('select proposal_public_page($1) as r', [t])
+  const file     = (t, id) => rpc('select order_file_for_token($1,$2) as r', [t, id])
+  const finale   = (id, chi) => rpc('select final_document_for_traveler($1,$2) as r', [id, chi])
+  const conf     = (k, v) => db.query(`update app_config set value_text=$2 where key=$1`, [k, v])
+
+  // L'agenzia partner di oggi. Le prove della 0039 l'hanno cambiata: si legge.
+  const AG = (await db.query(`select id, operational_email from agencies where is_default_partner`)).rows[0]
+
+  const call = (n) => db.query(
+    `insert into bookings (id, traveler_id, td_id, service_type, status, cal_booking_uid,
+                           cal_event_type_slug, starts_at, ends_at, original_starts_at,
+                           price_cents, confirmed_at, last_actor)
+     values ($1, $2, $3, 'consultation', 'completed', 'uid-ai-' || $4, 'consulenza-xpetis-30',
+             now() - interval '3 days', now() - interval '3 days' + interval '30 minutes',
+             now() - interval '3 days', 6000, now(), 'n8n')`, [B(n), ANNA, TD, String(n)])
+  const nuovoOrdine = async (n) => {
+    await call(n)
+    await db.query(`insert into orders (id, traveler_id, td_id, service_type, source_booking_id, last_actor)
+                    values ($1, $2, $3, 'all_inclusive', $4, 'traveler')`, [O(n), ANNA, TD, B(n)])
+    return tokenDi('td_order_page', O(n))
+  }
+  // Un ordine portato fino all'agenzia in quattro gesti, per le prove storte.
+  const finoAllAgenzia = async (n, prezzo = 200000) => {
+    const t = await nuovoOrdine(n)
+    await db.query(`update orders set agency_id=$2 where id=$1`, [O(n), AG.id])
+    await bozza(t, 'Islanda in camper', prezzo)
+    await caricaDoc(t, 'Islanda.pdf')
+    const e = await invia(t, prezzo)
+    if (!e.ok) throw new Error('finoAllAgenzia: ' + JSON.stringify(e))
+    return { td: t, ag: await tokenDi('agency_proposal_confirm', O(n)) }
+  }
+
+  // Il ponte Stripe, come nelle prove della 0044, con la rata in metadata.xpetis.
+  const fxBase = JSON.parse(readFileSync(path.join(root, 'tests/fixtures/stripe/checkout_session_completed.json'), 'utf8'))
+  const SEG = 'whsec_parola_segreta_finta_per_l_harness'
+  let nEvt = 0
+  const evento = (sessione, orderId, importo, rata, extra = {}) => {
+    const b = JSON.parse(JSON.stringify(fxBase))
+    for (const k of Object.keys(b)) if (k.startsWith('_')) delete b[k]
+    b.id = `evt_ai_${String(++nEvt).padStart(4, '0')}`
+    b.created = Math.floor(Date.now() / 1000)
+    const o = b.data.object
+    o.id = sessione
+    o.amount_total = importo
+    o.amount_subtotal = importo
+    o.client_reference_id = orderId
+    o.metadata = { order_id: orderId, xpetis: rata }
+    Object.assign(o, extra)
+    return b
+  }
+  const webhook = async (corpo) => {
+    const raw = JSON.stringify(corpo)
+    const t = Math.floor(Date.now() / 1000)
+    const firma = `t=${t},v1=` + crypto.createHmac('sha256', SEG).update(`${t}.${raw}`, 'utf8').digest('hex')
+    return (await db.query('select stripe_webhook($1,$2) as e', [raw, firma])).rows[0].e
+  }
+  const cassa = (orderId, rata, sessione, importo) => db.query(
+    `insert into payments (order_id, kind, status, amount_cents, currency, stripe_account,
+                           client_reference_id, stripe_checkout_session_id, expires_at)
+     values ($1::uuid, $2::payment_kind, 'pending', $3, 'EUR', 'xpetis', $1::text, $4,
+             now() + interval '31 minutes')`, [orderId, rata, importo, sessione])
+
+  // ====================================================== A · la nascita
+  console.log('  -- la nascita: il designer riceve il suo link --')
+  const T1 = await nuovoOrdine(1)
+  {
+    const m = await posta('order_new_td_ai', O(1))
+    T1 && m.length === 1 && m[0].recipient === 'marco@example.com' && m[0].body_text.includes('/ordine/' + T1)
+      && (await posta('order_new_td', O(1))).length === 0
+      ? ok('l\'ordine All Inclusive nasce col token del designer e con la sua mail, non quella del su misura')
+      : fail('nascita: ' + JSON.stringify([!!T1, m.length]))
+    ;/passa dall.agenzia|va prima all.agenzia/.test(m[0]?.body_text ?? '') && m[0]?.body_text.includes('60,00 €')
+      ? ok('e la mail dice che la proposta passa dall\'agenzia, e quanto costava la call')
+      : fail('testo: ' + m[0]?.body_text)
+    const p = await pagina(T1)
+    p.esito === 'valido' && p.servizio === 'all_inclusive' && p.status === 'requested' && p.agenzia === null
+      ? ok('la pagina ordine riconosce l\'All Inclusive: stato, e nessuna agenzia ancora')
+      : fail('pagina: ' + JSON.stringify(p))
+    !/email|telefono|phone|cognome|full_name|Bianchi/.test(JSON.stringify(p))
+      ? ok('e del viaggiatore solo il nome') : fail('dati in più: ' + JSON.stringify(p))
+    const s = await rpc(`select save_proposal_draft($1,'x',50000,5,0) as r`, [T1])
+    s.esito === 'servizio_non_gestito'
+      ? ok('le funzioni del su misura non lavorano su un All Inclusive') : fail(JSON.stringify(s))
+  }
+
+  // ====================================================== B · la bozza
+  console.log('  -- la bozza e il documento --')
+  {
+    const e = await invia(T1, 450000)
+    e.esito === 'bozza_mancante' ? ok('non si invia una proposta mai salvata') : fail(JSON.stringify(e))
+  }
+  for (const [label, args, campo] of [
+    ['partenza nel passato',       ['Giappone', 450000, giorno(-1)], 'partenza'],
+    ['partenza oggi',              ['Giappone', 450000, giorno(0)], 'partenza'],
+    ['rientro prima della partenza', ['Giappone', 450000, PARTENZA, giorno(10)], 'ritorno'],
+    ['prezzo che non regge due casse', ['Giappone', 80], 'prezzo'],
+    ['descrizione vuota',          ['   ', 450000], 'descrizione'],
+  ]) {
+    const e = await bozza(T1, ...args)
+    e.ok === false && e.esito === 'dati_non_validi' && e.campo === campo
+      ? ok(`bozza con ${label}: rifiutata sul campo ${campo}`) : fail(`${label}: ` + JSON.stringify(e))
+  }
+  {
+    const e = await bozza(T1, 'Giappone 15 giorni, ryokan e treni', 450000, PARTENZA, giorno(105))
+    const o = await ordine(O(1))
+    e.ok && o.status === 'in_definition' && o.departure_date && o.last_actor === 'td'
+      ? ok('bozza salvata: in_definition, con la data di partenza, attribuita al designer')
+      : fail(JSON.stringify([e, o.status]))
+    const i = await invia(T1, 450000)
+    i.esito === 'documento_mancante' ? ok('senza documento di proposta non parte') : fail(JSON.stringify(i))
+  }
+  let DOC1
+  {
+    const { b, e } = await caricaDoc(T1, 'Giappone v1.pdf')
+    const o = await ordine(O(1))
+    DOC1 = e.file
+    b.tipo === 'proposal_document' && e.ok && e.esito === 'caricato' && o.status === 'in_definition'
+      ? ok('il documento si carica col meccanismo della consegna (0046), e lo stato non cambia')
+      : fail(JSON.stringify([b, e, o.status]))
+    const p = await pagina(T1)
+    p.documenti.length === 1 && p.documenti[0].nome === 'Giappone v1.pdf' && !('path' in p.documenti[0])
+      ? ok('la pagina lo elenca, senza percorso di Storage') : fail(JSON.stringify(p.documenti))
+    const i = await invia(T1, 450000)
+    i.esito === 'agenzia_non_assegnata'
+      ? ok('senza agenzia assegnata: la pagina dice che manca l\'agenzia, non che il designer ha sbagliato')
+      : fail(JSON.stringify(i))
+  }
+  // Il caso del prompt: un ordine senza agenzia che arriva alla proposta per
+  // un'altra strada (Studio, un workflow sbagliato). Lo ferma la 0009.
+  await expectFail('All Inclusive senza agenzia assegnata che arriva alla proposta: lo ferma il trigger', `
+    update orders set status='proposal_pending_agency', last_actor='team' where id='${O(1)}'`,
+    'senza agenzia assegnata')
+
+  // ====================================================== C · l'invio
+  console.log('  -- l\'invio all\'agenzia --')
+  await db.query(`update orders set agency_id=$2, last_actor='team' where id=$1`, [O(1), AG.id])
+  let TA1
+  {
+    const e0 = await invia(T1, 999999)
+    e0.esito === 'prezzo_cambiato' && e0.prezzo_cents === 450000
+      ? ok('l\'invio ridichiara il prezzo riletto: se è cambiato, si rifiuta') : fail(JSON.stringify(e0))
+    const e = await invia(T1, 450000)
+    const o = await ordine(O(1))
+    e.ok && e.esito === 'inviata' && o.status === 'proposal_pending_agency'
+      && o.total_price_cents === 450000 && o.deposit_cents === 135000 && o.balance_cents === 315000
+      ? ok('inviata: in verifica dell\'agenzia, con acconto 30% e saldo per residuo calcolati dal database')
+      : fail(JSON.stringify([e, o.status, o.deposit_cents, o.balance_cents]))
+    const pr = (await db.query(`select * from order_proposals where order_id=$1`, [O(1)])).rows
+    pr.length === 1 && pr[0].round === 1 && pr[0].document_file_id === DOC1 && pr[0].deposit_cents === 135000
+      && pr[0].delivery_days === null
+      ? ok('la fotografia della proposta: invio 1, col documento verificato e le due rate')
+      : fail(JSON.stringify(pr))
+    const t = (await db.query(`select * from access_tokens where purpose='agency_proposal_confirm' and order_id=$1`, [O(1)])).rows
+    TA1 = t[0]?.token
+    const giorni = t[0] ? (new Date(t[0].expires_at) - Date.now()) / 86400e3 : 0
+    t.length === 1 && t[0].audience === 'agency' && t[0].single_use && t[0].agency_id === AG.id
+      && giorni > 6.9 && giorni < 7.1 && t[0].payload.proposta === pr[0].id
+      ? ok('un token per l\'agenzia: monouso, legato a lei e alla proposta, scade in agency_confirm_valid_days')
+      : fail(JSON.stringify(t))
+    const m = await postaOrdine('agency_proposal_confirm', O(1))
+    m.length === 1 && m[0].recipient === AG.operational_email && m[0].body_text.includes('/agenzia/' + TA1)
+      && m[0].body_text.includes('4.500,00 €') && m[0].body_text.includes('1.350,00 €')
+      && m[0].body_text.includes('30%') && m[0].body_text.includes('Giappone v1.pdf')
+      ? ok('la mail all\'agenzia: all\'indirizzo operativo, con totale, acconto, percentuale, documento e link')
+      : fail('mail agenzia: ' + JSON.stringify(m.map(x => [x.recipient, x.body_text])))
+    !/Anna|Bianchi|viaggiatore@example/.test(m[0]?.body_text ?? '')
+      ? ok('e senza niente del viaggiatore') : fail('dati del viaggiatore nella mail all\'agenzia')
+    ;(await tokenDi('traveler_public_proposal', O(1))) === undefined
+      && (await postaOrdine('ai_proposal_traveler', O(1))).length === 0
+      ? ok('al viaggiatore non è arrivato niente: la proposta non verificata non lo raggiunge')
+      : fail('il viaggiatore ha già qualcosa')
+  }
+  await expectFail('dopo l\'invio il prezzo non si tocca, nemmeno da Studio', `
+    update orders set proposal_price_cents=100000 where id='${O(1)}'`, 'già partita')
+  await expectFail('e nemmeno l\'agenzia assegnata', `
+    update orders set agency_id='33333333-3333-3333-3333-333333333333' where id='${O(1)}'`, 'già partita')
+  await expectFail('e nemmeno l\'acconto', `
+    update orders set deposit_cents=1 where id='${O(1)}'`, 'già partita')
+  {
+    const e = await bozza(T1, 'ritocco', 400000)
+    e.esito === 'in_verifica_agenzia' ? ok('bozza durante la verifica: no, e la risposta dice perché')
+                                      : fail(JSON.stringify(e))
+    const i = await invia(T1, 450000)
+    i.ok && i.esito === 'gia_inviata' ? ok('il doppio clic su Invia: già inviata, nessun secondo token')
+                                      : fail(JSON.stringify(i))
+    const n = Number((await db.query(`select count(*) from access_tokens where purpose='agency_proposal_confirm'
+                                       and order_id=$1`, [O(1)])).rows[0].count)
+    n === 1 ? ok('ancora un token solo') : fail(n + ' token')
+  }
+  {
+    // my_orders: la proposta non verificata non si legge nemmeno dal browser.
+    await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [ANNA])
+    const r = (await db.query(`select * from my_orders where id=$1`, [O(1)])).rows[0]
+    await db.query(`select set_config('request.jwt.claim.sub', '', false)`)
+    r && r.proposal_price_cents === null && r.deposit_cents === null && r.total_price_cents === null
+      ? ok('my_orders maschera prezzo e acconto finché l\'agenzia non ha confermato')
+      : fail('my_orders: ' + JSON.stringify(r))
+  }
+
+  // ====================================================== D · la pagina dell'agenzia
+  console.log('  -- la pagina dell\'agenzia --')
+  {
+    const p = await pagAg(TA1)
+    p.esito === 'valido' && p.fase === 'da_decidere' && p.totale_cents === 450000 && p.acconto_cents === 135000
+      && p.documento?.id === DOC1 && p.invio_n === 1
+      ? ok('da decidere: totale, rate, invio e documento') : fail(JSON.stringify(p))
+    !/Anna|Bianchi|viaggiatore@example|traveler/.test(JSON.stringify(p))
+      ? ok('e niente del viaggiatore') : fail('dati del viaggiatore: ' + JSON.stringify(p))
+    const f = await file(TA1, DOC1)
+    f.esito === 'valido' && f.path.startsWith('ordini/') ? ok('l\'agenzia scarica il documento della sua proposta')
+                                                         : fail(JSON.stringify(f))
+    ;(await pagina(TA1)).esito === 'token_di_altro_tipo' && (await pagAg(T1)).esito === 'token_di_altro_tipo'
+      ? ok('il token dell\'agenzia non apre la pagina del designer, e viceversa') : fail('token scambiati')
+    ;(await pagAg('agenzia-inventata')).esito === 'inesistente'
+      ? ok('un token inventato riceve la risposta generica') : fail('token inventato')
+  }
+
+  // ====================================================== E · l'agenzia rifiuta
+  console.log('  -- l\'agenzia non conferma --')
+  {
+    const e0 = await decidi(TA1, 'non_fattibile', '  ')
+    e0.ok === false && e0.esito === 'dati_non_validi' && e0.campo === 'nota'
+      ? ok('«non fattibile» senza dire perché: no') : fail(JSON.stringify(e0))
+    const e1 = await decidi(TA1, 'boh')
+    e1.esito === 'dati_non_validi' && e1.campo === 'decisione' ? ok('una decisione che non esiste: no')
+                                                              : fail(JSON.stringify(e1))
+    ;(await pagAg(TA1)).fase === 'da_decidere' ? ok('e un tentativo sbagliato non consuma il link')
+                                              : fail('link consumato da un errore')
+  }
+  {
+    const e = await decidi(TA1, 'non_fattibile', 'Il ryokan di Kyoto è pieno ad aprile')
+    const o = await ordine(O(1))
+    const h = await ultimaStoria(O(1))
+    e.ok && e.esito === 'non_fattibile' && o.status === 'in_definition' && o.last_actor === 'agency'
+      && o.agency_rejection_note.includes('ryokan') && h.actor === 'agency'
+      ? ok('non fattibile: la proposta torna al designer, con la nota, attribuita all\'agenzia')
+      : fail(JSON.stringify([e, o.status, h]))
+    const d = (await db.query(`select * from agency_decisions where order_id=$1`, [O(1)])).rows
+    d.length === 1 && d[0].decision === 'rejected' && d[0].actor === 'agency'
+      ? ok('la decisione resta scritta, una per proposta') : fail(JSON.stringify(d))
+    const m = await postaOrdine('agency_rejected_td', O(1))
+    m.length === 1 && m[0].recipient === 'marco@example.com' && m[0].body_text.includes('ryokan')
+      && m[0].body_text.includes('/ordine/' + T1)
+      ? ok('il designer riceve la nota dell\'agenzia e il link per correggere') : fail('mail rifiuto: ' + m.length)
+    ;(await postaOrdine('ai_proposal_traveler', O(1))).length === 0 && !(await tokenDi('traveler_public_proposal', O(1)))
+      ? ok('e al viaggiatore, ancora, niente') : fail('il viaggiatore ha ricevuto una proposta rifiutata')
+    const p = await pagina(T1)
+    p.ultimo_invio?.decisione === 'rejected' && p.ultimo_invio.nota.includes('ryokan')
+      ? ok('la pagina del designer dice cosa ha scritto l\'agenzia') : fail(JSON.stringify(p.ultimo_invio))
+  }
+  {
+    // L'agenzia che risponde di nuovo sullo stesso link: la prima risposta vince.
+    const e = await decidi(TA1, 'conferma')
+    e.ok === false && e.esito === 'gia_decisa' && e.decisione === 'non_fattibile' && e.deciso_il
+      ? ok('un secondo clic, sull\'altro tasto: «già deciso», con la decisione e la data') : fail(JSON.stringify(e))
+    const p = await pagAg(TA1)
+    p.fase === 'non_fattibile' && p.documento === null && p.nota.includes('ryokan')
+      ? ok('e la pagina dice com\'è andata, senza più il documento da scaricare') : fail(JSON.stringify(p))
+    ;(await file(TA1, DOC1)).esito === 'gia_usato'
+      ? ok('un link consumato non scarica più il documento') : fail('documento ancora scaricabile')
+    ;(await ordine(O(1))).status === 'in_definition' ? ok('e l\'ordine non si è mosso') : fail('ordine mosso')
+  }
+
+  // ====================================================== F · secondo invio, conferma
+  console.log('  -- il secondo invio, e la conferma --')
+  let TA2, TV, DOC2
+  {
+    const e = await bozza(T1, 'Giappone 15 giorni, Kyoto a maggio', 480000, PARTENZA, giorno(105))
+    const { e: c } = await caricaDoc(T1, 'Giappone v2.pdf')
+    DOC2 = c.file
+    const i = await invia(T1, 480000)
+    const pr = (await db.query(`select * from order_proposals where order_id=$1 order by round`, [O(1)])).rows
+    TA2 = await tokenDi('agency_proposal_confirm', O(1))
+    e.ok && i.ok && pr.length === 2 && pr[1].round === 2 && pr[1].document_file_id === DOC2
+      && pr[1].deposit_cents === 144000 && TA2 && TA2 !== TA1
+      ? ok('corretta e rimandata: invio 2, col documento nuovo, acconto ricalcolato, token nuovo')
+      : fail(JSON.stringify([e, i, pr.length]))
+    ;(await pagAg(TA1)).esito === 'revocato'
+      ? ok('il link del primo invio risponde «annullato»') : fail('link vecchio ancora vivo')
+    ;(await postaOrdine('agency_proposal_confirm', O(1))).length === 2
+      ? ok('e l\'agenzia ha la sua seconda mail') : fail('seconda mail all\'agenzia assente')
+  }
+  {
+    const e = await decidi(TA2, 'conferma')
+    const o = await ordine(O(1))
+    e.ok && e.esito === 'confermata' && o.status === 'awaiting_deposit' && o.agency_confirmed_at
+      && o.last_actor === 'agency'
+      ? ok('confermata: in attesa dell\'acconto, con la data della conferma') : fail(JSON.stringify([e, o.status]))
+    TV = await tokenDi('traveler_public_proposal', O(1))
+    const m = await postaOrdine('ai_proposal_traveler', O(1))
+    TV && m.length === 1 && m[0].recipient === 'viaggiatore@example.com' && m[0].body_text.includes('/proposta/' + TV)
+      && m[0].body_text.includes('1.440,00 €') && m[0].body_text.includes('4.800,00 €')
+      ? ok('la cascata: il viaggiatore riceve la proposta con l\'acconto e il link della sua pagina')
+      : fail('mail viaggiatore: ' + JSON.stringify(m.map(x => x.body_text)))
+    const mt = await postaOrdine('agency_confirmed_td', O(1))
+    mt.length === 1 && mt[0].body_text.includes('/ordine/' + T1)
+      ? ok('e il designer la conferma, con il link alla pagina dove sta il messaggio pronto')
+      : fail('mail conferma al designer: ' + mt.length)
+    const p = await pagina(T1)
+    p.messaggio_pronto?.includes('/proposta/' + TV) && p.link_pagina?.includes(TV)
+      ? ok('sulla pagina del designer: il messaggio da girare nel gruppo commerciale') : fail(JSON.stringify(p.messaggio_pronto))
+  }
+  {
+    // «Agenzia che conferma due volte.»
+    const e = await decidi(TA2, 'conferma')
+    const d = Number((await db.query(`select count(*) from agency_decisions where order_id=$1`, [O(1)])).rows[0].count)
+    e.ok === true && e.esito === 'gia_decisa' && e.decisione === 'conferma' && d === 2
+      && (await postaOrdine('ai_proposal_traveler', O(1))).length === 1
+      ? ok('l\'agenzia conferma due volte: «già confermata», una decisione, una mail al viaggiatore')
+      : fail(JSON.stringify([e, d]))
+    ;(await pagAg(TA2)).fase === 'confermata' ? ok('e la pagina dice «confermata»') : fail('pagina agenzia')
+  }
+  await expectFail('confermata, la proposta non si tocca più', `
+    update orders set proposal_description='altro' where id='${O(1)}'`, 'già partita')
+
+  // ====================================================== G · la pagina del viaggiatore
+  console.log('  -- la pagina del viaggiatore --')
+  {
+    const v = await pagV(TV)
+    v.esito === 'valido' && v.servizio === 'all_inclusive' && v.fase === 'da_pagare_acconto'
+      && v.cassa?.rata === 'deposit' && v.cassa.importo_cents === 144000 && v.totale_cents === 480000
+      && v.documento?.id === DOC2
+      ? ok('da pagare l\'acconto: la cassa la dice il database, col documento verificato')
+      : fail(JSON.stringify(v))
+    !/Anna|Bianchi|viaggiatore@example/.test(JSON.stringify(v))
+      ? ok('niente del viaggiatore: la pagina si gira nel gruppo') : fail('dati del viaggiatore in pagina')
+    ;(await file(TV, DOC2)).esito === 'valido' && (await file(TV, DOC1)).esito === 'file_sconosciuto'
+      ? ok('scarica il documento confermato, non quello rifiutato') : fail('documenti sbagliati')
+    ;(await rpc('select request_revision($1,$2) as r', [TV, 'x'])).esito === 'servizio_non_gestito'
+      ? ok('la revisione inclusa è del su misura: qui non esiste') : fail('revisione su un All Inclusive')
+  }
+
+  // ====================================================== H · due casse
+  console.log('  -- acconto e saldo: due casse sullo stesso ordine --')
+  await expectOk('una cassa acconto e una cassa saldo aperte insieme: payments_one_pending_per_kind le regge', `
+    insert into payments (order_id, kind, status, amount_cents, stripe_account)
+    values ('${O(1)}', 'deposit', 'pending', 144000, 'xpetis'),
+           ('${O(1)}', 'balance', 'pending', 336000, 'xpetis')`)
+  await expectFail('ma non due casse acconto', `
+    insert into payments (order_id, kind, status, amount_cents, stripe_account)
+    values ('${O(1)}', 'deposit', 'pending', 144000, 'xpetis')`, 'payments_one_pending_per_kind')
+  await db.query(`delete from payments where order_id=$1`, [O(1)])
+
+  // ====================================================== I · l'acconto
+  console.log('  -- l\'acconto --')
+  await conf('team_notify_recipients', 'simone@xpetis.test')
+  await conf('team_notify_events', 'ordine_pagato, acconto_pagato, saldo_pagato, agenzia_ha_confermato')
+  await cassa(O(1), 'deposit', 'cs_test_ai_01', 144000)
+  {
+    const e = await webhook(evento('cs_test_ai_01', O(1), 100000, 'deposit'))
+    e.esito === 'importo_non_combacia' && (await ordine(O(1))).status === 'awaiting_deposit'
+      && (await alert('stripe_importo_non_combacia', O(1)))?.message.includes('acconto')
+      ? ok('acconto con l\'importo sbagliato: l\'ordine non si muove, alert che dice «acconto»')
+      : fail(JSON.stringify(e))
+  }
+  {
+    const ev = evento('cs_test_ai_01', O(1), 144000, 'deposit')
+    const e = await webhook(ev)
+    const o = await ordine(O(1))
+    const p = (await db.query(`select status, kind from payments where stripe_checkout_session_id='cs_test_ai_01'`)).rows[0]
+    e.ok && e.esito === 'ordine_pagato' && o.status === 'deposit_paid' && o.last_actor === 'traveler'
+      && p.status === 'paid' && p.kind === 'deposit'
+      ? ok('acconto giusto: deposit_paid, attribuito al viaggiatore, riga pagata') : fail(JSON.stringify([e, o.status]))
+    const n = (await db.query(`select * from outbound_messages where message_kind='team_acconto_pagato'
+                                and entity_id=$1`, [O(1)])).rows
+    n.length === 1 && n[0].body_text.includes('Mancano i tempi del saldo')
+      ? ok('il team lo sa, se «acconto_pagato» è fra gli eventi, e sa che mancano i tempi del saldo')
+      : fail('notifica acconto: ' + JSON.stringify(n.map(x => x.body_text)))
+    const r = await webhook(ev)
+    r.esito === 'duplicato' ? ok('lo stesso evt_ due volte: duplicato') : fail(JSON.stringify(r))
+    const r2 = await webhook(evento('cs_test_ai_01', O(1), 144000, 'deposit'))
+    r2.ok && r2.esito === 'gia_pagato' ? ok('un altro evt_ per la stessa sessione: già pagato, non è un guasto')
+                                       : fail(JSON.stringify(r2))
+  }
+
+  // ====================================================== J · i tempi del saldo
+  console.log('  -- i tempi del saldo, scritti dal team --')
+  await expectFail('«balance_due_at mancante quando serve»: il saldo non si chiede senza i suoi tempi', `
+    update orders set status='awaiting_balance', last_actor='team' where id='${O(1)}'`, 'senza i suoi tempi')
+  await expectFail('tempi del saldo nel passato: no', `
+    update orders set balance_due_at = now() - interval '1 day' where id='${O(1)}'`, 'nel passato')
+  await expectFail('tempi del saldo dopo la partenza: no', `
+    update orders set balance_due_at = '${giorno(100)}'::date + time '12:00' where id='${O(1)}'`, 'dopo la partenza')
+  {
+    await db.query(`update orders set balance_due_at = $2::date + time '18:00' where id=$1`, [O(1), giorno(60)])
+    const o = await ordine(O(1))
+    const h = (await db.query(`select from_status, to_status, actor from order_status_history
+                                where order_id=$1 order by id desc limit 2`, [O(1)])).rows
+    o.status === 'awaiting_balance' && h[0].to_status === 'awaiting_balance' && h[0].actor === 'system'
+      && h[1].to_status === 'deposit_paid'
+      ? ok('scritti i tempi, il saldo si chiede da solo: awaiting_balance, e la storia è in ordine')
+      : fail(JSON.stringify([o.status, h]))
+    const m = await posta('ai_balance_traveler', O(1))
+    m.length === 1 && m[0].recipient === 'viaggiatore@example.com' && m[0].body_text.includes('3.360,00 €')
+      && m[0].body_text.includes(giorno(60).split('-').reverse().join('/'))
+      ? ok('il viaggiatore riceve la richiesta del saldo, con l\'importo e la data')
+      : fail('mail saldo: ' + JSON.stringify(m.map(x => x.body_text)))
+    const l = (await db.query(`select actor from event_log where entity_id=$1 and event='tempi_saldo_inseriti'`, [O(1)])).rows
+    l.length === 1 && l[0].actor === 'team' ? ok('e il diario dice che i tempi li ha scritti il team')
+                                            : fail(JSON.stringify(l))
+    const v = await pagV(TV)
+    v.fase === 'da_pagare_saldo' && v.cassa?.rata === 'balance' && v.cassa.importo_cents === 336000 && v.saldo_entro
+      ? ok('la pagina del viaggiatore apre la cassa del saldo') : fail(JSON.stringify(v))
+  }
+
+  // ====================================================== K · il saldo
+  console.log('  -- il saldo --')
+  await cassa(O(1), 'balance', 'cs_test_ai_02', 336000)
+  {
+    const e = await webhook(evento('cs_test_ai_02', O(1), 336000, 'balance'))
+    const o = await ordine(O(1))
+    e.esito === 'ordine_pagato' && o.status === 'balance_paid'
+      ? ok('saldo pagato: balance_paid') : fail(JSON.stringify([e, o.status]))
+    const m = await posta('ai_balance_paid_td', O(1))
+    m.length === 1 && m[0].recipient === 'marco@example.com' && m[0].body_text.includes('/ordine/' + T1)
+      ? ok('il designer riceve la mail: adesso il documento finale') : fail('mail saldato: ' + m.length)
+    ;(await db.query(`select 1 from outbound_messages where message_kind='team_saldo_pagato' and entity_id=$1`, [O(1)])).rows.length === 1
+      ? ok('e il team la sua notifica') : fail('notifica saldo')
+    const p = (await db.query(`select kind, status from payments where order_id=$1 order by kind`, [O(1)])).rows
+    p.length === 2 && p.every(x => x.status === 'paid')
+      ? ok('due incassi riusciti sullo stesso ordine, uno per rata') : fail(JSON.stringify(p))
+  }
+  await expectFail('saldato, i tempi del saldo non si cambiano più', `
+    update orders set balance_due_at = '${giorno(50)}'::date + time '12:00' where id='${O(1)}'`, 'già pagato')
+
+  // ====================================================== L · il documento finale
+  console.log('  -- il documento finale --')
+  let FIN
+  {
+    const b = await biglietto(T1, 'Giappone - documento di viaggio.pdf')
+    const e = await carica(T1, b.path, 'Giappone - documento di viaggio.pdf')
+    const o = await ordine(O(1))
+    FIN = e.file
+    b.tipo === 'final_document' && e.ok && e.esito === 'consegnato' && o.status === 'delivered'
+      && o.delivered_at && o.last_actor === 'td'
+      ? ok('a saldo pagato il designer carica il documento finale: delivered, attribuito a lui')
+      : fail(JSON.stringify([b, e, o.status]))
+    const m = await posta('ai_delivery_traveler', FIN)
+    m.length === 1 && m[0].body_text.includes('/proposta/' + TV) && /Google/.test(m[0].body_text)
+      ? ok('il viaggiatore riceve la mail con la sua pagina, e sa che per scaricare si entra con Google')
+      : fail('mail consegna: ' + JSON.stringify(m.map(x => x.body_text)))
+    const p = await pagina(T1)
+    p.messaggio_consegna?.includes('/proposta/' + TV) && p.file_finale.length === 1
+      ? ok('il designer ha il messaggio per il gruppo, e il file nella sua pagina') : fail(JSON.stringify(p.messaggio_consegna))
+    const v = await pagV(TV)
+    v.fase === 'consegnata' && v.file_finale.length === 1 && v.file_finale[0].id === FIN && !v.cassa
+      ? ok('la pagina del viaggiatore elenca il documento finale, senza cassa') : fail(JSON.stringify(v))
+  }
+  {
+    ;(await file(TV, FIN)).esito === 'file_sconosciuto'
+      ? ok('dal link girato nel gruppo il documento finale NON si scarica') : fail('documento finale via token')
+    ;(await file(T1, FIN)).esito === 'valido'
+      ? ok('il designer sì, col suo token') : fail('il designer non scarica il suo file')
+    const a = await finale(FIN, null)
+    const b = await finale(FIN, ALTRO_UTENTE)
+    const c = await finale(FIN, ANNA)
+    a.esito === 'serve_accesso' && b.esito === 'file_sconosciuto' && c.esito === 'valido' && c.path.startsWith('ordini/')
+      ? ok('col login: senza sessione «accedi», un altro account «non esiste», il viaggiatore dell\'ordine sì')
+      : fail(JSON.stringify([a, b, c]))
+    ;(await finale(DOC2, ANNA)).esito === 'file_sconosciuto'
+      ? ok('e da lì esce solo il documento finale, non la proposta') : fail('proposta dalla porta del login')
+    const bb = await biglietto(T1)
+    bb.esito === 'stato_non_ammesso' ? ok('consegnato: non si carica altro') : fail(JSON.stringify(bb))
+  }
+  {
+    await tick()
+    ;(await ordine(O(1))).status === 'delivered'
+      ? ok('il silenzio non chiude l\'All Inclusive: la sua chiusura è un punto aperto') : fail('chiuso dall\'orologio')
+  }
+
+  // ====================================================== M · i casi storti
+  console.log('  -- acconto pagato su un ordine rifiutato --')
+  {
+    const { ag } = await finoAllAgenzia(2)
+    const acconto = (await ordine(O(2))).deposit_cents
+    await decidi(ag, 'non_fattibile', 'Prezzi dei voli cambiati')
+    // Una cassa acconto che non avrebbe dovuto esistere (aperta a mano, o da un
+    // giro che la route non fa): il ponte non deve portare avanti niente.
+    await cassa(O(2), 'deposit', 'cs_test_ai_03', acconto)
+    const e = await webhook(evento('cs_test_ai_03', O(2), acconto, 'deposit'))
+    const o = await ordine(O(2))
+    const a = await alert('stripe_pagamento_su_ordine_non_in_attesa', O(2))
+    e.ok === false && e.esito === 'pagamento_su_ordine_non_in_attesa' && o.status === 'in_definition'
+      && a?.severity === 'critical' && a.message.includes('NON CONFERMATA') && a.message.includes('dashboard Stripe')
+      ? ok('acconto su una proposta rifiutata: ordine fermo, alert critico che dice di rimborsare dalla dashboard')
+      : fail(JSON.stringify([e, o.status, a?.message]))
+    const p = (await db.query(`select status from payments where stripe_checkout_session_id='cs_test_ai_03'`)).rows[0]
+    p.status === 'paid' ? ok('e i soldi, che sono veri, restano registrati') : fail(p.status)
+  }
+
+  console.log('  -- saldo pagato prima dell\'acconto --')
+  {
+    const { ag } = await finoAllAgenzia(3, 300000)
+    await decidi(ag, 'conferma')
+    const o0 = await ordine(O(3))
+    await cassa(O(3), 'balance', 'cs_test_ai_04', o0.balance_cents)
+    const e = await webhook(evento('cs_test_ai_04', O(3), o0.balance_cents, 'balance'))
+    const o = await ordine(O(3))
+    const a = await alert('stripe_pagamento_su_ordine_non_in_attesa', O(3))
+    e.esito === 'pagamento_su_ordine_non_in_attesa' && o.status === 'awaiting_deposit'
+      && a?.message.includes('SALDO PAGATO PRIMA DEL TEMPO') && a.message.includes('acconto non è ancora stato pagato')
+      ? ok('saldo prima dell\'acconto: ordine fermo in attesa dell\'acconto, alert che lo dice')
+      : fail(JSON.stringify([e, o.status, a?.message]))
+
+    // Il seguito: il team rimborsa il saldo anticipato, arriva l'acconto, poi
+    // i tempi, poi il saldo vero. L'indice dei pagamenti riusciti conta anche
+    // il rimborsato: il ponte non deve esplodere, deve fermarsi e dirlo.
+    await db.query(`update payments set status='refunded', refunded_at=now() where stripe_checkout_session_id='cs_test_ai_04'`)
+    await cassa(O(3), 'deposit', 'cs_test_ai_05', o0.deposit_cents)
+    const d = await webhook(evento('cs_test_ai_05', O(3), o0.deposit_cents, 'deposit'))
+    await db.query(`update orders set balance_due_at = $2::date + time '12:00' where id=$1`, [O(3), giorno(30)])
+    await cassa(O(3), 'balance', 'cs_test_ai_06', o0.balance_cents)
+    const s = await webhook(evento('cs_test_ai_06', O(3), o0.balance_cents, 'balance'))
+    const o2 = await ordine(O(3))
+    d.esito === 'ordine_pagato' && s.ok === false && s.esito === 'rata_gia_registrata'
+      && o2.status === 'awaiting_balance' && await nAlert('stripe_rata_gia_registrata', O(3)) === 1
+      ? ok('il saldo vero dopo uno anticipato e rimborsato: niente errore da ritentare, ordine fermo, alert')
+      : fail(JSON.stringify([d.esito, s, o2.status]))
+    const w = (await db.query(`select processed_at, error from webhook_events where id=$1`, [s.webhook_event_id])).rows[0]
+    w.processed_at && !w.error ? ok('e il messaggio è chiuso: Stripe non ritenta per sempre') : fail(JSON.stringify(w))
+  }
+
+  console.log('  -- la rata non si indovina --')
+  {
+    const e = await webhook(evento('cs_test_ai_07', O(3), 1000, 'full'))
+    e.esito === 'rata_non_riconosciuta' && (await ordine(O(3))).status === 'awaiting_balance'
+      && await nAlert('stripe_rata_non_riconosciuta', O(3)) === 1
+      ? ok('un pagamento senza riga e con metadata.xpetis = full su un All Inclusive: alert, ordine fermo')
+      : fail(JSON.stringify(e))
+  }
+
+  console.log('  -- il link dell\'agenzia scade, il team lo rinnova --')
+  {
+    const { ag } = await finoAllAgenzia(4)
+    await db.query(`update access_tokens set expires_at = now() - interval '1 minute' where token=$1`, [ag])
+    await tick(); await tick()
+    const a = await alert('verifica_agenzia_scaduta', O(4))
+    a && await nAlert('verifica_agenzia_scaduta', O(4)) === 1 && a.message.includes(`rinnova_verifica_agenzia('${O(4)}')`)
+      ? ok('link scaduto senza risposta: un alert per ordine, con la riga per rinnovarlo')
+      : fail('alert: ' + a?.message)
+    ;(await pagAg(ag)).esito === 'scaduto' && (await decidi(ag, 'conferma')).esito === 'scaduto'
+      && (await ordine(O(4))).status === 'proposal_pending_agency'
+      ? ok('e il link scaduto non conferma: la proposta resta in verifica') : fail('link scaduto che conferma')
+    const nuovo = await rpc(`select rinnova_verifica_agenzia($1) as r`, [O(4)])
+    ;(await pagAg(ag)).esito === 'revocato' && (await pagAg(nuovo)).fase === 'da_decidere'
+      && (await postaOrdine('agency_proposal_confirm', O(4))).length === 2
+      ? ok('rinnovato: il vecchio è annullato, il nuovo vale, e l\'agenzia ha una mail nuova')
+      : fail('rinnovo')
+
+    // Il team conferma da Studio (l'agenzia al telefono): la cascata parte lo
+    // stesso, e la decisione dice chi è stato.
+    await db.query(`update orders set status='awaiting_deposit', last_actor='team' where id=$1`, [O(4)])
+    const d = (await db.query(`select decision, actor from agency_decisions where order_id=$1`, [O(4)])).rows
+    d.length === 1 && d[0].decision === 'confirmed' && d[0].actor === 'team'
+      && (await postaOrdine('ai_proposal_traveler', O(4))).length === 1
+      && (await pagAg(nuovo)).esito === 'revocato'
+      ? ok('confermata da Studio: la cascata parte, la decisione è del team, il link dell\'agenzia si spegne')
+      : fail(JSON.stringify(d))
+    let esploso = false
+    try { await rpc(`select rinnova_verifica_agenzia($1) as r`, [O(4)]) } catch { esploso = true }
+    esploso ? ok('e non si rinnova un link su una proposta che non è più in verifica') : fail('rinnovo fuori stato')
+  }
+
+  console.log('  -- il saldo scaduto, e la consegna senza documento finale --')
+  {
+    await db.query(`update orders set status='deposit_paid', last_actor='team' where id=$1`, [O(4)])
+    await db.query(`update orders set balance_due_at = $2::date + time '12:00' where id=$1`, [O(4), giorno(20)])
+    // Una scadenza passata si fabbrica spegnendo i trigger per un attimo:
+    // quello delle regole, giustamente, non la lascerebbe scrivere.
+    await db.exec(`set session_replication_role = replica;
+                   update orders set balance_due_at = now() - interval '1 hour' where id='${O(4)}';
+                   set session_replication_role = origin;`)
+    await tick(); await tick()
+    const a = await alert('saldo_scaduto', O(4))
+    a?.severity === 'critical' && await nAlert('saldo_scaduto', O(4)) === 1
+      && (await ordine(O(4))).status === 'awaiting_balance'
+      ? ok('saldo non arrivato in tempo: un alert critico al team, e il sistema non annulla niente')
+      : fail('saldo scaduto: ' + a?.message)
+    await db.query(`update orders set status='balance_paid', last_actor='team' where id=$1`, [O(4)])
+  }
+  await expectFail('consegnato senza il documento finale: no (c\'è solo quello di proposta)', `
+    update orders set status='delivered', last_actor='td' where id='${O(4)}'`, 'consegnato senza')
+
+  console.log('  -- le regole dell\'invio, anche da Studio --')
+  {
+    const t = await nuovoOrdine(5)
+    await db.query(`update orders set agency_id=$2 where id=$1`, [O(5), AG.id])
+    await bozza(t, 'Norvegia', 100)
+    await caricaDoc(t, 'Norvegia.pdf')
+    const e = await invia(t, 100)
+    e.esito === 'dati_non_validi' && e.campo === 'prezzo'
+      ? ok('un totale il cui acconto o saldo scende sotto 0,50 €: no, due casse Stripe non si aprono')
+      : fail(JSON.stringify(e))
+    await db.query(`update app_config set value = null, value_text = 'x' where key = 'agency_confirm_valid_days'`)
+    await bozza(t, 'Norvegia', 150000)
+    const e2 = await invia(t, 150000)
+    await db.query(`update app_config set value = 7, value_text = null where key = 'agency_confirm_valid_days'`)
+    e2.esito === 'non_configurato' && (await ordine(O(5))).status === 'in_definition'
+      ? ok('senza agency_confirm_valid_days l\'invio non parte: la vita del link non si inventa')
+      : fail(JSON.stringify(e2))
+  }
+  await expectFail('da Studio, una proposta senza data di partenza non parte verso l\'agenzia', `
+    update orders set departure_date = null where id='${O(5)}';
+    update orders set status='proposal_pending_agency', last_actor='team' where id='${O(5)}'`, 'senza data di partenza')
+
+  // ====================================================== N · la chiave ristretta
+  console.log('  -- la chiave Stripe dell\'agenzia, da Vault --')
+  {
+    let esploso = ''
+    try { await rpc(`select agency_stripe_key($1) as r`, [AG.id]) } catch (e) { esploso = e.message }
+    esploso.includes('stripe_credential_ref') ? ok('senza riferimento: nessuna chiave, e la frase dice cosa manca')
+                                              : fail(esploso || 'chiave senza riferimento')
+    await db.query(`insert into vault.decrypted_secrets (name, decrypted_secret)
+                    values ('stripe_key_prova', 'rk_test_finta'), ('stripe_sk_prova', 'sk_test_finta')`)
+    await db.query(`update agencies set stripe_credential_ref='stripe_key_prova' where id=$1`, [AG.id])
+    const k = await rpc(`select agency_stripe_key($1) as r`, [AG.id])
+    k === 'rk_test_finta' ? ok('con il riferimento: la chiave ristretta dal Vault') : fail(k)
+    await db.query(`update agencies set stripe_credential_ref='stripe_sk_prova' where id=$1`, [AG.id])
+    esploso = ''
+    try { await rpc(`select agency_stripe_key($1) as r`, [AG.id]) } catch (e) { esploso = e.message }
+    esploso.includes('non è una chiave ristretta')
+      ? ok('una secret key al posto della ristretta: rifiutata, niente rimborsi via API')
+      : fail(esploso || 'secret key accettata')
+    await db.query(`update agencies set stripe_credential_ref=null where id=$1`, [AG.id])
+    const c = (await db.query(`select column_name from information_schema.columns
+                                where table_name='agencies' and column_name ~ '(secret|key|password)'`)).rows
+    c.length === 0 ? ok('e in agencies nessuna colonna porta una chiave: solo il riferimento')
+                   : fail(JSON.stringify(c))
+  }
+
+  // ====================================================== O · chi arriva a cosa
+  console.log('  -- anon e authenticated non arrivano a niente --')
+  const chiuse = ['agency_page(text)', 'agency_decide(text,text,text)', 'agency_stripe_key(uuid)',
+    'ai_save_draft(text,text,integer,date,date,integer)', 'ai_send_to_agency(text,integer)',
+    'final_document_for_traveler(uuid,uuid)', 'rinnova_verifica_agenzia(uuid)',
+    'agency_token_context(text)', 'td_ai_order_page(uuid)', 'ai_traveler_page(uuid)',
+    'stripe_checkout_ai(jsonb,uuid,payments,orders)', 'emetti_verifica_agenzia(uuid)',
+    'clock_ramo_verifica_agenzia()', 'clock_ramo_saldo_scaduto()', 'td_order_token(text,boolean)',
+    'ai_ticket(uuid,text,bigint,text)', 'ai_deliver(uuid,text,text,text,bigint,text)']
+  for (const f of chiuse) {
+    const r = (await db.query(
+      `select has_function_privilege('anon', $1, 'EXECUTE') as a,
+              has_function_privilege('authenticated', $1, 'EXECUTE') as u`, [f])).rows[0]
+    !r.a && !r.u ? ok(`${f}: chiusa ad anon e authenticated`) : fail(`${f} aperta: ${JSON.stringify(r)}`)
+  }
+  for (const f of ['agency_page(text)', 'agency_decide(text,text,text)', 'agency_stripe_key(uuid)',
+                   'ai_save_draft(text,text,integer,date,date,integer)', 'ai_send_to_agency(text,integer)',
+                   'final_document_for_traveler(uuid,uuid)', 'rinnova_verifica_agenzia(uuid)']) {
+    const v = (await db.query(`select has_function_privilege('service_role', $1, 'EXECUTE') as v`, [f])).rows[0].v
+    v ? ok(`${f}: la chiama la route server (o il team)`) : fail(`${f} non raggiungibile dalla chiave secret`)
+  }
+  {
+    const r = (await db.query(
+      `select has_table_privilege('anon', 'agency_decisions', 'SELECT') as a,
+              has_table_privilege('authenticated', 'agency_decisions', 'SELECT') as u,
+              (select relrowsecurity from pg_class where relname = 'agency_decisions') as rls`)).rows[0]
+    !r.a && !r.u && r.rls ? ok('agency_decisions: RLS accesa e non leggibile dal browser') : fail(JSON.stringify(r))
+  }
+  {
+    const r = (await db.query(
+      `select count(*) from outbound_messages
+        where coalesce(body_html,'') || coalesce(body_text,'') ~* '/storage/v1/|[?&]token='`)).rows[0]
+    Number(r.count) === 0 ? ok('nessuna mail All Inclusive porta un link di Storage') : fail(r.count + ' mail')
+  }
+  await conf('team_notify_recipients', '')
+  await conf('team_notify_events', 'ordine_pagato')
+}
+
+// ===========================================================================
+// Tre event type, tre reti, e i viaggi di gruppo (migration 0048)
+// ===========================================================================
+// Le tre reti si provano sui casi storti, uno per rete: due servizi sullo
+// stesso slug, uno slug fuori elenco su un servizio attivo, una prenotazione la
+// cui durata non combacia col listino.
+console.log('\n== Tre event type e tre reti (0048) ==')
+{
+  const DRAFT = '99999999-0048-4048-8048-000000000001'
+  await db.exec(`
+    insert into travel_designers (id, slug, status, display_name, email, bio, photo_url, cal_username)
+    values ('${DRAFT}','td-slug-storti','draft','TD Slug Storti','storti@example.com',
+            'Bio lunga abbastanza da superare il controllo di completezza del profilo.',
+            'https://example.com/s.jpg','td-slug-storti-xpetis');
+    insert into td_countries (td_id, country_code, level) values ('${DRAFT}','peru',1);
+    insert into td_axis_values (td_id, axis_code, value)
+    select '${DRAFT}', code, 2 from quiz_axes;`)
+
+  // ------------------------------------------------------------- a. unicità
+  console.log('  -- a. un designer, uno slug --')
+  await expectOk('consulenza breve sullo slug da 30', `
+    insert into td_services (td_id, service_type, is_active, price_cents, duration_minutes, cal_event_type_slug)
+    values ('${DRAFT}','consultation',true,6000,30,'consulenza-xpetis-30')`)
+  // Su un designer in bozza il trigger degli slug non guarda: è proprio il
+  // caso in cui l'unicità è l'ultima difesa prima del prezzo sbagliato.
+  await expectFail('approfondita sullo STESSO slug dello stesso designer', `
+    insert into td_services (td_id, service_type, is_active, price_cents, duration_minutes, cal_event_type_slug)
+    values ('${DRAFT}','consultation_deep',true,15000,60,'consulenza-xpetis-30')`,
+    'td_services_one_service_per_slug')
+  {
+    const n = Number((await q(`
+      select count(*) from td_services s
+       where s.cal_event_type_slug = 'consulenza-xpetis-30'
+         and s.td_id in (select id from travel_designers where slug in ('marco-rossi','giulia-neri'))`)).rows[0].count)
+    n === 2 ? ok('lo stesso slug su due designer diversi resta ammesso (la chiave è la coppia)')
+            : fail('slug condiviso fra designer: ' + n)
+  }
+  {
+    // La migration controlla i doppioni prima di creare il vincolo, e li nomina.
+    // Il blocco si rigioca qui su un doppione vero, col vincolo tolto per un
+    // attimo dentro una transazione che poi torna indietro.
+    const src = readFileSync(path.join(root, 'migrations', '0048_tre_event_type_e_gruppi.sql'), 'utf8')
+    const guardia = src.slice(src.indexOf('do $$'), src.indexOf('end $$;') + 'end $$;'.length)
+    let msg = ''
+    try {
+      await db.exec(`begin;
+        alter table td_services drop constraint td_services_one_service_per_slug;
+        insert into td_services (td_id, service_type, is_active, price_cents, duration_minutes, cal_event_type_slug)
+        values ('${DRAFT}','consultation_deep',true,15000,60,'consulenza-xpetis-30');
+        ${guardia}`)
+    } catch (e) { msg = e.message } finally { await db.exec('rollback') }
+    msg.includes('td-slug-storti → consulenza-xpetis-30')
+      ? ok('la guardia della migration nomina designer e slug doppi: ' + msg.slice(msg.indexOf('td-slug')))
+      : fail('guardia: ' + msg)
+    const c = Number((await q(`select count(*) from pg_constraint where conname='td_services_one_service_per_slug'`)).rows[0].count)
+    c === 1 ? ok('e il vincolo è tornato al suo posto') : fail('vincolo perso nel rollback')
+  }
+
+  // ------------------------------------------------------- b. slug fuori elenco
+  console.log('  -- b. slug fuori elenco --')
+  const blocchi = async (id) => (await q('select td_publish_blockers($1) as b', [id])).rows[0].b
+  await db.exec(`update td_services set cal_event_type_slug = 'consulenza-xpetis-30-min'
+                  where td_id = '${DRAFT}' and service_type = 'consultation'`)
+  {
+    const b = await blocchi(DRAFT)
+    b.some(x => x.includes('«consulenza-xpetis-30-min» fuori elenco'))
+      ? ok('lo slug che Cal.com inventa dal titolo è un blocco: ' + b.find(x => x.includes('fuori elenco')))
+      : fail('blockers: ' + JSON.stringify(b))
+  }
+  await expectFail('e il profilo non si pubblica', `
+    update travel_designers set status='published' where id='${DRAFT}'`, 'fuori elenco')
+  // L'errore che la regola vecchia lascia in eredità: la breve collegata al 60.
+  await db.exec(`update td_services set cal_event_type_slug = 'consulenza-xpetis-60', duration_minutes = 60
+                  where td_id = '${DRAFT}' and service_type = 'consultation'`)
+  {
+    const b = await blocchi(DRAFT)
+    b.some(x => x.startsWith('consultation: slug Cal.com «consulenza-xpetis-60»'))
+      ? ok('la breve sul 60 (regola del 21 settembre) è bloccata: lo slug è giusto, il tipo no')
+      : fail('breve sul 60: ' + JSON.stringify(b))
+  }
+  await db.exec(`update td_services set cal_event_type_slug = 'consulenza-xpetis-30', duration_minutes = 30
+                  where td_id = '${DRAFT}' and service_type = 'consultation';
+                 insert into td_services (td_id, service_type, is_active, cal_event_type_slug)
+                 values ('${DRAFT}','consultation_deep', false, 'consulenza-xpetis-approfondita');`)
+  {
+    const b = await blocchi(DRAFT)
+    !b.some(x => x.includes('slug')) ? ok('un servizio SPENTO con slug vecchio non blocca (può avere prenotazioni in volo)')
+                                    : fail('spento che blocca: ' + JSON.stringify(b))
+  }
+  await expectOk('slug giusti: il profilo si pubblica', `
+    update travel_designers set status='published' where id='${DRAFT}'`)
+  await expectFail('accendere lo slug vecchio su un designer GIÀ pubblicato', `
+    update td_services set is_active = true, price_cents = 15000, duration_minutes = 60
+     where td_id='${DRAFT}' and service_type='consultation_deep'`, 'non ammesso')
+  await expectFail('cambiare lo slug di un designer pubblicato fuori elenco', `
+    update td_services set cal_event_type_slug = 'consulenza-xpetis-30-min'
+     where td_id='${DRAFT}' and service_type='consultation'`, 'non ammesso')
+  await expectOk('cambiare il prezzo non tocca la rete', `
+    update td_services set price_cents = 6500 where td_id='${DRAFT}' and service_type='consultation'`)
+  {
+    await q(`update app_config set value_text = null, value = 0 where key = 'calcom_slugs_consultation'`)
+    const b = await blocchi(DRAFT)
+    b.some(x => x.includes('manca app_config.calcom_slugs_consultation'))
+      ? ok('senza la riga di configurazione il servizio è bloccato, e il motivo lo dice')
+      : fail('config assente: ' + JSON.stringify(b))
+    await q(`update app_config set value = null, value_text = 'consulenza-xpetis-30' where key = 'calcom_slugs_consultation'`)
+  }
+  {
+    const r = (await q(`select count(*) from td_publish_readiness
+                         where slug in ('marco-rossi','giulia-neri') and can_publish`)).rows[0]
+    Number(r.count) === 2 ? ok('i due designer demo restano pubblicabili con gli slug nuovi')
+                          : fail('demo non pubblicabili: ' + r.count)
+  }
+  for (const f of ['calcom_expected_slugs(service_type)', 'enforce_service_slug_on_published()']) {
+    const r = (await q(`select has_function_privilege('anon', $1, 'EXECUTE') as a,
+                               has_function_privilege('authenticated', $1, 'EXECUTE') as u`, [f])).rows[0]
+    !r.a && !r.u ? ok(`${f}: chiusa ad anon e authenticated`) : fail(`${f} aperta`)
+  }
+
+  // ------------------------------------------------------- c. durata vera
+  console.log('  -- c. durata dichiarata contro durata vera --')
+  const base = JSON.parse(readFileSync(path.join(root, 'tests', 'fixtures', 'calcom', 'booking_created.json'), 'utf8'))
+  let n = 0
+  const creata = async (slug, minuti) => {
+    const b = JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(base).filter(([k]) => !k.startsWith('_')))))
+    n++
+    b.createdAt = `2026-09-27T10:0${n}:00.000Z`
+    b.payload.uid = `durata-0048-${n}`
+    b.payload.type = slug
+    b.payload.startTime = '2026-10-20T09:00:00.000Z'
+    b.payload.endTime = new Date(Date.parse(b.payload.startTime) + minuti * 60000).toISOString()
+    const raw = JSON.stringify(b)
+    const firma = crypto.createHmac('sha256', segretoCalcom.valore).update(raw, 'utf8').digest('hex')
+    return (await q('select calcom_webhook($1, $2) as e', [raw, firma])).rows[0].e
+  }
+  const nDurata = async () => Number((await q(
+    `select count(*) from team_alerts where kind = 'calcom_durata_non_combacia'`)).rows[0].count)
+  {
+    const e = await creata('consulenza-xpetis-30', 30)
+    e.esito === 'creata' && await nDurata() === 0
+      ? ok('30 a listino, slot da 30: creata, nessun alert')
+      : fail('durata giusta: ' + JSON.stringify(e))
+  }
+  {
+    // marco-rossi ha l'approfondita da 90 (prove sui vincoli, più su). Lo slot
+    // che arriva è da 30: l'event type è quello sbagliato.
+    const e = await creata('consulenza-xpetis-90', 30)
+    const b = (await q('select status, price_cents, service_type from bookings where id = $1', [e.booking_id])).rows[0]
+    const a = (await q(`select severity, entity_type, entity_id, message from team_alerts
+                         where kind = 'calcom_durata_non_combacia'`)).rows
+    e.esito === 'creata' && b?.status === 'pending_payment' && b.price_cents === 9000
+      ? ok('90 a listino, slot da 30: la prenotazione si crea COMUNQUE, col suo prezzo (lo slot è vero)')
+      : fail('durata storta, prenotazione: ' + JSON.stringify({ e, b }))
+    a.length === 1 && a[0].severity === 'critical' && a[0].entity_type === 'booking'
+      && a[0].entity_id === e.booking_id && a[0].message.includes('90 minuti')
+      && a[0].message.includes('ne dura 30')
+      ? ok('e alza un alert critico sulla prenotazione: ' + a[0].message.slice(0, 110) + '…')
+      : fail('alert durata: ' + JSON.stringify(a))
+    e.dettaglio?.includes('slot di 30 min') ? ok('il dettaglio della risposta a n8n lo dice')
+                                           : fail('dettaglio: ' + e.dettaglio)
+  }
+}
+
+console.log('\n== I viaggi di gruppo (0048) ==')
+{
+  const r = (await q(`select slug, group_trips from public_td_showcase
+                       where slug in ('marco-rossi','giulia-neri') order by slug`)).rows
+  r.length === 2 && r.every(x => x.group_trips.length === 3)
+    ? ok('tre viaggi di gruppo per ciascuno dei due designer demo, nella vetrina pubblica')
+    : fail('group_trips: ' + JSON.stringify(r.map(x => [x.slug, x.group_trips.length])))
+  const g = r.find(x => x.slug === 'giulia-neri').group_trips[0]
+  const chiavi = ['title', 'dates_label', 'duration_label', 'group_size_label', 'price_label', 'image_path']
+  JSON.stringify(Object.keys(g).sort()) === JSON.stringify([...chiavi].sort())
+    ? ok('ogni viaggio porta i sei campi del form, e nient\'altro: ' + g.title + ' · ' + g.dates_label)
+    : fail('chiavi: ' + JSON.stringify(Object.keys(g)))
+  const t = (await q(`select has_table_privilege('anon','td_group_trips','SELECT') as a,
+                             has_table_privilege('authenticated','td_group_trips','SELECT') as u,
+                             (select relrowsecurity from pg_class where relname='td_group_trips') as rls`)).rows[0]
+  !t.a && !t.u && t.rls ? ok('td_group_trips: RLS accesa, la tabella non è leggibile dal browser')
+                        : fail(JSON.stringify(t))
+  const v = (await q(`select has_table_privilege('anon','public_td_showcase','SELECT') as a`)).rows[0]
+  v.a ? ok('la vista pubblica non ha perso il grant nel create or replace') : fail('grant perso')
+  await expectFail('un viaggio di gruppo senza titolo', `
+    insert into td_group_trips (td_id, position, title)
+    values ('11111111-1111-1111-1111-111111111111', 9, '  ')`, 'check')
+  // I percorsi delle immagini vivono nel seed e i file in seed-immagini/: il
+  // generatore legge i primi, e un percorso senza file è una card vuota.
+  const percorsi = (await q(`select image_path from td_group_trips where image_path is not null`)).rows
+  const mancanti = percorsi.filter(p => !existsSync(path.join(root, '..', 'seed-immagini', p.image_path)))
+  mancanti.length === 0 ? ok(`le ${percorsi.length} immagini finte dei viaggi di gruppo esistono in seed-immagini/`)
+                        : fail('immagini mancanti: ' + mancanti.map(p => p.image_path).join(', '))
 }
 
 console.log(failures === 0 ? '\nTutto verde.\n' : `\n${failures} asserzioni fallite.\n`)

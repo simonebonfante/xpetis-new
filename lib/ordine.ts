@@ -25,9 +25,17 @@ export type StatoOrdine =
   | 'completed'
   | 'cancelled'
   | 'disputed'
+  // Dalla 0047: la cascata dell'All Inclusive.
+  | 'proposal_pending_agency'
+  | 'awaiting_deposit'
+  | 'deposit_paid'
+  | 'awaiting_balance'
+  | 'balance_paid'
 
 export type PaginaOrdine = {
   esito: EsitoToken
+  /** Dalla 0047: la stessa porta serve i due servizi, e la pagina sceglie la faccia. */
+  servizio?: 'custom_itinerary'
   human_ref?: string
   status?: StatoOrdine
   td_name?: string
@@ -61,7 +69,7 @@ export type PaginaOrdine = {
  */
 export type FileOrdine = {
   id: string
-  tipo: 'itinerary' | 'revision'
+  tipo: 'itinerary' | 'revision' | 'proposal_document' | 'final_document'
   nome: string
   caricato_il: string
 }
@@ -91,6 +99,7 @@ export type FaseProposta =
 
 export type PaginaProposta = {
   esito: EsitoToken
+  servizio?: 'custom_itinerary'
   fase?: FaseProposta
   /** Solo per la route della cassa, lato server: la pagina non lo scrive nell'HTML. */
   order_id?: string
@@ -120,7 +129,7 @@ async function rpc<T>(funzione: string, argomenti: Record<string, unknown>, ripi
 }
 
 export const leggiPaginaOrdine = (token: string) =>
-  rpc<PaginaOrdine>('td_order_page', { p_token: token }, { esito: 'irraggiungibile' })
+  rpc<PaginaOrdine | PaginaOrdineAI>('td_order_page', { p_token: token }, { esito: 'irraggiungibile' })
 
 export const salvaBozza = (
   token: string,
@@ -146,7 +155,7 @@ export const inviaProposta = (token: string, prezzoConfermatoCents: number | nul
   )
 
 export const leggiPaginaProposta = (token: string) =>
-  rpc<PaginaProposta>('proposal_public_page', { p_token: token }, { esito: 'irraggiungibile' })
+  rpc<PaginaProposta | PaginaPropostaAI>('proposal_public_page', { p_token: token }, { esito: 'irraggiungibile' })
 
 // ---------------------------------------------------------------- la consegna (0046)
 
@@ -157,7 +166,7 @@ export type EsitoConsegna = {
   campo?: string
   stato?: string
   path?: string
-  tipo?: 'itinerary' | 'revision'
+  tipo?: FileOrdine['tipo']
   chiesta_il?: string
   consegnata_il?: string
   scaduta_il?: string
@@ -193,6 +202,139 @@ export const permessoFile = (token: string, fileId: string) =>
 
 export const chiediRevisione = (token: string, nota: string) =>
   rpc<EsitoConsegna>('request_revision', { p_token: token, p_nota: nota }, { ok: false, esito: 'irraggiungibile' })
+
+// ---------------------------------------------------------------- l'All Inclusive (0047)
+
+/**
+ * La pagina ordine All Inclusive, vista dal designer. Stessa porta della su
+ * misura (`td_order_page`): il database risolve il token una volta e sceglie
+ * la faccia, e `servizio` la dice alla pagina.
+ */
+export type PaginaOrdineAI = {
+  esito: 'valido'
+  servizio: 'all_inclusive'
+  human_ref: string
+  status: StatoOrdine
+  td_name: string
+  nome_viaggiatore: string | null
+  call_il: string | null
+  prezzo_call_cents: number | null
+  credito_usato_su: string | null
+  /** Il nome dell'agenzia assegnata e attiva, o `null`: la assegna il team. */
+  agenzia: string | null
+  descrizione: string | null
+  prezzo_cents: number | null
+  partenza: string | null
+  ritorno: string | null
+  credito_cents: number | null
+  acconto_cents: number | null
+  saldo_cents: number | null
+  saldo_entro: string | null
+  inviata_il: string | null
+  confermata_il: string | null
+  ultimo_invio: {
+    n: number
+    inviata_il: string
+    decisione: 'confirmed' | 'rejected' | null
+    nota: string | null
+    decisa_il: string | null
+  } | null
+  documenti: FileOrdine[]
+  file_finale: FileOrdine[]
+  link_pagina: string | null
+  messaggio_pronto: string | null
+  messaggio_consegna: string | null
+  consegnato_il: string | null
+  chiuso_il: string | null
+}
+
+export type FasePropostaAI =
+  | 'da_pagare_acconto'
+  | 'acconto_pagato'
+  | 'da_pagare_saldo'
+  | 'saldata'
+  | 'consegnata'
+  | 'chiusa'
+  | 'annullata'
+  | 'in_verifica'
+  | 'in_aggiornamento'
+
+/** La pagina del viaggiatore per l'All Inclusive. Niente del viaggiatore: si gira nel gruppo. */
+export type PaginaPropostaAI = {
+  esito: 'valido'
+  servizio: 'all_inclusive'
+  fase: FasePropostaAI
+  /** Per la route della cassa, lato server: la pagina non li scrive nell'HTML. */
+  order_id: string
+  agency_id: string | null
+  human_ref: string
+  td_name: string
+  td_slug: string
+  agenzia: string | null
+  descrizione: string | null
+  totale_cents: number | null
+  acconto_cents: number | null
+  saldo_cents: number | null
+  partenza: string | null
+  ritorno: string | null
+  saldo_entro: string | null
+  documento: { id: string; nome: string } | null
+  /** Solo i nomi: il documento finale si scarica da `/documento/<id>`, col login. */
+  file_finale: FileOrdine[]
+  consegnato_il: string | null
+  /** Quale rata aprire e per quanto, **dal database**. Assente se non c'è niente da pagare. */
+  cassa: { rata: 'deposit' | 'balance'; importo_cents: number } | null
+}
+
+export const eAllInclusive = <T extends { servizio?: string }>(p: T): boolean => p.servizio === 'all_inclusive'
+
+export const salvaBozzaAI = (
+  token: string,
+  bozza: {
+    descrizione: string
+    prezzoCents: number | null
+    partenza: string | null
+    ritorno: string | null
+    creditoCents: number | null
+  },
+) =>
+  rpc<EsitoAzione>(
+    'ai_save_draft',
+    {
+      p_token: token,
+      p_descrizione: bozza.descrizione,
+      p_prezzo_cents: bozza.prezzoCents,
+      p_partenza: bozza.partenza,
+      p_ritorno: bozza.ritorno,
+      p_credito_cents: bozza.creditoCents,
+    },
+    { ok: false, esito: 'irraggiungibile' },
+  )
+
+export const inviaAllAgenzia = (token: string, prezzoConfermatoCents: number | null) =>
+  rpc<EsitoAzione>(
+    'ai_send_to_agency',
+    { p_token: token, p_prezzo_confermato_cents: prezzoConfermatoCents },
+    { ok: false, esito: 'irraggiungibile' },
+  )
+
+/**
+ * Il permesso di scaricare il documento finale, per chi è entrato con Google.
+ * `viewer` è l'utente della sessione, **verificato** con `getUser()`.
+ */
+export const permessoDocumentoFinale = (fileId: string, viewer: string | null) =>
+  rpc<{ esito: string; path?: string; nome?: string; human_ref?: string }>(
+    'final_document_for_traveler',
+    { p_file_id: fileId, p_viewer: viewer },
+    { esito: 'irraggiungibile' },
+  )
+
+/** Una data `YYYY-MM-DD` del database, scritta per un italiano. */
+export function dataGiorno(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const [a, m, g] = iso.slice(0, 10).split('-')
+  return `${g}/${m}/${a}`
+}
 
 // ---------------------------------------------------------------- gli euro
 
