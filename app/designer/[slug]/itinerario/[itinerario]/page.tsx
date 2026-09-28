@@ -18,10 +18,18 @@ import {
 } from '@/lib/vetrina'
 
 /**
- * "Itinerario pronto da vivere" — Figma 261:1068.
+ * "Itinerario pronto da vivere" — Figma nuovo `Q9Krydv6xD8mFJCtU9NHzr`, nodo
+ * 3-1386 (fino al 27 settembre: file vecchio, nodo 261:1068).
  *
- * L'ultima delle quattro pagine disegnate, e la destinazione del tasto "Ottieni
- * maggiori informazioni" delle card di vetrina, che fino a ieri era spento.
+ * La destinazione del tasto "Ottieni maggiori informazioni" delle card di
+ * vetrina. **L'indirizzo non si tocca** (`/designer/<slug>/itinerario/<slug
+ * dell'itinerario>`, migration 0033): con l'ordinale di prima, riordinare gli
+ * itinerari faceva rispondere 200 ai link vecchi con un itinerario diverso. Il
+ * disegno nuovo cambia la forma di questa pagina, non il suo indirizzo.
+ *
+ * Il Figma nuovo è quasi identico al vecchio: stesse sezioni, stessi contenuti
+ * che non hanno sorgente, stesso "Acquista l'itinerario". Qui sotto le ragioni
+ * valgono ancora tutte.
  *
  * ## Cosa si compra qui: niente
  *
@@ -129,7 +137,7 @@ function SchedaPrezzo({
     <div className="flex flex-col rounded-[15px] bg-neutro p-6 lg:p-8">
       {itinerario.price_label && (
         <>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div className="flex flex-wrap items-baseline gap-3">
             <p className="text-[24px] leading-[2] tracking-[-0.264px]">A partire da</p>
             <p className="font-titoli text-[36px] font-bold leading-[34px] text-primario">
               {itinerario.price_label}
@@ -145,7 +153,7 @@ function SchedaPrezzo({
       )}
 
       {itinerario.duration_label && (
-        <dl className="mt-8 border-t border-dashed border-scuro pt-4">
+        <dl className="mt-6 border-t border-dashed border-scuro pt-4">
           <div className="grid gap-1 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-6">
             <dt className="text-[18px] font-bold leading-[1.5] tracking-[-0.198px]">Durata</dt>
             <dd className="text-[18px] leading-[1.5] tracking-[-0.198px]">
@@ -157,9 +165,8 @@ function SchedaPrezzo({
       )}
 
       {/* L'unica azione della pagina, e porta al box della consulenza sulla
-          vetrina: è là che si prenota (milestone 4, iframe Cal.com). Non è un
-          404 travestito — la pagina esiste — ma il tasto "Prenota la call" che
-          troverà arrivando è ancora spento, e lo dice da sé. */}
+          vetrina: è là che si prenota (iframe Cal.com, con il login prima se
+          serve). */}
       <Link
         href={`/designer/${slug}#servizi`}
         className="mt-auto block rounded-[30px] bg-primario px-5 py-2 text-center text-corpo text-neutro transition hover:brightness-110 lg:mt-10"
@@ -173,8 +180,8 @@ function SchedaPrezzo({
 /** La scheda del designer: la sua foto, il suo nome, e la via per la vetrina. */
 function SchedaDesigner({ vetrina }: { vetrina: Vetrina }) {
   return (
-    <div className="rounded-[15px] bg-neutro p-6 lg:p-8">
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-center lg:gap-[21px]">
+    <div className="rounded-[15px] bg-neutro p-6 lg:px-8 lg:py-[39px]">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start lg:gap-[21px]">
         <div className="relative size-[200px] shrink-0 overflow-hidden rounded-[10px] lg:size-[243px]">
           <FotoVetrina
             src={vetrina.photo_url}
@@ -189,13 +196,18 @@ function SchedaDesigner({ vetrina }: { vetrina: Vetrina }) {
               senso della scheda — questo itinerario ha un autore — con la sua
               headline, che parla del designer e non del viaggio: è la sola frase
               che la vista dà e che qui non è fuori posto. */}
-          <p className="text-corpo">Progettato da</p>
-          <h2 className="mt-1 font-titoli text-[26px] font-bold leading-tight">
+          {/* Figma nuovo: il testo in Merriweather 24 in alto, il nome sotto.
+              Qui il testo è la headline, e il nome è un link alla vetrina. */}
+          {vetrina.headline && (
+            <p className="max-w-[534px] font-titoli text-[20px] leading-[1.4] lg:text-[24px] lg:leading-[34px]">
+              {vetrina.headline}
+            </p>
+          )}
+          <h2 className={`${vetrina.headline ? 'mt-6' : ''} font-titoli text-[26px] font-bold leading-tight`}>
             <Link href={`/designer/${vetrina.slug}`} className="hover:text-primario">
               {vetrina.display_name}
             </Link>
           </h2>
-          {vetrina.headline && <p className="mt-4 max-w-[534px] text-corpo">{vetrina.headline}</p>}
         </div>
       </div>
     </div>
@@ -280,7 +292,7 @@ export default async function PaginaItinerarioPronto({ params }: Props) {
               frase del match. Il senso però è fissato dal Flusso e non si tocca:
               l'itinerario è un punto di partenza, la call è la porta, il su
               misura si compra dopo la call e non da qui. */}
-          <div className="mt-6 rounded-[15px] bg-scuro p-6 text-neutro lg:max-w-[868px] lg:p-[60px]">
+          <div className="mt-6 rounded-[15px] bg-scuro p-6 text-neutro lg:max-w-[868px] lg:px-[61px] lg:pb-[21px] lg:pt-[45px]">
             <h2 className="font-titoli text-[32px] font-bold leading-tight lg:text-[40px]">
               Vuoi cambiare qualcosa?
             </h2>
@@ -290,9 +302,11 @@ export default async function PaginaItinerarioPronto({ params }: Props) {
               tempi, al tuo budget e al tuo stile di viaggio. Poi potrai acquistare la versione su
               misura per te.
             </p>
+            {/* Figma nuovo: il tasto va in basso a destra della fascia. */}
+            <div className="mt-10 flex lg:mt-[45px] lg:justify-end">
             <Link
               href={`/designer/${vetrina.slug}#servizi`}
-              className="group mt-10 inline-flex items-center gap-3"
+              className="group inline-flex items-center"
             >
               <span className="rounded-[30px] bg-primario px-5 py-2 text-corpo text-neutro transition group-hover:brightness-110">
                 Personalizza con una call
@@ -309,6 +323,7 @@ export default async function PaginaItinerarioPronto({ params }: Props) {
                 className="size-10 shrink-0"
               />
             </Link>
+            </div>
           </div>
         </div>
       </section>

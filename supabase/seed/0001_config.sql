@@ -5,35 +5,59 @@
 -- I 6 assi del quiz, con i pesi della sez. 2 del Flusso e il verso dichiarato
 -- nel form Vetrina TD. `label_min` e `label_max` sono il verso: non dedurlo mai
 -- dal nome del codice, è l'errore che nessuna prova tecnica intercetta.
-insert into quiz_axes (code, kind, label_it, weight, scale_max, label_min, label_max, sort_order) values
-  ('planning_involvement', 'continuous',  'Coinvolgimento nella pianificazione', 1.5, 4, 'Poco controllo',  'Molto controllo', 1),
-  ('pace',                 'continuous',  'Ritmo',                                3.0, 4, 'Slow',            'Dynamic',         2),
-  ('companions',           'categorical', 'Con chi viaggi',                       2.0, 5, null,              null,              3),
-  ('comfort_wild',         'continuous',  'Comfort / Wild',                       1.5, 4, 'Comfort',         'Wild',            4),
-  ('curated_vs_real',      'continuous',  'Estetica curata / Vita reale',         1.0, 4, 'Estetica curata', 'Vita reale',      5),
-  ('social_orientation',   'continuous',  'Orientamento sociale',                 1.0, 4, 'Intimità',        'Socialità',       6)
+-- Domanda e ordine vengono da `xpetis_quiz_viaggiatore_.json` (migration 0049):
+-- "con chi viaggi" è la sesta domanda, non la terza.
+-- ⚠️ `planning_involvement` si legge al contrario del nome: il valore 1 è il
+-- viaggiatore che vuole decidere di più, cioè "Poco controllo" del designer.
+insert into quiz_axes (code, kind, label_it, question_it, weight, scale_max, label_min, label_max, sort_order) values
+  ('planning_involvement', 'continuous',  'Coinvolgimento nella pianificazione',
+   'Quanto vuoi essere coinvolto nella progettazione del viaggio?',                              1.5, 4, 'Poco controllo',  'Molto controllo', 1),
+  ('pace',                 'continuous',  'Ritmo',
+   'Come vuoi che scorra il tuo tempo durante il viaggio?',                                      3.0, 4, 'Slow',            'Dynamic',         2),
+  ('comfort_wild',         'continuous',  'Comfort / Wild',
+   'Se un''esperienza straordinaria richiede un po'' di fatica o disagio, tu...',               1.5, 4, 'Comfort',         'Wild',            3),
+  ('curated_vs_real',      'continuous',  'Estetica curata / Vita reale',
+   'Quale di queste immagini senti più tua?',                                                    1.0, 4, 'Estetica curata', 'Vita reale',      4),
+  ('social_orientation',   'continuous',  'Orientamento sociale',
+   'In viaggio, cerchi più raccoglimento o connessione?',                                        1.0, 4, 'Intimità',        'Socialità',       5),
+  ('companions',           'categorical', 'Con chi viaggi',
+   'Con chi vivrai questo viaggio?',                                                             2.0, 5, null,              null,              6)
 on conflict (code) do nothing;
 
--- Etichette delle quattro risposte per asse continuo. Gli estremi 1 e 4 vengono
--- dal form; i due valori intermedi li scrive Gaia (tono caldo, mai da
--- questionario). Il ritmo ha già tutte e quattro le etichette dal Flusso.
-insert into quiz_axis_options (axis_code, value, label_it) values
-  ('pace', 1, 'Lento'), ('pace', 2, 'Disteso'), ('pace', 3, 'Vivace'), ('pace', 4, 'Intenso'),
-  ('planning_involvement', 1, 'Poco controllo'),  ('planning_involvement', 2, 'DA SCRIVERE'),
-  ('planning_involvement', 3, 'DA SCRIVERE'),     ('planning_involvement', 4, 'Molto controllo'),
-  ('comfort_wild', 1, 'Comfort'),                 ('comfort_wild', 2, 'DA SCRIVERE'),
-  ('comfort_wild', 3, 'DA SCRIVERE'),             ('comfort_wild', 4, 'Wild'),
-  ('curated_vs_real', 1, 'Estetica curata'),      ('curated_vs_real', 2, 'DA SCRIVERE'),
-  ('curated_vs_real', 3, 'DA SCRIVERE'),          ('curated_vs_real', 4, 'Vita reale'),
-  ('social_orientation', 1, 'Intimità'),          ('social_orientation', 2, 'DA SCRIVERE'),
-  ('social_orientation', 3, 'DA SCRIVERE'),       ('social_orientation', 4, 'Socialità'),
-  -- Le cinque opzioni di "con chi viaggi", con le parole esatte del form: sono
-  -- queste stringhe che arriveranno nei JSON delle vetrine.
-  ('companions', 1, 'Viaggiatore solo'),
-  ('companions', 2, 'Coppia'),
-  ('companions', 3, 'Famiglia con bambini/ragazzi'),
-  ('companions', 4, 'Gruppo di amici/piccolo gruppo'),
-  ('companions', 5, 'Gruppo organizzato')
+-- Le risposte. Due colonne con due mestieri diversi:
+--  · `label_it` è l'etichetta corta. Su "con chi viaggi" è una **chiave**: le
+--    parole esatte del form (`CONCHI`), che arriveranno nei JSON delle vetrine.
+--  · `answer_it` è la risposta come la legge il viaggiatore, dal quiz. Sui
+--    cinque assi continui il valore è lo `score` del file; su "con chi viaggi"
+--    il testo è agganciato alla chiave del form (`td_value_match`).
+-- I valori intermedi 2 e 3 dei continui non hanno un'etichetta corta: il quiz
+-- mostra `answer_it`, e nessun altro le legge.
+insert into quiz_axis_options (axis_code, value, label_it, answer_it) values
+  ('planning_involvement', 1, 'Poco controllo',  'Voglio decidere io, ho bisogno di un esperto che mi guidi'),
+  ('planning_involvement', 2, 'DA SCRIVERE',     'Mi piace co-progettarlo, costruiamolo insieme!'),
+  ('planning_involvement', 3, 'DA SCRIVERE',     'Voglio una proposta già pronta, poi la facciamo nostra insieme'),
+  ('planning_involvement', 4, 'Molto controllo', 'Pensateci voi, io voglio solo viverlo'),
+  ('pace', 1, 'Lento',   'Lento: poche cose, vissute a fondo'),
+  ('pace', 2, 'Disteso', 'Disteso: clima rilassato con qualche esplorazione nei posti vicini'),
+  ('pace', 3, 'Vivace',  'Vivace: ritmo energico e curioso ma senza frenesia'),
+  ('pace', 4, 'Intenso', 'Intenso: voglio fare e vedere il più possibile'),
+  ('comfort_wild', 1, 'Comfort',     'Cerco sempre l''alternativa più comoda'),
+  ('comfort_wild', 2, 'DA SCRIVERE', 'Valuto caso per caso, dipende da quanto ne vale la pena'),
+  ('comfort_wild', 3, 'DA SCRIVERE', 'Ci sto, se è organizzata bene'),
+  ('comfort_wild', 4, 'Wild',        'È proprio quello che voglio, la fatica fa parte del viaggio'),
+  ('curated_vs_real', 1, 'Estetica curata', 'Un paesaggio perfetto, quasi da cartolina'),
+  ('curated_vs_real', 2, 'DA SCRIVERE',     'Un posto bellissimo ma autentico, fuori dai circuiti turistici'),
+  ('curated_vs_real', 3, 'DA SCRIVERE',     'Un''atmosfera viva fatta di dettagli, non di effetti speciali'),
+  ('curated_vs_real', 4, 'Vita reale',      'Un luogo vero, anche grezzo, dove senti la vita scorrere'),
+  ('social_orientation', 1, 'Intimità',    'Voglio stare con me stesso o con chi è con me in viaggio'),
+  ('social_orientation', 2, 'DA SCRIVERE', 'Apprezzo i miei spazi, ma non mi dispiace qualche incontro'),
+  ('social_orientation', 3, 'DA SCRIVERE', 'Mi piace aprirmi, a modo mio e con i miei tempi'),
+  ('social_orientation', 4, 'Socialità',   'Adoro incontrare persone e raccogliere le loro storie'),
+  ('companions', 1, 'Viaggiatore solo',               'Da solo/a'),
+  ('companions', 2, 'Coppia',                         'In coppia'),
+  ('companions', 3, 'Famiglia con bambini/ragazzi',   'Famiglia con bambini/ragazzi'),
+  ('companions', 4, 'Gruppo di amici/piccolo gruppo', 'Gruppo di amici / piccolo gruppo'),
+  ('companions', 5, 'Gruppo organizzato',             'Gruppo organizzato con altri viaggiatori')
 on conflict do nothing;
 
 -- Filtro 1: tema del viaggio (9 voci).

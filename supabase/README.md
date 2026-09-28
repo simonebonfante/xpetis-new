@@ -85,14 +85,39 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0046_silenzio_conferma.sql` | Il silenzio-conferma e i due modi di romperlo: la mail al designer con i tasti no-show e «altro problema» (`clock_ramo_postcall_td`), `booking_exceptions`, la chiusura a 48 ore (`clock_ramo_chiusura_call`); la consegna (`td_delivery_ticket`, `td_deliver`, `order_file_for_token`) con le mail; la revisione (`request_revision`) e la chiusura a 5 giorni (`clock_ramo_chiusura_ordini`); `td_order_page` e `proposal_public_page` riemesse con la consegna; `clock_tick` con tre rami in più |
 | `0047_all_inclusive.sql` | L'All Inclusive intero: `payment_account()` risponde anche per `deposit` e `balance`, la chiave ristretta dell'agenzia da Vault (`agency_stripe_key`), le regole dell'ordine (`ai_order_rules`: congelamento, acconto calcolato, tempi del saldo, consegna col documento finale), il token monouso dell'agenzia e `agency_decisions`, la pagina e il clic dell'agenzia, la cascata, le due rate nel ponte Stripe (`stripe_checkout_ai`), le pagine del designer e del viaggiatore riemesse con lo smistamento, il documento finale col login (`final_document_for_traveler`), due rami dell'orologio |
 | `0048_tre_event_type_e_gruppi.sql` | Le tre reti sui tre event type (deviazione 10 riscritta): `td_services_one_service_per_slug` (designer + slug unici), `calcom_expected_slugs()` e il ramo nuovo di `td_publish_blockers` sugli slug fuori elenco, il trigger che li vieta su un designer già pubblicato, e `calcom_webhook` riemessa col confronto fra durata dello slot e listino (`calcom_durata_non_combacia`). E `td_group_trips`, i viaggi di gruppo, con la colonna `group_trips` in coda a `public_td_showcase` |
+| `0049_testi_quiz.sql` | Il quiz del viaggiatore da `xpetis_quiz_viaggiatore_.json`: la domanda di ogni asse in `question_it`, le risposte nella colonna nuova `quiz_axis_options.answer_it` (su "con chi viaggi" agganciate alla chiave del form, non al numero), l'ordine nuovo con "con chi viaggi" sesta, e `public_quiz_axes` che in `options` porta la risposta da leggere. Nessun codice, valore o estremo toccato |
 
 ## La geografia
 
 Il seed `0002_geo.sql` **non si scrive a mano**: lo genera
-`scripts/genera_geo.mjs` da `xpetis_destinazioni.json`, che resta la fonte. Se la
-tassonomia cambia, si rilancia lo script. L'harness confronta i conteggi nel
-database contro le statistiche dichiarate dal file stesso, non contro numeri
-copiati: 6 continenti, 14 macro-aree, 129 stati, 244 regioni, 1.220 città.
+`scripts/genera_geo.mjs` dalla tassonomia, che resta la fonte. Se la tassonomia
+cambia, si rilancia lo script. L'harness confronta i conteggi nel database
+contro le statistiche dichiarate dal file stesso, non contro numeri copiati.
+
+**Dal 27 settembre 2026 la fonte è `xpetis_destinazioni_v2.json`**: 6
+continenti, 14 macro-aree, 129 stati, 244 regioni **identici** alla prima
+versione, e **188 città invece di 1.220** — la potatura di Alessandro,
+confermata da Simone. Le 188 sono un sottoinsieme esatto delle vecchie (stessi
+codici, stessi nomi): nessuna lettera nuova. La prima versione è in
+`archivio/xpetis_destinazioni_v1.json`, e il nome del file sorgente vive in una
+costante sola (`SORGENTE` in `genera_geo.mjs`), che legge anche l'harness.
+
+**Il seed è convergente, non solo additivo**, ed è la differenza che conta sul
+database vero:
+
+- le **città** che il file non ha più si cancellano. Niente le referenzia:
+  verificato sul database di sviluppo il 27 settembre (nessuna chiave esterna
+  verso `geo_cities`, la legge solo la vista `geo_search`);
+- una **riga in più** negli altri quattro livelli ferma il seed invece di
+  cancellare: uno stato ha dietro `td_countries` e `quiz_responses`, e toglierlo
+  è una decisione;
+- una **città senza la sua regione** ferma il seed: la `join` che le aggancia la
+  scarterebbe in silenzio, e una destinazione sparirebbe senza errori;
+- tutto sta in **una transazione**: fermato da una guardia, non lascia mezza
+  potatura.
+
+L'harness rigira il seed sopra dati esistenti, controlla che converga, che un
+terzo giro non cambi niente e che le due guardie fermino davvero.
 
 Tre cose della tassonomia che lo schema provvisorio non prevedeva.
 
@@ -107,9 +132,10 @@ un'informazione di prodotto e sta nel database (`is_selectable` su ogni
 livello), non nel codice del sito. La vista `geo_search` la espone insieme allo
 stato a cui ogni voce porta.
 
-**Una città può stare in due regioni.** Jaipur è dentro "India del Nord" e dentro
-"Rajasthan", ed è corretto. L'unicità delle città è quindi per regione, non per
-stato.
+**Una città può stare in due regioni.** Nella prima tassonomia Jaipur era dentro
+"India del Nord" e dentro "Rajasthan", ed era corretto. L'unicità delle città è
+quindi per regione, non per stato. La v2 non ha più nessun caso così (Jaipur è
+stata potata), ma la regola resta e l'harness la prova con una città inventata.
 
 ## Il verso degli assi
 
@@ -138,6 +164,46 @@ e le etichette sono le parole esatte del form: sono quelle stringhe che
 arriveranno nei JSON delle vetrine. Vale anche per i tag: "Aree estreme/polari"
 con la barra, perché un'etichetta che non combacia carattere per carattere fa
 perdere quel tag in silenzio.
+
+### Le parole del quiz (0049)
+
+Domande e risposte vengono da `xpetis_quiz_viaggiatore_.json` e sono **dati**:
+`quiz_axes.question_it` per la domanda, `quiz_axis_options.answer_it` per la
+risposta. L'ordine delle domande è `sort_order`: controllo, ritmo, scomodità,
+luogo, sociale, **con chi viaggi per sesta**.
+
+Le colonne delle opzioni sono due perché fanno due mestieri:
+
+| Colonna | Cosa è | Chi la legge |
+|---|---|---|
+| `label_it` | Etichetta corta. Su `companions` è **la chiave del form** (`CONCHI`), carattere per carattere | L'import delle vetrine |
+| `answer_it` | La risposta come la legge il viaggiatore ("Da solo/a") | La pagina del quiz, via `public_quiz_axes.options` |
+
+Riscrivere `label_it` con le parole del quiz avrebbe rotto l'import di
+"con chi viaggi" in silenzio. Il file del quiz lo sa: ogni opzione della sesta
+domanda porta `td_value_match`, ed è su quella che la 0049 aggancia il testo.
+Sui cinque assi continui la risposta va al suo **`score`**, non alla posizione
+nell'array.
+
+Il verso regge opzione per opzione, e l'harness lo prova dall'inizio alla fine:
+parte dalle parole del file ("Lento…"), trova il valore nella vista come fa la
+pagina, lo passa a `match_designers()`, e controlla che il polo 1 faccia salire
+il designer col valore basso (Marco, lento) e il polo 4 quello col valore alto
+(Giulia, intensa). Lo stesso, meccanico, su ogni asse dove i due demo divergono.
+
+⚠️ `planning_involvement` è l'asse che si legge al contrario del nome: il
+valore 1 è il viaggiatore che vuole **decidere di più** ("Voglio decidere io"),
+cioè il designer con **poco** controllo. Il verso è quello del designer, come il
+form.
+
+La sesta domanda **non è una scala**: 1 se il designer ha dichiarato quella
+configurazione, 0 se no, e un valore "vicino" non vale mezzo punto. Entra però
+nella stessa media pesata degli altri assi, col suo peso (`weight` = 2.0, dal
+Flusso).
+
+Le risposte già salvate (`quiz_responses.answers`, `{ codice_asse: valore }`)
+restano leggibili: codici e valori non cambiano, cambia solo il testo che le
+racconta.
 
 ## I servizi
 
@@ -271,10 +337,16 @@ documentate nel file: `unaccent()` è STABLE e va avvolta in
 
 Il testo digitato lo normalizza il browser (`lib/geo.ts`), la colonna la
 normalizza Postgres: sono **due implementazioni**, e l'harness verifica che siano
-d'accordo su tutti i 1.613 nomi della tassonomia. Non è teoria — il primo giro ha
-trovato nove nomi su cui divergevano (Tromsø, Køge, Helsingør, Hveragerði,
+d'accordo su tutti i nomi della tassonomia (1.613 con la v1, 581 con la v2): il
+numero lo dà il file, non una soglia scritta a mano. Non è teoria — il primo giro
+ha trovato nove nomi su cui divergevano (Tromsø, Køge, Helsingør, Hveragerði,
 Ísafjörður, Płock, Ostrołęka, Kuşadası): `unaccent` traduce anche le lettere che
 non sono "base + segno", e `normalize('NFD')` no.
+
+**La v2 ha potato tutti e nove quei nomi.** La tabella delle lettere in
+`lib/geo.ts` resta, e siccome nessun nome vero la esercita più l'harness la
+confronta con `unaccent` **lettera per lettera**, insieme a tutte le lettere non
+ASCII che la tassonomia contiene oggi (39 in tutto).
 
 Due flag e non uno, di proposito. `is_selectable` è **cosa dichiara la
 tassonomia**; `is_filterable` è **cosa filtra oggi in XPETIS**, ed è quello che
@@ -1242,11 +1314,8 @@ tag, consulenza attiva. Serve al team in onboarding.
 
 ## Cosa manca ancora
 
-**La tassonomia geografica.** Le tabelle `geo_*` hanno una struttura
-provvisoria e il seed contiene sei paesi finti solo per far girare i test.
-Quando arriva il file ufficiale (6 continenti, 14 macro-aree, 129 stati, 244
-regioni, 1.220 città) si riallineano le colonne e si scrive lo script di
-import.
+~~**La tassonomia geografica.**~~ → importata (0029), ora dalla v2 con 188
+città: vedi "La geografia".
 
 **Le decisioni ancora aperte, riportate nei commenti del codice:**
 
@@ -1257,7 +1326,8 @@ import.
 | Chi toglie dalla vetrina un viaggio di gruppo già partito (la data è testo) | `0048_tre_event_type_e_gruppi.sql` |
 | L'asse "con chi viaggi" ammette più valori per TD? (oggi sì) | `0007_travel_designers.sql` |
 | Le quattro categorie di "con chi viaggi" non sono nel flusso: quelle nel seed sono un'ipotesi | `seed/0001_config.sql` |
-| Le etichette delle scale 1-4 degli altri cinque assi (le scrive Gaia) | `seed/0001_config.sql` |
+| ~~Le etichette delle scale 1-4 degli altri cinque assi (le scrive Gaia)~~ → arrivate col quiz (0049), in `answer_it` | `0049_testi_quiz.sql` |
+| Il peso di "con chi viaggi" (2.0, secondo dei sei) contro il quiz che la dice "di impatto minore rispetto alle domande 1-5" | `seed/0001_config.sql` |
 | Cosa fa il sito se nel suggeritore l'utente seleziona un continente o una macro-area | `0002_geo.sql` |
 | Foto di sfondo della card: la colonna c'è, la decisione UX no | `0007_travel_designers.sql` |
 

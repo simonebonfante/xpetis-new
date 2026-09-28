@@ -12,9 +12,10 @@
  * **Le due implementazioni non sono lo stesso codice, e non possono esserlo**: il
  * pattern lo compone il browser, la colonna la calcola il database. Non è un
  * dettaglio da lasciare alla buona volontà, quindi l'harness verifica che siano
- * d'accordo **su tutti i 1.613 nomi della tassonomia vera** (`run.mjs`, sezione
- * 0035). Se un giorno arriva un nome su cui divergono, il test lo dice: è già
- * servito il primo giorno.
+ * d'accordo **su tutti i nomi della tassonomia vera** (`run.mjs`, sezione
+ * 0035: 1.613 con la prima versione, 581 dalla v2 del 27 settembre 2026). Se un
+ * giorno arriva un nome su cui divergono, il test lo dice: è già servito il
+ * primo giorno.
  */
 
 /**
@@ -22,11 +23,16 @@
  * perché non sono "base + segno" ma lettere a sé.
  *
  * Non è una lista scritta a memoria: ogni riga è il risultato osservato di
- * `unaccent('unaccent', …)`. Quattro di queste vivono davvero nella tassonomia —
+ * `unaccent('unaccent', …)`. Quattro di queste vivevano nella prima tassonomia —
  * `ø` (Tromsø, Køge, Helsingør), `ð` (Hveragerði, Ísafjörður), `ł` (Płock,
  * Ostrołęka), `ı` (Kuşadası) — e senza la traduzione quei nove nomi non si
  * trovavano scrivendoli con la loro lettera vera. Le altre stanno qui perché
  * arrivano dallo stesso alfabeto e costano una riga.
+ *
+ * **La v2 (27 settembre 2026) ha potato tutti e nove quei nomi**, e la tabella
+ * resta lo stesso: costa niente, e il giorno che una di quelle città torna non
+ * deve tornare anche il difetto. Non essendo più esercitata da nessun nome vero,
+ * l'harness la confronta con `unaccent` lettera per lettera.
  *
  * **Attenzione a non allungare la lista a intuito:** `ə` e `ǝ` per esempio
  * `unaccent` le lascia stare, quindi tradurle qui *creerebbe* la divergenza che

@@ -23,7 +23,11 @@ type Riga = {
   scale_min: number
   scale_max: number
   sort_order: number
-  /** `{ "1": "Comfort", "2": "DA SCRIVERE", … }`, aggregato dalla vista. */
+  /**
+   * `{ "1": "Cerco sempre l'alternativa più comoda", … }`, aggregato dalla vista:
+   * dalla 0049 è la risposta come la legge il viaggiatore (`answer_it`), non la
+   * chiave del form.
+   */
   options: Record<string, string> | null
 }
 

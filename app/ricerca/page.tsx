@@ -5,6 +5,7 @@ import { BadgeStella } from '@/components/badge-stella'
 import { RicercaDestinazione } from '@/components/ricerca-destinazione'
 import { FiltriRicerca } from '@/components/filtri-ricerca'
 import { CardDesigner } from '@/components/card-designer'
+import { RicordaRisultati } from '@/components/torna-ai-risultati'
 import { componiFrase } from '@/lib/frase'
 import { leggiQuiz } from '@/lib/quiz-risposte'
 import {
@@ -144,6 +145,8 @@ export default async function PaginaRicerca({ searchParams }: Props) {
   return (
     <div className="relative bg-crema">
       <Header />
+      {/* Per il tasto "Torna ai risultati" della vetrina: vedi il componente. */}
+      <RicordaRisultati percorso={`/ricerca${queryQuiz.size ? `?${queryQuiz}` : ''}`} />
 
       <main className="relative mx-auto max-w-[1312px] px-4 pt-[160px] lg:px-0 lg:pt-[209px]">
         {/* I due bolli del Figma. Quello della valutazione media resta fuori

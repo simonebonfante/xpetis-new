@@ -94,6 +94,28 @@ export type ItinerarioPronto = {
 }
 
 /**
+ * Un viaggio di gruppo del designer (migration 0048, chiave `gruppo` del form).
+ *
+ * **Tutti testo libero, come li scrive il designer**: "14 – 25 set 2025",
+ * "12 giorni", "10 persone", "1.380€". Non si riformattano e non si
+ * interpretano — chi mostra non indovina. Sono vetrina: nessuna cassa, nessun
+ * ordine nasce da qui.
+ *
+ * **Non c'è uno slug**, e quindi non c'è una pagina: il nodo Figma 3-1121 ne
+ * disegna una per viaggio, ma un indirizzo stabile vuole una colonna che
+ * `td_group_trips` non ha (è la storia della 0033 per gli itinerari). Finché
+ * non si decide, la card in vetrina non ha tasto.
+ */
+export type ViaggioDiGruppo = {
+  title: string
+  dates_label: string | null
+  duration_label: string | null
+  group_size_label: string | null
+  price_label: string | null
+  image_path: string | null
+}
+
+/**
  * L'indirizzo della pagina di un itinerario pronto, e il modo di risolverlo. Il
  * contratto sta qui in un posto solo, come `lib/quiz-risposte.ts` fa per le
  * risposte del quiz: chi costruisce il link e chi lo legge vedono la stessa
@@ -149,6 +171,8 @@ export type Vetrina = {
    * pubblicato c'è; il tipo lo ammette perché la colonna lo ammette.
    */
   cal_username: string | null
+  /** Dalla 0048, in coda alla vista. Vuoto per chi non ne organizza. */
+  group_trips: ViaggioDiGruppo[]
 }
 
 /** La vetrina di un designer pubblicato, o `null` se lo slug non esiste. */

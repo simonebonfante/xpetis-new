@@ -10,6 +10,9 @@ import crypto from 'node:crypto'
 import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
+// La tassonomia da cui è generato il seed 0002. Letta dal generatore, così
+// harness e seed non possono guardare due file diversi.
+const { SORGENTE: SORGENTE_GEO } = await import(path.join(root, 'scripts', 'genera_geo.mjs'))
 const db = await PGlite.create({ extensions: { pg_trgm, pgcrypto, unaccent } })
 
 // La parola segreta con cui Cal.com firma i webhook. Nel repo non c'è e non ci
@@ -123,7 +126,8 @@ console.log('\n== Tassonomia geografica ==')
 {
   // Il confronto è contro le statistiche dichiarate dalla tassonomia stessa,
   // non contro numeri copiati a mano: se il file cambia, il test lo dice.
-  const tax = JSON.parse(readFileSync(path.join(root, '..', 'xpetis_destinazioni.json'), 'utf8'))
+  // Il nome del file lo dà il generatore, non questa riga: sono una cosa sola.
+  const tax = JSON.parse(readFileSync(path.join(root, '..', SORGENTE_GEO), 'utf8'))
   const st = tax.statistics
   for (const [label, table, expected] of [
     ['continenti',  'geo_continents',  st.continents],
@@ -175,14 +179,76 @@ console.log('\n== Tassonomia geografica ==')
   itr === 20 ? ok('l\'Italia ha le sue 20 regioni') : fail('regioni italiane: ' + itr)
 }
 {
-  // Una città può stare in due regioni dello stesso stato: è il caso di Jaipur.
-  const j = (await q(`select r.name_it from geo_cities c
-                        join geo_regions r on r.id = c.region_id
-                       where c.country_code='india' and c.name_it='Jaipur'
-                       order by r.name_it`)).rows.map(x => x.name_it)
-  j.length === 2
-    ? ok('Jaipur vive in due regioni (' + j.join(', ') + '): unicità per regione, non per stato')
-    : fail('Jaipur: ' + JSON.stringify(j))
+  // Una città può stare in due regioni dello stesso stato. Nella prima
+  // tassonomia era il caso di Jaipur; la v2 l'ha potata e non ne ha nessuna,
+  // ma la regola dello schema resta (unicità per regione, non per stato) e si
+  // prova con una città inventata. La potatura qui sotto la toglie.
+  const due = (await q(`select id from geo_regions where country_code='italia'
+                         order by slug limit 2`)).rows.map(r => r.id)
+  await expectOk('la stessa città in due regioni dello stesso stato', `
+    insert into geo_cities (country_code, region_id, slug, name_it, is_selectable) values
+      ('italia', ${due[0]}, 'citta-di-confine', 'Città di confine', false),
+      ('italia', ${due[1]}, 'citta-di-confine', 'Città di confine', false)`)
+  await expectFail('ma non due volte nella stessa regione', `
+    insert into geo_cities (country_code, region_id, slug, name_it, is_selectable)
+    values ('italia', ${due[0]}, 'citta-di-confine', 'Città di confine', false)`, 'unique')
+}
+{
+  // LA POTATURA (v2, 27 settembre 2026). Sul database vero il seed si rigira
+  // sopra la tassonomia vecchia: se fosse solo additivo le 1.032 città cadute
+  // resterebbero nel suggeritore. Qui si simula: due città che il file non ha
+  // più (quella inventata qui sopra, e Siena, che c'era nella v1), poi si
+  // rigira il seed.
+  await db.exec(`insert into geo_cities (country_code, region_id, slug, name_it, is_selectable)
+                 select 'italia', id, 'siena', 'Siena', false from geo_regions
+                  where country_code='italia' and slug='toscana'`)
+  const seed = readFileSync(path.join(root, 'seed', '0002_geo.sql'), 'utf8')
+  await expectOk('il seed geografico si rigira sopra dati esistenti', seed)
+  const n = Number((await q('select count(*) from geo_cities')).rows[0].count)
+  const s = Number((await q(`select count(*) from geo_cities where slug in ('siena','citta-di-confine')`)).rows[0].count)
+  const tax = JSON.parse(readFileSync(path.join(root, '..', SORGENTE_GEO), 'utf8'))
+  n === tax.statistics.cities && s === 0
+    ? ok(`rigirato, converge: ${n} città come dichiara il file, quelle cadute se ne sono andate`)
+    : fail(`dopo il secondo giro: ${n} città, ${s} cadute ancora dentro`)
+  await expectOk('e un terzo giro non cambia niente', seed)
+  const n3 = Number((await q('select count(*) from geo_cities')).rows[0].count)
+  n3 === n ? ok('idempotente') : fail(`terzo giro: ${n3}`)
+
+  // Le due guardie: una destinazione non sparisce senza dirlo.
+  // Il seed è una transazione sola: dopo una guardia che ferma, il database è
+  // com'era prima, e la transazione rimasta aperta si chiude a mano.
+  await expectFail('una città la cui regione non esiste ferma il seed',
+    seed.replace("('italia', 'toscana', 'firenze'", "('italia', 'toscana_inventata', 'firenze'"),
+    'Città senza regione')
+  await db.exec('rollback')
+  seed.includes("('italia', 'toscana', 'firenze'")
+    ? ok('(la guardia è stata provata su Firenze, che la v2 contiene)')
+    : fail('Firenze non è nel seed: la prova della guardia non ha provato niente')
+  await db.exec(`insert into geo_countries (code, macro_area_code, name_it, is_selectable, sort_order)
+                 values ('atlantide', 'europa_sud', 'Atlantide', true, 999)`)
+  await db.exec(`insert into geo_cities (country_code, region_id, slug, name_it, is_selectable)
+                 select 'italia', id, 'siena', 'Siena', false from geo_regions
+                  where country_code='italia' and slug='toscana'`)
+  await expectFail('uno stato che il file non ha ferma il seed, e non viene cancellato', seed, 'atlantide')
+  await db.exec('rollback')
+  const dopo = (await q(`select (select count(*) from geo_countries where code='atlantide')::int as a,
+                                (select count(*) from geo_cities where slug='siena')::int as s`)).rows[0]
+  dopo.a === 1 && dopo.s === 1
+    ? ok('fermato dalla guardia, il seed non ha potato niente: tutto o niente')
+    : fail('seed fermato a metà: ' + JSON.stringify(dopo))
+  await db.exec(`delete from geo_countries where code='atlantide'; delete from geo_cities where slug='siena'`)
+}
+{
+  // I due designer demo non devono aver perso paesi: la potatura tocca solo
+  // le città, e i paesi sono ciò su cui poggiano td_countries e il match.
+  const r = (await q(`select td.slug, string_agg(tc.country_code, ',' order by tc.country_code) as paesi
+                        from td_countries tc join travel_designers td on td.id = tc.td_id
+                       where td.slug in ('marco-rossi','giulia-neri')
+                       group by td.slug order by td.slug`)).rows
+  JSON.stringify(r) === JSON.stringify([{ slug: 'giulia-neri', paesi: 'bolivia,peru' },
+                                        { slug: 'marco-rossi', paesi: 'giappone,thailandia,vietnam' }])
+    ? ok('i due designer demo hanno ancora tutti i loro paesi dopo la potatura')
+    : fail('paesi dei demo: ' + JSON.stringify(r))
 }
 {
   const c = (await q(`select country_code, is_filterable from geo_search
@@ -400,6 +466,220 @@ await expectFail('valore 5 su un asse continuo rifiutato', `
   t.label_it === 'Aree estreme/polari'
     ? ok('etichetta del tag identica al form (altrimenti non aggancia)')
     : fail('etichetta: ' + t.label_it)
+}
+
+console.log('\n== Il quiz del viaggiatore: testi, ordine, verso (0049) ==')
+{
+  // Tre file fuori dal database, letti così come sono: il quiz, il form e un
+  // JSON vero del form. Se uno dei tre cambia, queste prove lo dicono.
+  const radice = path.join(root, '..')
+  const QUIZ = JSON.parse(readFileSync(path.join(radice, 'xpetis_quiz_viaggiatore_.json'), 'utf8'))
+  const form = readFileSync(path.join(radice, 'Vetrina TD (2).html'), 'utf8').replace(/\\"/g, '"')
+  const CONCHI = JSON.parse(form.match(/const CONCHI = (\[.*?\]);/)[1])
+  const VETRINA = JSON.parse(readFileSync(path.join(radice, 'vetrina_nuova.json'), 'utf8'))
+
+  // La chiave del form → il codice dell'asse. È la tabella di MAPPATURA_VETRINA.md:
+  // scritta a mano una volta sola, e qui sotto verificata sul verso.
+  const ASSE = {
+    controllo: 'planning_involvement', ritmo: 'pace', scomodita: 'comfort_wild',
+    luogo: 'curated_vs_real', sociale: 'social_orientation', conChi: 'companions',
+  }
+
+  const assi = (await q(`select code, kind, question_it, sort_order, scale_min, scale_max,
+                                label_min, label_max from quiz_axes order by sort_order`)).rows
+  const opzioni = (await q(`select axis_code, value, label_it, answer_it from quiz_axis_options`)).rows
+  const vista = Object.fromEntries((await q(`select code, options from public_quiz_axes`)).rows
+    .map(r => [r.code, r.options]))
+
+  QUIZ.questions.length === assi.length
+    ? ok(`il quiz ha tante domande quanti assi (${assi.length})`)
+    : fail(`domande ${QUIZ.questions.length}, assi ${assi.length}`)
+
+  // L'ordine delle domande: quello del file, non quello di prima.
+  const ordine = assi.map(a => a.code)
+  const atteso = [...QUIZ.questions].sort((a, b) => a.order - b.order).map(d => ASSE[d.matching_axis])
+  JSON.stringify(ordine) === JSON.stringify(atteso)
+    ? ok('le sei domande nell\'ordine del file: ' + ordine.join(' → '))
+    : fail('ordine: ' + JSON.stringify(ordine) + ' atteso ' + JSON.stringify(atteso))
+  ordine[5] === 'companions'
+    ? ok('"con chi viaggi" è la sesta domanda, non più la terza') : fail('companions in posizione ' + (ordine.indexOf('companions') + 1))
+
+  for (const d of QUIZ.questions) {
+    const codice = ASSE[d.matching_axis]
+    const asse = assi.find(a => a.code === codice)
+    if (!asse) { fail(`domanda ${d.id}: nessun asse ${codice}`); continue }
+
+    asse.question_it === d.text
+      ? ok(`${codice}: la domanda è quella del file`) : fail(`${codice}: domanda ${JSON.stringify(asse.question_it)}`)
+
+    // Scala 1-4 ⇔ asse continuo; la sesta non produce un punteggio.
+    const continuo = d.answer_type === 'scale_1_4'
+    ;(continuo ? asse.kind === 'continuous' : asse.kind === 'categorical')
+      ? ok(`${codice}: ${d.answer_type} ⇔ ${asse.kind}`) : fail(`${codice}: ${d.answer_type} ma kind=${asse.kind}`)
+
+    if (continuo) {
+      // OPZIONE PER OPZIONE, sul campo `score` e non sulla posizione nell'array.
+      const sbagliate = d.options.filter(o => {
+        const riga = opzioni.find(r => r.axis_code === codice && r.value === o.score)
+        return !riga || riga.answer_it !== o.text || vista[codice]?.[String(o.score)] !== o.text
+      })
+      sbagliate.length === 0
+        ? ok(`${codice}: le quattro risposte al loro score, in tabella e nella vista`)
+        : fail(`${codice}: risposte fuori posto ${JSON.stringify(sbagliate.map(o => o.id + '=' + o.score))}`)
+      // Il polo 1 è il valore più basso dell'asse: lo `score` minimo è `scale_min`.
+      const scores = d.options.map(o => o.score)
+      Math.min(...scores) === asse.scale_min && Math.max(...scores) === asse.scale_max
+        ? ok(`${codice}: polo 1 = scale_min (${asse.label_min}), polo 4 = scale_max (${asse.label_max})`)
+        : fail(`${codice}: score ${scores} contro scala ${asse.scale_min}-${asse.scale_max}`)
+    } else {
+      // "Con chi viaggi": il testo si aggancia alla chiave del form, e la chiave
+      // non si tocca.
+      const sbagliate = d.options.filter(o => {
+        const riga = opzioni.find(r => r.axis_code === codice && r.label_it === o.td_value_match)
+        return !riga || riga.answer_it !== o.text || vista[codice]?.[String(riga.value)] !== o.text
+      })
+      sbagliate.length === 0
+        ? ok(`${codice}: le cinque risposte agganciate alla chiave del form (td_value_match)`)
+        : fail(`${codice}: non agganciate ${JSON.stringify(sbagliate.map(o => o.id))}`)
+    }
+  }
+
+  // TRAPPOLA (a): le chiavi del form, carattere per carattere.
+  const chiavi = opzioni.filter(r => r.axis_code === 'companions')
+    .sort((a, b) => a.value - b.value).map(r => r.label_it)
+  JSON.stringify(chiavi) === JSON.stringify(CONCHI)
+    ? ok('le cinque label_it di "con chi viaggi" sono ancora le CONCHI del form, byte per byte')
+    : fail('label_it ' + JSON.stringify(chiavi) + ' contro form ' + JSON.stringify(CONCHI))
+  const tdMatch = QUIZ.questions.find(d => d.matching_axis === 'conChi').options.map(o => o.td_value_match)
+  JSON.stringify(tdMatch) === JSON.stringify(CONCHI)
+    ? ok('le td_value_match del quiz sono le CONCHI del form: il quiz non ha cambiato una chiave')
+    : fail('td_value_match divergono dal form: ' + JSON.stringify(tdMatch))
+  const nonRiconosciute = (VETRINA.assi.conChi ?? []).filter(v => !chiavi.includes(v))
+  nonRiconosciute.length === 0
+    ? ok('le voci conChi di vetrina_nuova.json sono tutte riconosciute')
+    : fail('conChi non riconosciute: ' + JSON.stringify(nonRiconosciute))
+
+  const buchi = Object.entries(vista).flatMap(([c, o]) =>
+    Object.entries(o).filter(([, t]) => !t || /DA SCRIVERE/i.test(t)).map(([v]) => c + ':' + v))
+  buchi.length === 0 ? ok('nella vista del quiz nessun "DA SCRIVERE"') : fail('buchi: ' + buchi.join(', '))
+  assi.every(a => a.question_it?.trim())
+    ? ok('ogni asse ha la sua domanda: niente più etichetta interna in pagina')
+    : fail('assi senza domanda')
+
+  // IL VERSO DALL'INIZIO ALLA FINE, su `pace`. Si parte dalle PAROLE del file
+  // ("Lento…", "Intenso…"), si passa dalla vista come fa la pagina del quiz per
+  // trovare il valore, e il valore va in `match_designers()`. Marco è lento,
+  // Giulia intensa: lo si legge dai dati invece di darlo per scontato.
+  const ritmo = QUIZ.questions.find(d => d.matching_axis === 'ritmo')
+  const valoreDiTesto = (inizio) => {
+    const testo = ritmo.options.find(o => o.text.startsWith(inizio)).text
+    return Number(Object.entries(vista.pace).find(([, t]) => t === testo)[0])
+  }
+  const valori = Object.fromEntries((await q(`
+    select td.slug, v.value from td_axis_values v join travel_designers td on td.id = v.td_id
+     where v.axis_code = 'pace' and td.slug in ('marco-rossi','giulia-neri')`)).rows.map(r => [r.slug, r.value]))
+  const pace = assi.find(a => a.code === 'pace')
+  pace.label_min === 'Slow' && valori['marco-rossi'] < valori['giulia-neri']
+    ? ok(`premessa: Marco è più lento di Giulia (pace ${valori['marco-rossi']} contro ${valori['giulia-neri']}, 1 = ${pace.label_min})`)
+    : fail('premessa sui designer demo: ' + JSON.stringify(valori))
+
+  const posizioni = async (quiz) => Object.fromEntries((await q(`
+    select slug, rank_position, salient_axes from match_designers(null, null, $1::jsonb)
+     where slug in ('marco-rossi','giulia-neri')`, [JSON.stringify(quiz)])).rows.map(r => [r.slug, r]))
+
+  const lento = valoreDiTesto('Lento')
+  const intenso = valoreDiTesto('Intenso')
+  lento === pace.scale_min && intenso === pace.scale_max
+    ? ok(`"Lento" è il valore ${lento}, "Intenso" il ${intenso}`) : fail(`Lento=${lento} Intenso=${intenso}`)
+  {
+    const r = await posizioni({ pace: lento })
+    r['marco-rossi'].rank_position < r['giulia-neri'].rank_position
+      ? ok('rispondere "Lento" (polo 1) fa salire Marco sopra Giulia')
+      : fail('polo 1 su pace: ' + JSON.stringify(r))
+    r['marco-rossi'].salient_axes.includes('pace') && !r['giulia-neri'].salient_axes.includes('pace')
+      ? ok('e la frase di Marco parla del ritmo, quella di Giulia no')
+      : fail('salienza polo 1: ' + JSON.stringify(r))
+  }
+  {
+    const r = await posizioni({ pace: intenso })
+    r['giulia-neri'].rank_position < r['marco-rossi'].rank_position
+      ? ok('rispondere "Intenso" (polo 4) fa salire Giulia sopra Marco')
+      : fail('polo 4 su pace: ' + JSON.stringify(r))
+  }
+
+  // Lo stesso, meccanico, su tutti gli assi continui dove i due demo divergono:
+  // il polo basso premia chi ha il valore basso, il polo alto l'opposto.
+  const demo = (await q(`
+    select v.axis_code, td.slug, v.value from td_axis_values v
+      join travel_designers td on td.id = v.td_id join quiz_axes a on a.code = v.axis_code
+     where a.kind = 'continuous' and td.slug in ('marco-rossi','giulia-neri')`)).rows
+  for (const a of assi.filter(a => a.kind === 'continuous')) {
+    const m = demo.find(r => r.axis_code === a.code && r.slug === 'marco-rossi')?.value
+    const g = demo.find(r => r.axis_code === a.code && r.slug === 'giulia-neri')?.value
+    if (m == null || g == null || m === g) continue
+    const basso = m < g ? 'marco-rossi' : 'giulia-neri'
+    const alto  = m < g ? 'giulia-neri' : 'marco-rossi'
+    const r1 = await posizioni({ [a.code]: a.scale_min })
+    const r4 = await posizioni({ [a.code]: a.scale_max })
+    r1[basso].rank_position < r1[alto].rank_position && r4[alto].rank_position < r4[basso].rank_position
+      ? ok(`${a.code}: polo "${a.label_min}" premia ${basso}, polo "${a.label_max}" premia ${alto}`)
+      : fail(`${a.code}: verso rotto ${JSON.stringify({ r1, r4 })}`)
+  }
+
+  // La sesta non è una scala: 1 se il designer ha quella configurazione, 0 se
+  // no — un valore "vicino" non vale mezzo punto.
+  const conChi = (await q(`
+    select td.slug, array_agg(v.value order by v.value) as valori from td_axis_values v
+      join travel_designers td on td.id = v.td_id
+     where v.axis_code = 'companions' and td.slug = 'marco-rossi' group by td.slug`)).rows[0].valori
+  const vicino = [1, 2, 3, 4, 5].find(v => !conChi.includes(v) && (conChi.includes(v - 1) || conChi.includes(v + 1)))
+  {
+    const r = await posizioni({ companions: conChi[0] })
+    r['marco-rossi'].salient_axes.includes('companions')
+      ? ok(`"con chi viaggi" = ${conChi[0]}: Marco la dichiara, punto pieno`)
+      : fail('companions posseduto senza punto: ' + JSON.stringify(r))
+  }
+  if (vicino == null) fail('prova di "con chi viaggi": nessun valore vicino libero per Marco ' + JSON.stringify(conChi))
+  else {
+    const r = await posizioni({ companions: vicino })
+    !r['marco-rossi'].salient_axes.includes('companions')
+      ? ok(`"con chi viaggi" = ${vicino}, accanto a ${JSON.stringify(conChi)}: zero, non una distanza`)
+      : fail('companions trattato come scala: ' + JSON.stringify(r))
+  }
+
+  // LA 0049 SU UN DATABASE GIÀ POPOLATO. Qui sopra la migration ha girato su
+  // tabelle vuote e i testi li ha portati il seed: il ramo che conta sul
+  // database di sviluppo — gli UPDATE — non l'ha visto nessuno. Si rimette lo
+  // stato di prima (testi vuoti, "con chi viaggi" terza) e si rigira.
+  const migrazione = readFileSync(path.join(root, 'migrations', '0049_testi_quiz.sql'), 'utf8')
+    .replace(/alter table quiz_axis_options add column answer_it text;/, '')
+  const primaDella0049 = `
+    update quiz_axis_options set answer_it = null;
+    update quiz_axes set question_it = null;
+    update quiz_axes set sort_order = case code
+      when 'planning_involvement' then 1 when 'pace' then 2 when 'companions' then 3
+      when 'comfort_wild' then 4 when 'curated_vs_real' then 5 else 6 end;`
+  const fotografia = async () => JSON.stringify((await q(`
+    select a.code, a.sort_order, a.question_it, a.label_min, a.label_max,
+           (select jsonb_agg(jsonb_build_array(o.value, o.label_it, o.answer_it) order by o.value)
+              from quiz_axis_options o where o.axis_code = a.code) as opzioni
+      from quiz_axes a order by a.code`)).rows)
+  const dopoIlSeed = await fotografia()
+  await db.exec(primaDella0049)
+  await expectOk('la 0049 si applica sopra le tabelle già popolate', migrazione)
+  ;(await fotografia()) === dopoIlSeed
+    ? ok('e lascia esattamente lo stato che porta il seed: testi, ordine, chiavi e verso')
+    : fail('la 0049 e il seed non dicono la stessa cosa')
+
+  // La guardia: una chiave del form ritoccata a mano da Studio non aggancia il
+  // testo, e la migration si ferma invece di lasciare un'opzione muta.
+  await db.exec('begin')
+  await db.exec(primaDella0049 + `
+    update quiz_axis_options set label_it = 'Viaggiatore  solo' where axis_code = 'companions' and value = 1;`)
+  await expectFail('una chiave del form ritoccata ferma la 0049', migrazione, 'companions:1')
+  await db.exec('rollback')
+  ;(await fotografia()) === dopoIlSeed
+    ? ok('fermata la migration, niente è cambiato') : fail('stato alterato dopo la guardia')
 }
 
 console.log('\n== I cinque servizi del form ==')
@@ -704,10 +984,35 @@ await expectOk('correggere un nome aggiorna il normalizzato nello stesso stateme
     union all select name_it, name_norm from geo_regions
     union all select name_it, name_norm from geo_cities`)).rows
   const perse = righe.filter(r => !r.name_norm.includes(normalizza(r.name_it)))
-  righe.length > 1500 && perse.length === 0
-    ? ok(`browser e database normalizzano allo stesso modo su ${righe.length} nomi veri`)
+  // Il numero dei nomi lo dà la tassonomia, non una soglia scritta a mano: con
+  // la v1 era «> 1500», e la potatura della v2 (581 nomi) l'avrebbe fatto
+  // diventare rosso per la ragione sbagliata.
+  const st = JSON.parse(readFileSync(path.join(root, '..', SORGENTE_GEO), 'utf8')).statistics
+  const attesi = st.continents + st.macro_areas + st.states + st.regions + st.cities
+  righe.length === attesi && perse.length === 0
+    ? ok(`browser e database normalizzano allo stesso modo su tutti i ${righe.length} nomi della tassonomia`)
     : fail(`nomi su cui le due normalizzazioni divergono (${perse.length} su ${righe.length}): `
            + JSON.stringify(perse.slice(0, 5)))
+
+  // **La tabella delle lettere, da sola.** Con la v2 i nove nomi che l'avevano
+  // fatta nascere (Tromsø, Hveragerði, Płock, Kuşadası…) sono stati potati:
+  // la prova qui sopra non la esercita più su nessun nome vero. Quindi ogni
+  // lettera si confronta con `unaccent` direttamente, in minuscolo e in
+  // maiuscolo, e insieme le lettere non ASCII che la tassonomia contiene oggi.
+  // Se un nome futuro porta una lettera che il browser e il database trattano
+  // in modo diverso, la prova sui nomi lo dice; questa dice che la tabella non
+  // è marcita nel frattempo.
+  const lettere = new Set(Object.keys(senzaSegno))
+  for (const k of Object.keys(senzaSegno)) lettere.add(k.toUpperCase())
+  for (const r of righe) for (const c of r.name_it) if (c.charCodeAt(0) > 127) lettere.add(c)
+  const divergenti = []
+  for (const c of lettere) {
+    const d = (await q('select lower(unaccent_immutable($1)) as n', [c])).rows[0].n
+    if (d !== normalizza(c)) divergenti.push(`${c}: database «${d}», browser «${normalizza(c)}»`)
+  }
+  divergenti.length === 0
+    ? ok(`${lettere.size} lettere non ASCII (la tabella e quelle della tassonomia): stessa traduzione nei due lati`)
+    : fail('lettere divergenti: ' + divergenti.join('; '))
 }
 
 console.log('\n== Parametri di testo in app_config (0034) ==')

@@ -62,12 +62,14 @@ n8n/            # copia versionata dei workflow + LEGGIMI su come si reimportano
 supabase/
   migrations/   # numerate, si applicano in ordine
   seed/         # config, tassonomia geografica generata, dati finti
-  scripts/      # genera_geo.mjs: rigenera il seed geografico dal JSON
+  scripts/      # genera_geo.mjs: rigenera il seed geografico da xpetis_destinazioni_v2.json
   tests/run.mjs # harness: applica tutto su PGlite, ~284 asserzioni
   tests/fixtures/calcom/  # i 7 messaggi VERI di Cal.com, firme incluse
   README.md     # documentazione dello schema e delle decisioni
   MAPPATURA_VETRINA.md  # form Vetrina TD → schema
   MAPPATURA_CALCOM.md   # messaggi Cal.com → schema, da payload veri
+xpetis_destinazioni_v2.json  # la tassonomia geografica, fonte del seed 0002 (188 città)
+archivio/             # file superati, tenuti per memoria: la tassonomia v1 (1.220 città)
 PIANO.md              # stato, decisioni, task, deviazioni, stime
 REGISTRO.md           # una voce per sessione, dalla più recente alla più vecchia
 PUNTI_APERTI.md       # le domande aperte, scritte per il team non tecnico
@@ -117,29 +119,30 @@ autorevole:** **`Q9Krydv6xD8mFJCtU9NHzr`** («XPETIS - Def»),
 `https://www.figma.com/design/Q9Krydv6xD8mFJCtU9NHzr/XPETIS---Def?node-id=<nodo>`.
 Non è una revisione del vecchio: è un altro file.
 
-| Pagina | Nodo sul file nuovo |
-|---|---|
-| Vetrina del designer | `2-743` |
-| Viaggi di gruppo | `3-1121` |
-| Itinerario pronto da vivere | `3-1386` |
-| Homepage | **da chiedere** |
-| Ricerca / risultati | **da chiedere** |
-| Quiz | **da chiedere** |
+| Pagina | Nodo sul file nuovo | Stato nel codice |
+|---|---|---|
+| Vetrina del designer | `2-743` | Costruita dal file nuovo il 28 settembre (contiene anche la sezione «Viaggi di gruppo») |
+| Viaggi di gruppo | `3-1121` | **Una pagina per viaggio**, non l'elenco. **Non costruita**: vuole uno slug stabile che `td_group_trips` non ha, ed è una migration da decidere (`PIANO.md`) |
+| Itinerario pronto da vivere | `3-1386` | Costruita dal file nuovo il 28 settembre. Indirizzo invariato (slug della 0033) |
+| Homepage | **da chiedere** | Dal file vecchio |
+| Ricerca / risultati | **da chiedere** | Dal file vecchio |
+| Quiz | **da chiedere** | Dal file vecchio |
 
 Solo i tre nodi con un numero sono verificati. Home, ricerca e quiz Simone li
 dice «praticamente identiche» e si revisionano dopo: **il loro nodo sul file
 nuovo va chiesto**, non ricavato. I nodi vecchi (`160-77`, `177-262`,
 `346-932`, `346-896`…) puntano al file superato `x1DYYagZ2moagmpEHZHYYE` e **non
-vanno riusati** sul file nuovo, dove non significano niente. Le pagine già
-costruite fino al 27 settembre vengono dal file vecchio.
+vanno riusati** sul file nuovo, dove non significano niente. Home, ricerca e
+quiz vengono ancora dal file vecchio.
 
 Pagamento: **plugin Stripe**, niente pagina disegnata. Prenotazione: **iframe
 Cal.com** della pagina del designer. (Deciso da Simone il 10 agosto 2026.)
 
 Gli asset si riscaricano con `bash scripts/scarica-asset-figma.sh`: le URL degli
-asset scadono in 7 giorni, la chiave del file no. ⚠️ Lo script oggi scarica
-ancora dal **file vecchio**: va riscritto quando le pagine si ricostruiscono dal
-file nuovo.
+asset scadono in 7 giorni, la chiave del file no. Dal 28 settembre lo script
+scarica dal **file nuovo** gli asset di vetrina e itinerario pronto, e dice
+sezione per sezione quali (home, ricerca, quiz, header, footer) vengono
+**ancora dal file vecchio**, finché i loro nodi non arrivano.
 
 ## Decisioni architetturali già prese
 

@@ -43,6 +43,14 @@ export const CHIAVI = {
    * Chi ne fa un link `wa.me` toglie spazi e `+`.
    */
   whatsapp: 'whatsapp_number',
+  /**
+   * Le due finestre che "Come funziona" in vetrina dice al viaggiatore (Flusso
+   * §5): rimborso pieno fino a N ore prima, riprogrammazione fino a N ore prima.
+   * Gruppo `booking_rules`, già servito da `public_config`. Si leggono con
+   * `leggiNumeroConfig()`: sono le stesse righe che userà il controllore.
+   */
+  oreRimborsoPieno: 'cancel_full_refund_hours',
+  oreMinimeRiprogrammazione: 'reschedule_min_hours',
 } as const
 
 /**
@@ -64,6 +72,28 @@ export async function leggiTestoConfig(chiave: string): Promise<string | null> {
   if (error) throw new Error(`public_config: ${error.message}`)
 
   return ripulisci(data)
+}
+
+/**
+ * Il valore numerico di un parametro **pubblico**, o `null` se la riga non c'è.
+ *
+ * Come `leggiTestoConfig()`, un'assenza non solleva: chi la usa toglie la frase
+ * che conteneva il numero, invece di stamparne uno scritto nel codice.
+ */
+export async function leggiNumeroConfig(chiave: string): Promise<number | null> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('public_config')
+    .select('value')
+    .eq('key', chiave)
+    .maybeSingle()
+
+  if (error) throw new Error(`public_config: ${error.message}`)
+
+  const valore = (data as { value: number | string | null } | null)?.value
+  if (valore === null || valore === undefined) return null
+  const numero = Number(valore)
+  return Number.isFinite(numero) ? numero : null
 }
 
 /**

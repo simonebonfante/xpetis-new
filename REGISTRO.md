@@ -9,6 +9,75 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**28 settembre 2026 — le pagine ridisegnate sul Figma nuovo (prompt D)**
+
+Tre nodi del file `Q9Krydv6xD8mFJCtU9NHzr`: vetrina `2-743`, viaggi di gruppo
+`3-1121`, itinerario pronto `3-1386`. Letti col connettore dopo la skill
+design-to-code; nessun altro nodo ricavato.
+
+**Prima di toccare il box ho elencato cosa fa**, perché è l'imbocco del funnel
+e un rifacimento può perdere un pezzo senza che niente diventi rosso: il
+cancello del login, la guardia su `cal_username` nullo, l'embed con la
+configurazione piatta e i due eventi, il paracadute «Vai al pagamento», il
+`cal_booking_uid` che non arriva al browser, il tasto solo sui servizi
+acquistabili, il ritorno al servizio scelto. Tutto questo vive in
+`prenota-consulenza.tsx` e `lib/cal-embed.ts`, **e quei due file non li ho
+toccati**: `git diff` vuoto. In `box-servizio.tsx` è cambiato il markup;
+`calLink` e la chiamata a `PrenotaConsulenza` sono le stesse righe.
+
+**Il disegno nuovo dà ragione al Flusso sul box.** Il vecchio metteva tutti i
+servizi nel selettore e costringeva a un compromesso (tasto solo su due, frase
+sugli altri). Il nuovo ha due pillole — breve e approfondita — e i servizi
+dopo la call in quattro riquadri non cliccabili. Li mostro **solo se il
+designer li ha attivi**: il Figma ne disegna quattro perché disegna un
+designer che li ha tutti. La spunta «progetti e prenoti tutto per me» è
+sparita dal disegno, e il Flusso la mette comunque nel modulo di pagamento.
+
+**Cosa ho aggiunto o corretto rispetto al disegno, e perché.**
+- Le **date** sulla card dei viaggi di gruppo: il Figma le mette solo nella
+  pagina del viaggio, che non c'è.
+- **«Come funziona»**: il passo 1 prometteva «modificare o cancellare fino a
+  24 ore prima», il Flusso dice 24 per il rimborso e 12 per spostare; ora i
+  due numeri vengono da `app_config` (`leggiNumeroConfig`, nuova in
+  `lib/config.ts`). «Inclusi i voli» è caduto. E il passo 3 nominava il su
+  misura anche a Giulia, che non lo offre: l'ho visto nel render, non l'avevo
+  previsto, e ora nomina solo i servizi attivi.
+- **«Torna ai risultati»**: la vetrina non conosce l'indirizzo dei risultati,
+  e `document.referrer` nelle navigazioni interne di Next non cambia — l'avevo
+  scritto così la prima volta e l'ho buttato. Ora `/ricerca` si annota
+  l'indirizzo in `sessionStorage` e il tasto lo rilegge; senza, porta a
+  `/ricerca`. È l'unica riga fuori dalle tre pagine.
+
+**Mi sono fermato sulla pagina del viaggio di gruppo.** Il nodo `3-1121` è una
+pagina per viaggio, quindi vuole un indirizzo stabile, e `td_group_trips` non
+ha uno slug. È la storia della `0033`; la migration la decide Simone. Anche
+decisa, la pagina avrebbe poco: fascia d'età, temi a stelle, tappe e
+informazioni utili non hanno sorgente, e «Acquista il posto» è un tasto
+d'acquisto che il Flusso non prevede.
+
+**Le domande di agosto, una per una**, sono in una tabella in milestone 3.
+Nessuna chiusa per inerzia: quelle della card di `/ricerca` non stanno in
+questi nodi, «Membro XPETIS» è ridisegnata ma esporre `joined_at` resta una
+decisione, «Acquista l'itinerario» è ancora lì e vince ancora il Flusso.
+
+**Gli asset.** Lo script scarica dal file nuovo le icone di queste pagine: sei
+sono byte per byte le stesse di prima (verificato con `cmp`), due sono nuove
+(il bollo del credito, col «$» del disegno). Home, ricerca, quiz, header e
+footer sono dichiarati «file vecchio» sezione per sezione.
+
+**Verificato**: build verde, harness verde, lint pulito sui file toccati (due
+errori `set-state-in-effect` restano in `quiz-domande.tsx` e
+`ricerca-destinazione.tsx`, che non ho toccato). Render con `curl` sul database
+di sviluppo: una pillola per Marco, due per Giulia, `?servizio=` inventato che
+ricade sulla breve, link di login col servizio giusto, date dei viaggi di
+gruppo, 24 e 12 ore da `app_config`, itinerario del 23 agosto a 200 e ordinali
+a 404. **Non verificato**: niente browser — nessuna pagina vista, nessun clic,
+nessun embed aperto, niente da collegato. E nel seed non c'è un designer senza
+viaggi di gruppo né uno senza `cal_username`: quei rami sono scritti, non visti.
+Le prove sono la 121-133.
+
+---
+
 **27 settembre 2026 — la milestone 7: l'All Inclusive, con l'agenzia in mezzo**
 
 Il prompt: l'agenzia in `agencies`, la verifica con la sua pagina a token,
@@ -202,6 +271,133 @@ prove 102-108, con le due righe di `app_config` da inserire a mano.
 `.env.local` con `.`, e oggi fallisce sulla riga `RESEND_FROM`, che ha le
 parentesi angolate e non è fra virgolette. Non ho toccato il file: è tuo e
 contiene i segreti.
+
+---
+
+**27 settembre 2026, notte — la tassonomia v2: 1.220 città diventano 188**
+
+Il prompt «B». Il seed geografico si genera da `xpetis_destinazioni_v2.json`;
+nessuna migration, nessun tocco a `match_designers()` né alle bande. Harness da
+860 a **870 asserzioni**, verdi.
+
+**Prima di toccare, il confronto dei due file.** Continenti, macro-aree, stati e
+regioni identici, livello per livello, nome per nome e flag per flag; le 20
+regioni italiane sono le stesse venti, con gli stessi codici. Le 188 città sono
+un **sottoinsieme esatto** delle 1.220: nessuna nuova, nessuna rinominata.
+Quindi nessuna lettera nuova per la tabella degli accenti. Poi il database di
+sviluppo, in sola lettura con `supabase db query --linked` sul catalogo:
+**nessuna chiave esterna punta a `geo_cities`**, la legge solo `geo_search`,
+nessuna colonna di testo altrove conserva riferimenti a città. I primi quattro
+livelli coincidono codice per codice con la v2 e le 188 città ci sono già
+tutte.
+
+**Il punto vero non era il generatore, era il seed.** Faceva solo `insert … on
+conflict do update`: su un database vuoto la v2 dà 188 città, ma rigirato sul
+progetto vero ne avrebbe lasciate 1.220, perché non toglieva niente. Il
+suggeritore avrebbe continuato a proporre Siena, e nessuna prova l'avrebbe
+detto. Ora il seed è **convergente**: pota le città che il file non ha più; si
+**ferma** se negli altri livelli c'è una riga in più (uno stato ha dietro
+`td_countries`: toglierlo è una decisione) o se una città non trova la sua
+regione (la `join` l'avrebbe scartata in silenzio — cioè il modo esatto in cui
+«un errore qui fa sparire delle destinazioni»); e sta tutto in una transazione.
+In più il generatore rifiuta di scrivere se quello che ha letto non combacia
+con le `statistics` dichiarate dal file.
+
+**Il file vecchio in `archivio/`**, rinominato `xpetis_destinazioni_v1.json`,
+con un `LEGGIMI.md` che dice cosa l'ha sostituito e perché. Il nome della
+sorgente vive in una costante esportata dal generatore (`SORGENTE`), che
+l'harness importa: prima il percorso era scritto a mano in due posti, e
+cambiandone uno solo harness e seed avrebbero guardato due file diversi.
+
+**Due asserzioni dipendevano dalla v1, come il prompt temeva.** La prova degli
+accenti aveva una soglia `> 1500` nomi, scritta a mano: con 581 nomi sarebbe
+diventata rossa, e correggere il numero sarebbe stato l'errore. Ora il numero lo
+dà il file. E la prova «una città in due regioni» usava Jaipur, potata: la
+regola dello schema resta, quindi si prova con una città inventata. I conteggi
+per livello seguivano già da soli le `statistics`.
+
+**Una cosa che il prompt non chiedeva, e la dico.** I nove nomi che avevano
+fatto nascere la tabella degli accenti (Tromsø, Płock, Kuşadası…) sono **tutti**
+potati. La prova sui nomi resta verde, ma non esercita più `ø`, `ð`, `ł`, `ı`:
+la tabella in `lib/geo.ts` potrebbe marcire senza che niente lo dica. Ora
+l'harness la confronta con `unaccent` lettera per lettera (39 lettere: la
+tabella, le sue maiuscole, e tutte quelle non ASCII della v2).
+
+**I sabotaggi.** Tolta la potatura: rosso («191 città, 3 cadute ancora
+dentro»). Tolta la guardia sulle regioni: rosso. Prove nuove sul seed: rigirato
+sopra dati esistenti converge, un terzo giro non cambia niente, fermato da una
+guardia non pota niente.
+
+**La deviazione 7 non si è mossa**: l'avviso resta nel generatore e
+nell'intestazione del seed; aggiornato solo il percorso della v1 nel commento.
+
+**Cosa non ho fatto**: il seed non è stato applicato al progetto vero — scrive,
+e tocca a Simone. La procedura esatta e le prove 109-114 sono in `PIANO.md`,
+milestone 1. Il comando CLI proposto (`supabase db query --linked -f`) non l'ho
+provato con un file che contiene `begin`/`commit`: se lo rifiuta, il SQL
+Editor fa lo stesso.
+
+---
+
+**27 settembre 2026, notte fonda — il quiz: testi, ordine, e il verso degli assi**
+
+Il prompt «C». Le sei domande e le loro risposte da
+`xpetis_quiz_viaggiatore_.json`, e l'ordine nuovo con «con chi viaggi» sesta.
+`0049_testi_quiz.sql`, seed `0001` allineato, harness da 870 a **919
+asserzioni**, verdi. Nessun codice, valore o estremo d'asse toccato; nel
+TypeScript solo commenti che erano diventati falsi.
+
+**Il verso l'ho riverificato opzione per opzione**, non asse per asse, e sul
+campo `score` del file invece che sulla posizione nell'array (qui coincidono,
+ma non lo davo per buono). Venti risposte, tutte dalla parte giusta di
+`label_min` / `label_max`. L'unico asse dove ho dovuto fermarmi a pensare è il
+primo: il codice è `planning_involvement`, «coinvolgimento», ma il valore 1 è
+il viaggiatore che vuole decidere di più — «Poco controllo» *del designer*,
+come scrive il file fra parentesi. Il verso è giusto; il nome si legge al
+contrario, ed è la stessa trappola di `aesthetics`. Non l'ho rinominato: il
+codice sta nelle risposte salvate e nella query `quiz=` degli URL condivisi.
+Segnato in `PIANO.md` come domanda.
+
+**La trappola del form non è scattata, ma ci si passava a un centimetro.** Il
+quiz mostra al viaggiatore «Da solo/a» dove il form dice «Viaggiatore solo».
+La strada ovvia — scrivere le parole del quiz in `quiz_axis_options.label_it`,
+dove oggi c'è «DA SCRIVERE» — avrebbe rotto in silenzio l'import di «con chi
+viaggi», perché su quell'asse `label_it` è la chiave che arriva nei JSON dei 25.
+Quindi una colonna nuova, `answer_it`, e il testo agganciato alla chiave del
+form tramite `td_value_match` (il campo che il file porta apposta), non al
+numero dell'opzione. Il confronto byte per byte fra quiz, form (`CONCHI`),
+database e `vetrina_nuova.json` torna su tutte e cinque: **niente da fermare,
+niente da chiedere a Gaia e Alessandro**. L'harness adesso legge quei tre file a
+ogni giro, così se uno dei tre cambia lo dice lui.
+
+**La sesta domanda non è una scala, e `match_designers()` la tratta così**: 1
+se il designer ha dichiarato quella configurazione, 0 se no. L'harness lo prova
+con un valore *accanto* a quelli di Marco, che deve valere zero e non una
+distanza. Però entra nella stessa media pesata degli altri cinque assi, col peso
+2.0 del Flusso — il secondo più alto — mentre il file del quiz la dice «di
+impatto minore». Non l'ho toccato: è una taratura, non un errore tecnico, e il
+Flusso è la fonte del 2.0. Domanda per Alessandro.
+
+**Le prove che contano.** Il verso dall'inizio alla fine su `pace`: si parte
+dalle *parole* del file («Lento…»), si trova il valore nella vista come fa la
+pagina, lo si passa a `match_designers()`, e Marco (lento, letto dai dati e
+non dato per scontato) sale sopra Giulia; con «Intenso» l'opposto, e la frase di
+Marco parla del ritmo mentre quella di Giulia no. Poi lo stesso, meccanico, su
+ogni asse continuo dove i due demo divergono — cinque su cinque. E una prova
+che all'inizio non avevo scritto: l'harness applica le migration su tabelle
+vuote e i testi li porta il seed, quindi **il ramo degli UPDATE, cioè quello che
+girerà sul database di sviluppo, non l'aveva visto nessuno**. Ora si rimette lo
+stato di prima, si rigira la 0049, e si pretende che arrivi esattamente dove
+arriva il seed; più la guardia, che si ferma se una chiave del form è stata
+ritoccata da Studio.
+
+**Le risposte già salvate.** Sul database di sviluppo `quiz_responses` ha una
+riga sola (25 agosto, tutti gli assi a 1). È `{ codice: valore }`, e codici e
+valori non cambiano: resta leggibile e significa quello che significava.
+
+**Cosa non ho fatto**: la 0049 non è applicata al progetto vero — scrive, e
+tocca a Simone (`supabase db push`, poi le prove 115-120 in milestone 3). E il
+quiz non l'ho rifatto in un browser: il giro dei sei clic è la prova 117-119.
 
 ---
 

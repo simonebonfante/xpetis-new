@@ -36,11 +36,15 @@ import {
  *     copiasse quello del disegno appiccicando i valori 1-4 alle righe si
  *     girerebbe l'asse — il rischio numero uno del piano, quello che nessuna
  *     prova tecnica intercetta.
- *  2. **Il testo.** Il Figma porta domanda e risposte scritte per le prime due
- *     domande; il database ha `question_it` vuoto su tutti e sei gli assi e
- *     "DA SCRIVERE" sui valori intermedi dei cinque assi continui. Mostriamo
- *     quello che c'è: il quiz è incompleto per davvero e deve vedersi. I testi
- *     del Figma sono materiale per Gaia, e vanno nel seed, non qui.
+ *  2. **Il testo.** Domande e risposte vengono da `xpetis_quiz_viaggiatore_.json`
+ *     e stanno nel database dalla migration 0049 (`question_it`, `answer_it`),
+ *     non qui. Se un giorno mancassero, la pagina mostra il buco invece di
+ *     inventare: per questo restano le due ricadute qui sotto.
+ *
+ * L'ordine in pagina, dall'alto (valore 1) verso il basso (valore 4), è anche
+ * quello che il file del quiz dichiara (`scoring_note`): file e database dicono
+ * la stessa cosa, e il punto 1 non dipende più solo da questo componente. Il
+ * Figma vecchio resta al contrario; il nodo del quiz sul file nuovo è da chiedere.
  */
 export function QuizDomande({
   assi,
@@ -139,9 +143,9 @@ export function QuizDomande({
               {asse.question_it ?? asse.label_it}
             </legend>
 
-            {/* `question_it` è vuoto su tutti e sei gli assi: l'intestazione qui
-                sopra ricade sull'etichetta dell'asse, che è una targhetta e non
-                una domanda. Detto invece di nascosto. */}
+            {/* Senza `question_it` l'intestazione qui sopra ricade
+                sull'etichetta dell'asse, che è una targhetta e non una domanda.
+                Detto invece di nascosto. */}
             {!asse.question_it && (
               <p className="mt-2 text-piccolo uppercase tracking-wide text-primario">
                 domanda da scrivere

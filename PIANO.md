@@ -353,6 +353,55 @@ vetrina non mostra ancora i viaggi di gruppo, li mostrerà la pagina ridisegnata
 
 Le prove sono la 102-108, in fondo alla milestone 3.
 
+**Aggiornamento del 27 settembre 2026, notte — la tassonomia v2.** Il seed
+geografico si genera da `xpetis_destinazioni_v2.json`: stessi continenti,
+macro-aree, stati e regioni, **188 città invece di 1.220**. Nessuna migration:
+cambia il contenuto, non la forma. Harness a **870 asserzioni**, verdi.
+
+1. ⚠️ **Chi cercava «Siena» da oggi non trova niente.** È la potatura, ed è
+   voluta: una scelta di prodotto, non un difetto (sotto, in milestone 1).
+2. 🔴 **Il seed ora toglie, oltre ad aggiungere.** Rigirato sul database vero
+   cancella le 1.032 città cadute, e si ferma — senza toccare niente — se trova
+   qualcosa che non si aspetta. **Sul database vero non gira da solo**: la
+   procedura esatta è in milestone 1, prove 109-114.
+3. La deviazione 7 non si è mossa: la v2 ha le **stesse 20 regioni italiane**,
+   con gli stessi codici.
+
+**Aggiornamento del 27 settembre 2026, notte fonda — il quiz.** Domande e
+risposte vere da `xpetis_quiz_viaggiatore_.json`, e «con chi viaggi» passa da
+terza a **sesta**. `0049_testi_quiz.sql`, harness a **919 asserzioni** (erano
+870), verdi. Nessun codice, valore o estremo d'asse toccato.
+
+1. ✅ **Il verso regge, opzione per opzione.** Verificato sul campo `score` di
+   ognuna delle venti risposte, e provato dall'inizio alla fine: dalle parole
+   del file al valore nella vista a `match_designers()` — «Lento» fa salire
+   Marco, «Intenso» fa salire Giulia.
+2. ✅ **Le chiavi del form non si sono mosse.** Le parole del quiz («Da solo/a»)
+   stanno in una colonna nuova, `answer_it`; `label_it` resta la stringa del
+   form, byte per byte, e l'harness lo ricontrolla contro il form e contro
+   `vetrina_nuova.json` a ogni giro. **Nessuna divergenza**: niente da chiedere
+   a Gaia e Alessandro su questo.
+3. ✅ **L'unica risposta salvata sul database di sviluppo resta leggibile**:
+   codici e valori non cambiano.
+4. ❓ **Due cose da chiedere**, in milestone 3: il peso di «con chi viaggi», e
+   il nome del primo asse.
+
+**Aggiornamento del 28 settembre 2026 — le pagine ridisegnate (prompt D).**
+Vetrina e itinerario pronto rifatti sul Figma nuovo; la sezione dei viaggi di
+gruppo c'è, e sparisce per chi non ne ha. Nessuna migration, build e harness
+verdi.
+
+1. ✅ **Il funnel non è stato toccato**: `prenota-consulenza.tsx` e
+   `lib/cal-embed.ts` hanno `git diff` vuoto. Nel box è cambiata la forma.
+2. ✅ **L'indirizzo dell'itinerario è lo stesso**: il link del 23 agosto
+   risponde 200 con lo stesso itinerario, gli ordinali 404.
+3. ⛔ **Mi sono fermato sulla pagina del viaggio di gruppo**: il nodo `3-1121`
+   è una pagina per viaggio e vuole uno slug che la tabella non ha. Migration
+   da decidere.
+4. ❓ Il disegno **non chiude** le domande di agosto sulla card di `/ricerca`
+   (sono su un altro nodo) e ne apre otto, tutte in milestone 3 con chi decide.
+5. 🔴 **Le prove nel browser 121-133** sono tue: io non ho aperto una pagina.
+
 
 ### Cosa resta a te
 
@@ -606,7 +655,7 @@ Le prove sono la 102-108, in fondo alla milestone 3.
 | Materiale | Serve per | Stato |
 |---|---|---|
 | Link Figma delle pagine | Milestone 3, 4, 6, 7, 8 | ✅ arrivati il 10 agosto — file `x1DYYagZ2moagmpEHZHYYE`. **Superato il 27 settembre 2026 da un file nuovo, `Q9Krydv6xD8mFJCtU9NHzr`** («XPETIS - Def»): vetrina `2-743`, viaggi di gruppo `3-1121`, itinerario pronto `3-1386`. ⏳ **Mancano i nodi di home, ricerca e quiz** sul file nuovo |
-| Dataset geografico (129 stati, 244 regioni, 1.220 città) | Import geo, suggeritore, bande del match | ⏳ me lo incolli — versione normalizzata da Alessandro |
+| Dataset geografico (129 stati, 244 regioni, 1.220 città) | Import geo, suggeritore, bande del match | ✅ arrivato e importato. **Dal 27 settembre 2026 la v2, `xpetis_destinazioni_v2.json`: 188 città** (potatura di Alessandro). La v1 è in `archivio/` |
 | `GUIDA_PONTE_CALCOM.md` + fixture dei 7 messaggi veri | Nomi veri dei campi Cal.com e prove del ponte | ✅ arrivate — 7 fixture in `supabase/tests/fixtures/calcom/`, mappatura riscritta, ponte costruito |
 | JSON delle 25 vetrine compilate | Import profili TD | ⏳ da produrre dal form HTML |
 | `Vetrina TD (2).html` | È il form che produce quel JSON | ✅ in cartella |
@@ -763,7 +812,11 @@ Si applicano come migration nuove, mai modificando quelle esistenti.
       portate da fuori (tabella separata, non esposta)
 - [x] **[C]** `0028` — la vetrina completa su `public_td_showcase`, e limite del
       bucket immagini alzato
-- [ ] **[B]** Scrivere le due etichette intermedie di ogni asse continuo. Gli
+- [x] **[B]** ~~Scrivere le due etichette intermedie di ogni asse continuo.~~
+      → **arrivate il 27 settembre 2026** con `xpetis_quiz_viaggiatore_.json`,
+      insieme alle sei domande: sono in `answer_it` e `question_it` (0049). In
+      `label_it` restano i «DA SCRIVERE» dei valori 2 e 3, che però non legge più
+      nessuno: il quiz mostra `answer_it`. Il testo di prima, per memoria: Gli
       estremi ora vengono dal form: restano da scrivere i valori 2 e 3. **Con il
       quiz in piedi (14 agosto) quegli otto "DA SCRIVERE" si vedono in pagina**,
       e con loro un nono buco: `quiz_axes.question_it` è vuoto su tutti e sei gli
@@ -869,6 +922,74 @@ guidato da una coda di lavoro.
       agosto). `is_filterable` dice cosa filtra oggi, `is_selectable` conserva
       cosa dichiara la tassonomia
 - [ ] **[S]** *Rimandato:* come trattare le regioni italiane nella ricerca
+- [x] **[C]** **La tassonomia v2** (27 settembre 2026): `genera_geo.mjs` legge
+      `xpetis_destinazioni_v2.json`, la v1 è in `archivio/`, il seed si rigenera
+      e da oggi è **convergente** — pota le città cadute, si ferma su tutto il
+      resto, in una transazione sola
+- [ ] **[S]** Applicare il seed nuovo al database vero → prove 109-114 qui sotto
+
+**⚠️ La potatura delle città è una scelta di prodotto, e va scritta qui.** Le
+città cadono da **1.220 a 188**: le ha scelte Alessandro, perché nel
+suggeritore le minori sporcavano la ricerca, e Simone l'ha confermato il 27
+settembre 2026. Conseguenza visibile: **chi scrive «Siena», «Jaipur» o «Tromsø»
+nel suggeritore da oggi non trova niente** — né la città né il paese attraverso
+la città. Il paese si trova ancora scrivendo il paese. Le città non filtrano
+(portano solo al loro paese), quindi nessun risultato del match cambia; cambia
+cosa il suggeritore sa riconoscere. Se un giorno una città torna, si aggiunge al
+JSON e si rigenera.
+
+Tre cose trovate strada facendo, nessuna una sorpresa per la struttura:
+
+- la v2 è un **sottoinsieme esatto** della v1 (stessi codici, stessi nomi):
+  nessuna lettera che `unaccent` e il browser tratterebbero in modo diverso. Ma
+  **i nove nomi che avevano fatto nascere la tabella degli accenti** (Tromsø,
+  Płock, Kuşadası…) sono tutti potati: la tabella resta, e l'harness ora la
+  verifica lettera per lettera invece che solo sui nomi;
+- l'asserzione sugli accenti aveva una **soglia scritta a mano** (`> 1500`
+  nomi): con la v2 sarebbe diventata rossa per la ragione sbagliata. Ora il
+  numero atteso lo dà il file;
+- Jaipur, l'esempio della «città in due regioni», non c'è più: la regola resta
+  e si prova con una città inventata.
+
+**🔴 Le prove della tassonomia v2 (27 settembre 2026)**
+
+**Come si applica al database vero, in quest'ordine.** Non c'è una migration:
+è solo il seed `0002_geo.sql`, che il deploy non rigira. E **rigirarlo sopra i
+dati che ci sono già non è come applicarlo a vuoto**: sopra dati esistenti
+aggiorna nomi e ordini, **cancella le 1.032 città che il file non ha più**, e si
+ferma se trova una riga che non si aspetta. Il file è **una transazione sola**
+(`begin` … `commit`): se una guardia lo ferma, il database resta com'era.
+
+1. **Prima, in sola lettura** — i numeri di partenza:
+   ```sql
+   select (select count(*) from geo_continents)  as continenti,
+          (select count(*) from geo_macro_areas) as macro_aree,
+          (select count(*) from geo_countries)   as stati,
+          (select count(*) from geo_regions)     as regioni,
+          (select count(*) from geo_cities)      as citta;
+   ```
+   Atteso: **6 · 14 · 129 · 244 · 1220**. Io l'ho già verificato il 27
+   settembre sul progetto di sviluppo, insieme al fatto che i codici dei primi
+   quattro livelli coincidono uno per uno con la v2 e che le 188 città ci sono
+   già tutte: le guardie passeranno.
+2. **Poi il seed, dalla radice del progetto**:
+   ```bash
+   supabase db query --linked -f supabase/seed/0002_geo.sql
+   ```
+   Se il comando rifiuta il `begin`/`commit`, incolla il file nel SQL Editor:
+   è lo stesso. **Non l'ho eseguito io**: scrive sul database, e tocca a te.
+   Se si ferma con «Il database ha righe geografiche che … non ha più», **non
+   forzare**: dice quale riga, e toglierla è una decisione.
+3. **Non rigirare gli altri seed**: non servono, e `0003` ha dati demo.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 109 | La query del punto 1, dopo il seed | **6 · 14 · 129 · 244 · 188** | Se le città sono ancora 1220, il seed non è arrivato in fondo |
+| 110 | `select slug, name_it, is_selectable, is_filterable from geo_regions where country_code='italia' order by slug;` | **Venti righe**, tutte `is_selectable = true` e `is_filterable = false` | È la deviazione 7: se una dice `true` in `is_filterable`, fermati |
+| 111 | `select name_it, level from geo_search where name_norm like '%peru%';` | Compare **Perù** (paese). Poi sul sito, nel suggeritore, scrivi `peru` | La ricerca accento-insensibile sui nomi della v2 |
+| 112 | Nel suggeritore scrivi `Siena`, poi `Cusco` | Siena: niente. Cusco: la città, che porta al Perù | La prima è la potatura, la seconda una delle 188 |
+| 113 | `select td.slug, string_agg(tc.country_code, ', ' order by tc.country_code) from td_countries tc join travel_designers td on td.id = tc.td_id group by td.slug;` | giulia-neri: **bolivia, peru** · marco-rossi: **giappone, thailandia, vietnam** | I demo non perdono paesi: la potatura tocca solo le città |
+| 114 | Rilancia il comando del punto 2 una seconda volta | Nessun errore, conteggi invariati | Il seed è idempotente |
 - [ ] **[C]** Importatore fedele dei profili TD, idempotente e rilanciabile: non
       normalizza, ma **segnala** ogni voce che non ha saputo agganciare.
       Dal 27 settembre il form ha una chiave in più, `gruppo` → `td_group_trips`
@@ -1062,7 +1183,9 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
       **fatto**, verificato il 23 agosto contro `rsgyxbqzsxahsbdfgtbm`:
       `/designer/marco-rossi` serve "Alcuni dei miei viaggi" e i tre itinerari
       pronti col loro contenuto vero
-- [ ] **[S]** **Come si mostrano i viaggi di gruppo.** La sezione del Figma non
+- [x] **[S]** ~~**Come si mostrano i viaggi di gruppo.**~~ → la sorgente è arrivata
+      con la `0048` e la sezione è costruita dal Figma nuovo il 28 settembre (vedi
+      «Le pagine ridisegnate» qui sotto). Il testo di allora: la sezione del Figma non
       è costruita perché **non ha una sorgente**: nel form `gruppo[]` non ha
       campi modificabili e resta il contenuto d'esempio, quindi non si importa
       mai (deciso il 6 agosto). Le due strade sono aggiungerla al form o farli
@@ -1224,16 +1347,35 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
   leggere la data dal testo (fragile su 25 designer che scrivono ciascuno a modo
   suo). Non ho inventato un campo che il form non dà. Per Alessandro, Andrea e
   Chiara
-- ❓ **Il nodo `3-1121` è una pagina per viaggio o l'elenco?** Se ogni viaggio
+- ✅→❓ **Risposto dal disegno il 28 settembre: è una pagina per viaggio**, e
+  la domanda diventa quella dello slug — vedi «Le pagine ridisegnate».
+  Il testo di prima: **il nodo `3-1121` è una pagina per viaggio o l'elenco?** Se ogni viaggio
   di gruppo ha una pagina sua, serve uno `slug` come quello degli itinerari
   (0033). Oggi `td_group_trips` non ce l'ha. Si vede quando si costruisce la
   pagina
 - ❓ **`gruppoHaGia` e `gruppoTempi`** sono due chiavi nuove del form accanto a
   `gruppo`. Non le ho mappate: sembrano rispondere al servizio «Viaggio di
   gruppo a tua firma», ma è un'ipotesi. Cosa sono?
-- ❓ **Il viaggio di gruppo si compra?** Oggi no, per scelta del prompt: nessuna
+- ❓ **Il viaggio di gruppo si compra?** *28 set: il Figma `3-1121` ha «Acquista
+  il posto» e «Contatta il Travel Designer». Resta aperta: il disegno aggiunge
+  comportamento, e la pagina non è costruita.* Oggi no, per scelta del prompt: nessuna
   cassa e nessun ordine. Se il Figma `3-1121` mostra un tasto d'acquisto, è
   Figma che aggiunge comportamento, e vince il Flusso finché non si decide
+- ❓ **Quanto conta «con chi viaggi»?** Il file del quiz la dice di «impatto
+  minore rispetto alle domande 1-5»; nel database pesa **2.0**, il secondo peso
+  dei sei dopo il ritmo (3.0), ed entra nella stessa media pesata degli altri.
+  Il 2.0 viene dal Flusso (passo 0), quindi non l'ho toccato: un peso è una
+  decisione, e cambiarlo è un `update quiz_axes set weight = …` da Studio. Per
+  Alessandro
+- ❓ **Il primo asse si legge al contrario del suo nome.** Si chiama
+  `planning_involvement`, «Coinvolgimento nella pianificazione», ma il valore 1
+  è il viaggiatore che vuole decidere **di più** («Voglio decidere io»), cioè
+  «Poco controllo» **del designer** — il file lo scrive fra parentesi, il form e
+  il database no. Il verso è giusto, ed è quello che l'harness prova; il rischio
+  è per chi scriverà i mattoncini della frase o il briefing leggendo il nome.
+  Rinominare il codice toccherebbe le risposte salvate e il contratto `quiz=` in
+  URL, quindi non l'ho fatto di iniziativa. Basterebbe anche solo aggiungere
+  «(del designer)» a `label_min` / `label_max` e al `label_it`. Per Simone
 
 **🔴 Le prove (27 settembre 2026)**
 
@@ -1273,6 +1415,147 @@ fra virgolette. Mettilo fra virgolette prima di lanciarlo.
 | 106 | Prenota normalmente da 30 | Nessun alert di durata | — |
 | 107 | `select slug, jsonb_array_length(group_trips) from public_td_showcase;` | 3 e 3. Con la chiave publishable dal browser: `td_group_trips` risponde 401/permesso negato, la vista sì | La pagina non li mostra ancora: arriva con le pagine ridisegnate |
 | 108 | Apri `td-media/marco-rossi/gruppo-ha-giang.jpg` da Storage | L'immagine finta c'è | — |
+
+**🔴 Le prove del quiz (27 settembre 2026, notte fonda)**
+
+**Prima, sul database di sviluppo:** `supabase db push` — la
+`0049_testi_quiz.sql`. Non l'ho applicata io: scrive, e tocca a te. Se si ferma
+con «Quiz: opzioni senza testo dopo la 0049», una chiave di «con chi viaggi» è
+stata ritoccata da Studio: **non forzare**, il messaggio dice quale.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 115 | `select code, sort_order, question_it from quiz_axes order by sort_order;` | Sei righe: controllo, ritmo, scomodità (`comfort_wild`), luogo (`curated_vs_real`), sociale, **`companions` ultima**, tutte con la domanda | — |
+| 116 | `select axis_code, value, label_it, answer_it from quiz_axis_options where axis_code = 'companions' order by value;` | `label_it` **invariato** («Viaggiatore solo», «Coppia», …); `answer_it` con le parole del quiz («Da solo/a», «In coppia», …) | Se `label_it` è cambiato, l'import delle vetrine non riconoscerebbe più «con chi viaggi» |
+| 117 | Apri `/quiz` sul sito e scorri le sei schermate | Le sei domande **nell'ordine nuovo**, «Con chi vivrai questo viaggio?» per ultima; domande e risposte vere, **nessun «DA SCRIVERE»** e nessuna scritta «domanda da scrivere» | Le risposte dall'alto in basso sono i valori 1→4, come dice il file |
+| 118 | Rispondi al ritmo **«Lento: poche cose, vissute a fondo»**, il resto a piacere, e arriva ai risultati | Guarda dove sta **Marco** rispetto a Giulia | — |
+| 119 | «Modifica le risposte», cambia **solo** il ritmo in **«Intenso: voglio fare e vedere il più possibile»** | Giulia **sale** rispetto a prima, Marco scende. Se l'ordine non cambia affatto, dimmelo con le altre cinque risposte | Il ritmo pesa 3.0, il più alto: da solo deve bastare a spostarli, salvo risposte che su tutto il resto tirano fortissimo da una parte |
+| 120 | Fai il login con Google a quiz fatto, poi `select answers from quiz_responses order by created_at desc limit 1;` | Le chiavi sono ancora i codici (`pace`, `companions`, …) con valori 1-4 / 1-5 | La risposta salvata il 25 agosto resta com'era e si legge uguale |
+
+### Le pagine ridisegnate sul Figma nuovo (28 settembre 2026)
+
+- [x] **[C]** **Vetrina** dal nodo `2-743`: la scheda della call sta nella fascia
+      hero; poi «Cosa vuol dire viaggiare per me» con i viaggi firma, «Come
+      funziona», itinerari pronti, **viaggi di gruppo**, e la scheda finale «Ti
+      sembra il Travel Designer giusto per te?» con «Torna ai risultati»
+- [x] **[C]** **La scheda della call ha due pillole sole**, breve e approfondita
+      (deviazione 10), e l'approfondita compare solo a chi la offre. Sotto il
+      tasto, «E dopo l'incontro?» con i riquadri **dei soli servizi attivi** del
+      designer, e la riga del credito consulenza col prezzo della scheda
+- [x] **[C]** **`prenota-consulenza.tsx` e `lib/cal-embed.ts` non sono stati
+      toccati** (`git diff` vuoto). In `box-servizio.tsx` è cambiato il markup;
+      `calLink`, la guardia su `cal_username` nullo e la chiamata a
+      `PrenotaConsulenza` sono le stesse righe di prima
+- [x] **[C]** **Viaggi di gruppo in vetrina**: la sezione o c'è piena o non c'è.
+      Card senza tasto (non c'è la pagina), testo del designer non riformattato
+- [x] **[C]** **Itinerario pronto** dal nodo `3-1386`: ritocchi di forma (prezzo
+      accanto ad «A partire da», scheda del designer, tasto in basso a destra).
+      **Indirizzo, `percorsoItinerario` e `trovaItinerario` invariati**
+- [x] **[C]** `scripts/scarica-asset-figma.sh` scarica dal file nuovo gli asset
+      di queste pagine; sei icone sono byte per byte le stesse di prima, due
+      sono nuove (il bollo del credito). Home, ricerca, quiz, header e footer
+      restano dichiarati «file vecchio»
+- [x] **[C]** Nessuna migration, nessuna vista nuova. Build verde, harness verde
+- [ ] **[S]** ⛔ **La pagina del viaggio di gruppo (`3-1121`) non è costruita, e
+      mi sono fermato apposta.** Il nodo è **una pagina per viaggio** (filo di
+      briciole «Viaggi di gruppo > Argentina: Trekking in Patagonia», «Altri
+      viaggi di gruppo» in fondo), quindi vuole un indirizzo stabile, e
+      `td_group_trips` uno slug non ce l'ha. È la stessa storia della `0033`: un
+      ordinale farebbe rispondere 200 ai link vecchi con un viaggio diverso
+      dopo un riordino. **Serve una migration (colonna `slug` come la 0033 +
+      esposizione nella vista), e la decisione è tua.** Anche decisa, la pagina
+      avrebbe poco da mostrare: vedi le due domande sotto
+- [ ] **[S]** Le prove nel browser, qui sotto
+
+**❓ Il Figma nuovo e le domande aperte da agosto — una per una**
+
+Nessuna l'ho chiusa per inerzia. Quattro riguardano la card di `/ricerca` e la
+ricerca, che non sono fra i tre nodi di oggi: **il disegno non le può chiudere**
+finché non si ha il nodo della ricerca sul file nuovo.
+
+| Domanda (milestone 3) | Il Figma nuovo | Stato |
+|---|---|---|
+| Badge «match forte» | Sta nella card di `/ricerca`: nessuno dei tre nodi la contiene | **Aperta** |
+| Foto di sfondo della card | Idem. In vetrina l'hero è una fascia marrone piena, niente `background_photo_url` | **Aperta** |
+| La riga di tag vuota sotto «Esperti di…» | Ricerca | **Aperta** |
+| I divisori di sezione senza destinazione, e quanto larga è «fallback» | Ricerca | **Aperte** |
+| Il terzo gruppo di filtri («Quale tipo di supporto cerchi?») | Ricerca | **Aperta** |
+| Il «4.6» sulla foto e la sezione recensioni | Ancora disegnati, con testi d'esempio | **Aperta** (milestone 8): restano fuori, non esistono recensioni |
+| «Membro XPETIS» | Ridisegnata, con «1 anno» | **Resta fuori.** Ridisegnarla non decide di esporre `joined_at`: se la vuoi, è una colonna in `public_td_showcase`, cioè una migration |
+| Come si mostrano i viaggi di gruppo | Disegnati: sezione in vetrina + pagina per viaggio | **Chiusa la sezione** (la sorgente è la 0048). **Aperta la pagina**, per lo slug |
+| «Acquista l'itinerario» nella fascia scura | Ancora lì, identico | **Aperta**: vince il Flusso, il tasto non c'è |
+| Le sezioni dell'itinerario senza sorgente (tappe, informazioni utili, tappe principali, galleria a tre, paese, descrizione lunga) | Ancora tutte lì | **Chiusa il 23 agosto** (il form non si tocca): il disegno nuovo non cambia niente |
+| La riga di tag dei viaggi firma | Ancora «America Latina / 18 mesi / In solitaria», per viaggio | **Aperta**: il form non li raccoglie per viaggio, restano i paesi del designer |
+
+**❓ Domande nuove, nate dal disegno nuovo**
+
+- ❓ **Dove vanno `hero_bio` e `manifesto`?** Il Figma nuovo ha due posti per
+  del testo: sotto la tabella della hero (è la **storia**, il testo d'esempio è
+  quello del form accorciato) e sotto «Cosa vuol dire viaggiare per me» (un
+  paragrafo che si legge come la frase di presentazione chiusa da un
+  aforisma). I campi del form sono tre. Oggi: storia nella hero, `hero_bio` e
+  `manifesto` uno dopo l'altro sotto il titolo. Per Chiara
+- ❓ **I servizi dopo la call sono «spiegati bene»?** Il Flusso §3 lo chiede per
+  su misura e All Inclusive. Il disegno vecchio mostrava i loro testi e i loro
+  punti; quello nuovo un riquadro con titolo e una riga fissa («Ti scrivo il
+  viaggio giorno per giorno»). **I testi che i designer hanno scritto per quei
+  servizi oggi non compaiono in vetrina.** Per Chiara, e Gaia per le righe
+- ❓ **Il riquadro «Viaggio di gruppo» segue il servizio o i viaggi?** Oggi il
+  servizio `group_trip` attivo. Nel seed Marco e Giulia hanno tre viaggi di
+  gruppo ciascuno **e nessuno dei due ha il servizio attivo**: la sezione c'è,
+  il riquadro no. Nei dati veri sarà lo stesso se il form non lega le due cose
+- ❓ **Le date sulla card del viaggio di gruppo le ho aggiunte io.** Il disegno
+  della card mostra giorni e persone, le date solo nella pagina del viaggio,
+  che non c'è. Senza, le date non comparirebbero da nessuna parte — e una
+  partenza «14 – 25 set 2025» che si legge come passata è l'unica difesa che
+  oggi abbiamo contro un viaggio finito ancora in vetrina. Per Chiara
+- ❓ **«Come funziona»**: testi del Figma corretti in tre punti, tutti per Gaia.
+  Il passo 1 diceva «modificare o cancellare fino a 24 ore prima», il Flusso
+  dice rimborso pieno a 24 e riprogrammazione a 12 (i due numeri ora vengono da
+  `app_config`); il passo 2 dice i minuti della breve di quel designer; il passo
+  4 prometteva «inclusi i voli se lo desideri», che il Flusso non dice. Il passo
+  3 nomina solo i servizi che il designer offre, e il 4 c'è solo con l'All
+  Inclusive attivo
+- ❓ **Il simbolo del credito è un «$»** su un prezzo in euro. È l'asset del
+  disegno e l'ho usato com'è: si corregge nel Figma. Per Chiara
+- ❓ **«Conoscilo, raccontagli»** nella scheda finale è maschile, e il resto del
+  sito usa l'asterisco («preparat*»). Testo del Figma, lasciato com'è. Per Gaia
+- ❓ **La pagina del viaggio di gruppo, quando ci sarà, ha quattro contenuti
+  senza sorgente**: «Fascia d'età», «Questo viaggio fa per me?» (sei temi a
+  stelle), «Le tappe del viaggio», «Informazioni utili», più la descrizione e
+  la galleria a tre. Il form dà sei campi. E **«Acquista il posto»** è un tasto
+  d'acquisto che il Flusso non prevede. Per Alessandro, Andrea e Chiara
+
+**🔴 Le prove nel browser (28 settembre 2026)**
+
+Nessun passo sul database: niente migration. La `0048` deve già essere
+applicata (lo è, se le prove 102-108 sono passate).
+
+**Cosa ho verificato io, e cosa no.** Ho reso con `curl` le vetrine di Marco e
+Giulia e gli itinerari contro il database di sviluppo: le pillole giuste (una
+per Marco, due per Giulia), il link di login con `?servizio=` corretto anche
+con un servizio inventato, la sezione di gruppo con le date, «Come funziona»
+con 24 e 12 ore lette da `app_config`, e i 200/404 degli itinerari. **Non ho un
+browser: non ho visto nessuna pagina, non ho cliccato niente, non ho aperto
+l'embed, e non ho provato da collegato** (serve una sessione Google). **Non
+esiste nel seed un designer senza viaggi di gruppo**, né uno senza
+`cal_username`: quei due rami li ho scritti e letti, non visti girare.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 121 | **Da scollegato**, apri `/designer/giulia-neri`, clicca «Consulenza approfondita», poi «Prenota la call» | Vai a `/accedi`; dopo il login torni a `/designer/giulia-neri?servizio=consultation_deep#servizi`, sulla scheda da **150€ / 60 minuti** | È il cancello del login: **nessun iframe deve aprirsi da scollegato** |
+| 122 | Ora collegato, clicca «Prenota la call» | Si apre l'embed Cal.com di Giulia sull'event type `consulenza-xpetis-60`; nome ed email precompilati | — |
+| 123 | Nel modulo di prenotazione di Cal.com, guarda il campo nascosto (o, dopo, `payload.responses.xpetis_user_id` nel webhook) | Contiene **il tuo UUID** di `auth.users` | È la regressione che conta: senza, slot occupato e nessuna riga |
+| 124 | Completa la prenotazione | La pagina va da sola a `/attesa?td=giulia-neri`; la riga in `bookings` nasce `pending_payment` | — |
+| 125 | Riapri l'embed, prenota, e **prima** che la pagina cambi guarda sotto l'iframe | C'è «Hai finito di prenotare e la pagina non è cambiata? Vai al pagamento» | Il paracadute |
+| 126 | Strumenti di sviluppo aperti, scheda Rete, durante 122-124: cerca `cal_booking_uid` o l'`uid` della prenotazione in qualsiasi risposta del nostro sito | **Non c'è** | — |
+| 127 | Stesso giro su `/designer/marco-rossi` | **Una pillola sola** («Consulenza breve»), embed su `consulenza-xpetis-30` | Marco non ha l'approfondita |
+| 128 | `/designer/marco-rossi?servizio=consultation_deep` e `?servizio=custom_itinerary` | Si apre la breve, nessun errore | Link inventati o rimasti dal disegno vecchio |
+| 129 | **Un designer senza viaggi di gruppo.** Da Studio, sposta i tre viaggi di Giulia su Marco: `update td_group_trips set position = position + 3, td_id = '11111111-1111-1111-1111-111111111111' where td_id = '22222222-2222-2222-2222-222222222222';` e ricarica `/designer/giulia-neri` | **Nessun titolo «Viaggi di gruppo»**, nessuno spazio vuoto: dopo gli itinerari viene la scheda finale. Marco ne mostra sei | ⚠️ Per tornare indietro: `update td_group_trips set td_id = '22222222-2222-2222-2222-222222222222', position = position - 3 where td_id = '11111111-1111-1111-1111-111111111111' and position > 3;` |
+| 130 | **Un link vecchio dell'itinerario.** Apri `/designer/marco-rossi/itinerario/vietnam-del-nord-hanoi-ninh-binh-ha-giang` (quello delle prove del 23 agosto) | **Lo stesso itinerario**, «Vietnam del Nord: Hanoi, Ninh Binh, Ha Giang». `/itinerario/1` e lo stesso slug sotto Giulia rispondono **404** | Verificato anche da me con `curl`: 200, 404, 404 |
+| 131 | Da `/ricerca` con una destinazione e un filtro, apri una vetrina, scorri in fondo, «Torna ai risultati» | Torni alla **stessa** lista, filtri compresi. Aperta da un link diretto, lo stesso tasto porta a `/ricerca` | — |
+| 132 | «Prenota una call con …» (sotto i viaggi firma) e «Prenota la call con …» (in fondo) | Portano alla scheda della call in cima | Ancora `#servizi` |
+| 133 | Guarda le due pagine accanto al Figma, su telefono e su desktop | Dimmi cosa non torna | La hero va su tre colonne solo sopra i 1400 px; sotto, la scheda della call scende sotto la storia |
 
 ---
 
@@ -2223,7 +2506,10 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
   e ordine fermo, da portare avanti a mano. È una trappola che il su misura ha
   in forma più rara (una proposta riaperta e ripagata): non l'ho toccata là.
 
-### ⏸ Rimandate al prompt D — dalle prove del 27 settembre
+### ✅ Rimandate al prompt D — dalle prove del 27 settembre
+
+*Fatte il 28 settembre: la sezione c'è, e sparisce per chi non ha viaggi. Vedi
+milestone 3, «Le pagine ridisegnate sul Figma nuovo».*
 
 - **La sezione «viaggi di gruppo» non compare in vetrina.** Non è un difetto: la
   `0048` ha fatto tabella, seed, immagini ed esposizione nella vista
