@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/controlla-classi-morte.mjs",
     "build": "next build",
+    "check:classi": "node scripts/controlla-classi-morte.mjs",
     "start": "next start",
     "lint": "eslint",
     "test:schema": "npm --prefix supabase run test:schema"

@@ -6,10 +6,18 @@ import { Bottone } from '@/components/bottone'
 import { BadgeStella } from '@/components/badge-stella'
 import { RicercaDestinazione } from '@/components/ricerca-destinazione'
 
+// Le misure sono quelle dei tre segni sul Figma nuovo (nodi 56:179-181): non
+// sono quadrati, e forzarli a un lato solo li stirerebbe.
 const VANTAGGI = [
-  { icona: 'icona-ricerca', testo: 'Evitare ore di ricerca' },
-  { icona: 'icona-supporto', testo: 'Avere supporto prima, durante e dopo il viaggio' },
-  { icona: 'icona-misura', testo: 'Vivere un’esperienza costruita davvero su di te' },
+  { icona: { file: 'icona-ricerca', larghezza: 22, altezza: 22 }, testo: 'Evitare ore di ricerca' },
+  {
+    icona: { file: 'icona-supporto', larghezza: 27, altezza: 24 },
+    testo: 'Avere supporto prima, durante e dopo il viaggio',
+  },
+  {
+    icona: { file: 'icona-misura', larghezza: 21, altezza: 23 },
+    testo: 'Vivere un’esperienza costruita davvero su di te',
+  },
 ]
 
 const MODALITA = [
@@ -40,6 +48,28 @@ const MODALITA = [
   },
 ]
 
+/**
+ * La homepage — Figma nuovo `Q9Krydv6xD8mFJCtU9NHzr`, nodo 1-14, **controllata
+ * il 29 settembre 2026 e non rifatta** (costruita ad agosto dal file vecchio).
+ *
+ * Il confronto, sezione per sezione:
+ *
+ *  · **header, hero, "Il valore di un viaggio", chiusura, footer**: uguali. La
+ *    foto della hero e le tre stelle sono byte per byte le stesse.
+ *  · **"Affidarti a un Travel Designer significa"**: allineata. Da riga di
+ *    testo a titoletto, e le icone nuove dentro un tondo rosso al 20%.
+ *  · **"Come puoi viaggiare con XPETIS"**: ⛔ **non toccata, di proposito.** Il
+ *    disegno nuovo ne cambia struttura e contenuto: un'etichetta sopra ogni
+ *    card, un titolo-domanda, un testo diverso, niente elenco puntato, e un
+ *    link in fondo a ogni card ("Trova il tuo Travel Designer", "Scopri gli
+ *    itinerari", "Scopri i viaggi di gruppo") — i due ultimi verso pagine che
+ *    non esistono (non c'è un indice degli itinerari né dei viaggi di gruppo).
+ *    Riscriverla è una decisione, non un allineamento: la domanda è in
+ *    `PIANO.md`.
+ *
+ * Il tasto "Iscriviti" dell'header del disegno **non esiste**, per decisione di
+ * Simone: vedi `components/header.tsx`.
+ */
 export default function Homepage() {
   return (
     <>
@@ -126,28 +156,44 @@ export default function Homepage() {
             </div>
           </div>
 
-          <p className="mt-20 text-corpo">Affidarti a un Travel Designer significa</p>
-          <ul className="mt-6 grid gap-6 lg:grid-cols-3">
+          {/* Figma nuovo, nodo 1-14: da riga di testo a titoletto (Merriweather
+              28), e le icone dentro un tondo rosso al 20%. Il tondo è l'asset
+              del disegno ("Group 102"), il segno ci sta centrato sopra. */}
+          <h3 className="mt-10 font-titoli text-[28px] font-bold leading-normal">
+            Affidarti a un Travel Designer significa
+          </h3>
+          <ul className="mt-[18px] grid gap-[14px] lg:grid-cols-3">
             {VANTAGGI.map((vantaggio) => (
               <li
                 key={vantaggio.testo}
-                className="flex min-h-[108px] items-center gap-6 rounded-[20px] bg-neutro px-8 py-6"
+                className="flex min-h-[86px] items-center gap-3 rounded-[20px] bg-neutro px-4 py-[17px]"
               >
-                <Image
-                  src={`/img/${vantaggio.icona}.svg`}
-                  alt=""
-                  width={36}
-                  height={36}
-                  className="h-9 w-9 shrink-0"
-                />
-                <span className="text-corpo">{vantaggio.testo}</span>
+                <span className="relative flex size-[51px] shrink-0 items-center justify-center">
+                  <Image
+                    src="/img/cerchio-vantaggio.svg"
+                    alt=""
+                    width={51}
+                    height={51}
+                    className="absolute inset-0"
+                  />
+                  <Image
+                    src={`/img/${vantaggio.icona.file}.svg`}
+                    alt=""
+                    width={vantaggio.icona.larghezza}
+                    height={vantaggio.icona.altezza}
+                    className="relative"
+                  />
+                </span>
+                <span className="max-w-[191px] text-corpo">{vantaggio.testo}</span>
               </li>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* ------------------------------------------ come puoi viaggiare (scura) */}
+      {/* ------------------------------------------ come puoi viaggiare (scura)
+          Ancora quella del file vecchio: il Figma 1-14 la ristruttura, e non
+          si riscrive senza una decisione (vedi in testa). */}
       <section className="bg-scuro py-24 text-neutro lg:py-32">
         <div className="mx-auto max-w-[1312px] px-4 lg:px-0">
           <h2 className="max-w-[867px] font-titoli text-[40px] font-bold leading-tight lg:text-h2">

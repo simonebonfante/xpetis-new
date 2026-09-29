@@ -4,7 +4,8 @@ import { leggiAssiQuiz } from '@/lib/quiz'
 import { leggiQuiz } from '@/lib/quiz-risposte'
 
 /**
- * Il quiz, nodi Figma 346:932 e 346:896.
+ * Il quiz — Figma nuovo `Q9Krydv6xD8mFJCtU9NHzr`, nodo 2-2 e i cinque gemelli
+ * (fino al 28 settembre: file vecchio, nodi 346:932 e 346:896).
  *
  * È **sempre disponibile, con o senza destinazione** (Flusso §1): ci si arriva
  * dalla home ("Lasciati ispirare", "Non hai ancora le idee chiare?") e dalla

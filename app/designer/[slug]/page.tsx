@@ -10,6 +10,7 @@ import { BoxServizio } from '@/components/box-servizio'
 import { CardViaggioFirma } from '@/components/card-viaggio-firma'
 import { CardItinerario } from '@/components/card-itinerario'
 import { CardViaggioGruppo } from '@/components/card-viaggio-gruppo'
+import { DopoLaCall } from '@/components/dopo-la-call'
 import { RecensioniVetrina } from '@/components/recensioni-vetrina'
 import { FotoVetrina } from '@/components/foto-vetrina'
 import { TornaAiRisultati } from '@/components/torna-ai-risultati'
@@ -17,6 +18,7 @@ import {
   leggiVetrina,
   paragrafi,
   percorsoItinerario,
+  percorsoViaggioDiGruppo,
   siCompraInVetrina,
   urlMedia,
   type Servizio,
@@ -25,7 +27,14 @@ import {
 
 /**
  * La vetrina del Travel Designer — Figma nuovo `Q9Krydv6xD8mFJCtU9NHzr`, nodo
- * 2-743 (fino al 27 settembre: file vecchio, nodo 171:17).
+ * **72-48** dal 29 settembre (costruita il 28 dal nodo 2-743, di cui 72-48 è la
+ * revisione; fino al 27 settembre: file vecchio, nodo 171:17).
+ *
+ * Fra 2-743 e 72-48 cambia solo la fascia hero: "E dopo l'incontro?" esce
+ * dalla scheda della call e diventa un riquadro sotto la storia
+ * (`components/dopo-la-call.tsx`), la riga del credito resta nella scheda sotto
+ * il tasto, e la storia si stringe di poco. Dal titolo "Cosa vuol dire
+ * viaggiare per me" in giù i due nodi sono lo stesso disegno.
  *
  * Tutto arriva da `public_td_showcase` in una sola query, più due numeri di
  * `public_config` per "Come funziona". Nessuna vista nuova, nessuna lettura
@@ -45,9 +54,11 @@ import {
  *  2. **La riga "Membro XPETIS"** della scheda hero: vuole `joined_at`, che
  *     `public_td_showcase` non espone. Il Figma nuovo la ridisegna, ma
  *     ridisegnarla non decide di esporla. Vedi `lib/vetrina.ts`.
- *  3. **"Ottieni maggiori informazioni" sulle card dei viaggi di gruppo**: la
- *     pagina del viaggio (nodo 3-1121) non c'è. Vedi
- *     `components/card-viaggio-gruppo.tsx`.
+ *  3. **Il prezzo sul riquadro "Itinerario su misura"** e le icone dei
+ *     quattro riquadri dopo la call. Vedi `components/dopo-la-call.tsx`.
+ *
+ * Dal 29 settembre le card dei viaggi di gruppo portano alla pagina del
+ * viaggio (Figma 3-1121, migration 0051).
  */
 
 type Props = {
@@ -168,7 +179,7 @@ function Presentazione({ vetrina }: { vetrina: Vetrina }) {
         )}
 
         {storia.length > 0 && (
-          <div className="mt-10 max-w-[455px] text-corpo lg:mt-12">
+          <div className="mt-10 max-w-[428px] text-corpo lg:mt-12">
             {storia.map((p) => (
               <p key={p.slice(0, 40)}>{p}</p>
             ))}
@@ -340,11 +351,15 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
         id="servizi"
         className="scroll-mt-4 bg-[#9e6f54] px-4 pb-14 pt-[120px] text-neutro lg:px-[100px] lg:pt-[178px]"
       >
-        <div className="mx-auto grid max-w-[1312px] gap-12 min-[1400px]:grid-cols-[minmax(0,1fr)_420px] min-[1400px]:gap-[80px]">
+        {/* Tre pezzi, e l'ordine del codice è quello del telefono: chi sei,
+            la scheda per prenotare, poi cosa succede dopo. Sopra i 1400 px la
+            scheda sta a destra per tutta l'altezza e "E dopo l'incontro?" sale
+            a sinistra sotto la storia, come nel Figma 72-48. */}
+        <div className="mx-auto grid max-w-[1312px] gap-12 min-[1400px]:grid-cols-[minmax(0,1fr)_420px] min-[1400px]:gap-x-[80px] min-[1400px]:gap-y-[83px]">
           <Presentazione vetrina={vetrina} />
 
           {attivo && (
-            <div className="mx-auto w-full max-w-[420px] min-[1400px]:mx-0">
+            <div className="mx-auto w-full max-w-[420px] min-[1400px]:col-start-2 min-[1400px]:row-span-2 min-[1400px]:row-start-1 min-[1400px]:mx-0 min-[1400px]:mt-[122px]">
               <BoxServizio
                 nomeDesigner={nome}
                 servizi={servizi}
@@ -355,6 +370,10 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
               />
             </div>
           )}
+
+          <div className="min-[1400px]:col-start-1 min-[1400px]:row-start-2">
+            <DopoLaCall servizi={servizi} />
+          </div>
         </div>
       </section>
 
@@ -446,7 +465,11 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
 
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3">
               {gruppi.map((viaggio) => (
-                <CardViaggioGruppo key={`${viaggio.title}-${viaggio.dates_label}`} viaggio={viaggio} />
+                <CardViaggioGruppo
+                  key={viaggio.slug ?? viaggio.title}
+                  viaggio={viaggio}
+                  href={viaggio.slug ? percorsoViaggioDiGruppo(vetrina.slug, viaggio.slug) : null}
+                />
               ))}
             </div>
           </div>

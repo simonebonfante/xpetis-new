@@ -1,26 +1,39 @@
+import Image from 'next/image'
+import Link from 'next/link'
 import { FotoVetrina } from '@/components/foto-vetrina'
 import { urlMedia, type ViaggioDiGruppo } from '@/lib/vetrina'
 
 /**
  * Una card di "Viaggi di gruppo" (Figma nuovo, nodi 18:5959 e seguenti della
- * vetrina 2-743). È la sorella di `card-itinerario.tsx` — stessa foto, stessa
- * scheda bianca con la cucitura tratteggiata — con due differenze volute.
+ * vetrina 2-743, uguali nella 72-48). È la sorella di `card-itinerario.tsx` —
+ * stessa foto, stessa scheda bianca con la cucitura tratteggiata, stesso tasto.
  *
- * **Non ha tasto.** Il Figma ci mette "Ottieni maggiori informazioni", che
- * porterebbe alla pagina del viaggio (nodo 3-1121). Quella pagina non esiste,
- * perché un indirizzo stabile vuole uno slug che `td_group_trips` non ha: un
- * tasto verso un 404 è peggio di nessun tasto. Né una cassa: il viaggio di
- * gruppo è vetrina.
+ * **Il tasto porta alla pagina del viaggio** (Figma 3-1121) dal 29 settembre,
+ * quando `td_group_trips` ha avuto il suo slug (migration 0051). Fino a quel
+ * giorno la card non aveva tasto: un tasto verso un 404 è peggio di nessun
+ * tasto. **Non porta a una cassa**: il viaggio di gruppo è vetrina, e nemmeno
+ * la sua pagina vende niente.
  *
- * **Ha le date, che il Figma della card non disegna.** Le disegna solo nella
- * pagina del viaggio, che qui non c'è: senza, le date non comparirebbero da
- * nessuna parte. E una partenza passata ("14 – 25 set 2025") che si vede come
- * passata è l'unica difesa che oggi esiste contro un viaggio finito che resta
- * in vetrina — la domanda su chi lo toglie è aperta in PIANO.md.
+ * **Ha le date, che il Figma della card non disegna.** Le aggiunsi il 28
+ * settembre perché la pagina del viaggio non c'era e senza le date non
+ * comparivano da nessuna parte. Quella ragione è caduta; resta l'altra — una
+ * partenza passata ("14 – 25 set 2025") che si legge come passata è l'unica
+ * difesa che oggi esiste contro un viaggio finito ancora in vetrina. Se
+ * toglierle è una domanda per Chiara, in PIANO.md.
  *
  * Tutti i campi sono le stringhe del designer, senza riformattarle.
  */
-export function CardViaggioGruppo({ viaggio }: { viaggio: ViaggioDiGruppo }) {
+export function CardViaggioGruppo({
+  viaggio,
+  href,
+}: {
+  viaggio: ViaggioDiGruppo
+  /**
+   * `percorsoViaggioDiGruppo(designer, viaggio.slug)`: il contratto sta in
+   * `lib/vetrina.ts`. `null` se il viaggio non ha slug (database senza 0051).
+   */
+  href: string | null
+}) {
   const dettagli = [viaggio.dates_label, viaggio.duration_label, viaggio.group_size_label].filter(
     (riga): riga is string => Boolean(riga && riga.trim()),
   )
@@ -54,6 +67,27 @@ export function CardViaggioGruppo({ viaggio }: { viaggio: ViaggioDiGruppo }) {
               </div>
             )}
           </div>
+        )}
+
+        {/* Il tondo della freccia nel Figma nuovo è un cerchio rosso senza
+            freccia (un livello perso, nodo 18:5990): si usa la stessa freccia
+            delle card degli itinerari. */}
+        {/* Senza `href` il tasto non c'è: è il database a cui manca ancora la
+            0051 (nessuno slug, quindi nessun indirizzo). Meglio nessun tasto
+            che uno verso `/viaggio-di-gruppo/undefined`. */}
+        {href && (
+          <Link href={href} className="group mt-auto flex items-center gap-2 pt-6">
+            <span className="flex-1 rounded-[30px] bg-primario px-5 py-2 text-center text-corpo text-neutro transition group-hover:brightness-110">
+              Ottieni maggiori informazioni
+            </span>
+            <Image
+              src="/img/freccia-diagonale.svg"
+              alt=""
+              width={40}
+              height={40}
+              className="size-10 shrink-0"
+            />
+          </Link>
         )}
       </div>
     </article>

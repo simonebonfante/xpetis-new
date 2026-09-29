@@ -6,6 +6,11 @@ import { leggiUtente } from '@/lib/supabase/utente'
 /**
  * La barra bianca a pillola in cima.
  *
+ * ⚠️ **"Iscriviti" non esiste, e non va aggiunto** (decisione di Simone, 29
+ * settembre 2026). Il Figma nuovo lo disegna ancora accanto ad "Accedi" su
+ * ogni pagina: non si costruisce e non si lascia spento. Scritto anche in
+ * `PIANO.md`, perché chi guarda il disegno lo vede.
+ *
  * C'è "Accedi" e non "Iscriviti": il Flusso vuole la navigazione anonima e il
  * login obbligatorio soltanto al momento della prenotazione. Quel bottone è la
  * scorciatoia per chi ha già un account, non un cancello — il cancello vero è

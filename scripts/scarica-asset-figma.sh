@@ -4,12 +4,12 @@
 # **Due file Figma, e conta sapere quale.**
 #  · Q9Krydv6xD8mFJCtU9NHzr («XPETIS - Def») — il file autorevole dal 27
 #    settembre 2026: https://www.figma.com/design/Q9Krydv6xD8mFJCtU9NHzr/XPETIS---Def
-#    Da qui vengono gli asset di vetrina, itinerario pronto e viaggi di gruppo
-#    (nodi 2-743, 3-1386, 3-1121), riscaricati il 28 settembre 2026.
+#    Da qui vengono gli asset di home (1-14), quiz (2-2), vetrina (72-48, prima
+#    2-743), viaggio di gruppo (3-1121) e itinerario pronto (3-1386).
 #  · x1DYYagZ2moagmpEHZHYYE — il file superato. Da qui vengono **ancora** gli
-#    asset di home, ricerca, quiz, header e footer: i loro nodi sul file nuovo
-#    non sono noti (CLAUDE.md, sezione "Design") e non si ricavano. Le sezioni
-#    qui sotto lo dicono una per una. Quando quei nodi arrivano, si sostituiscono.
+#    asset della ricerca e le lettere del logo grande del footer: il nodo della
+#    ricerca sul file nuovo non è noto (CLAUDE.md, sezione "Design") e non si
+#    ricava. Le sezioni qui sotto lo dicono una per una.
 #
 # ATTENZIONE: le URL degli asset Figma scadono dopo circa 7 giorni. Se lo script
 # fallisce con 403 o 404 vanno rigenerate rileggendo il design con il connettore
@@ -29,20 +29,29 @@ scarica() {
   fi
 }
 
-echo "Home — FILE VECCHIO x1DYY…, nodi della home sul file nuovo da chiedere"
-scarica img/hero.png           "https://www.figma.com/api/mcp/asset/cd8c2684-0e54-4fbc-9fc2-79c20f68c526.png"
-scarica img/stella-grande.svg  "https://www.figma.com/api/mcp/asset/4232d809-5937-4dca-927a-1dd069630dbd.svg"
-scarica img/stella.svg         "https://www.figma.com/api/mcp/asset/b3cec270-0ca6-4f22-83b0-87d28e06daf1.svg"
-scarica img/stella-piccola.svg "https://www.figma.com/api/mcp/asset/3b498359-898a-4690-beb9-f2d7a7075825.svg"
+echo "Home (FILE NUOVO Q9Kry…, nodo 1-14) — URL generate il 29 settembre 2026"
+# Controllata il 29 settembre: la foto della hero, le tre stelle, la freccia
+# tonda sono **byte per byte** quelle scaricate ad agosto dal file vecchio
+# (verificato con cmp). Cambiano solo le tre icone di "Affidarti a un Travel
+# Designer significa", ridisegnate: ora un segno rosso dentro un tondo al 20%,
+# che è un asset a parte (cerchio-vantaggio.svg, nodo 56:150).
+scarica img/hero.png           "https://www.figma.com/api/mcp/asset/f0b1f8f0-6e2a-4a39-b280-c3680a6c2005.png"
+scarica img/stella-grande.svg  "https://www.figma.com/api/mcp/asset/a3470270-c799-44f5-bf2c-6499609db9f2.svg"
+scarica img/stella.svg         "https://www.figma.com/api/mcp/asset/2986faea-9061-40fb-a8ca-088958b84402.svg"
+scarica img/stella-piccola.svg "https://www.figma.com/api/mcp/asset/8fa0b9e0-fa80-4e01-927d-e7b7e92fdd54.svg"
+scarica img/freccia.svg        "https://www.figma.com/api/mcp/asset/38c1b320-9078-46de-b13b-f0a63660682a.svg"
+scarica img/icona-ricerca.svg  "https://www.figma.com/api/mcp/asset/49d57e79-706e-4b95-bdb9-5214e445e4a5.svg"
+scarica img/icona-supporto.svg "https://www.figma.com/api/mcp/asset/f8b0b16c-d068-4782-a425-6b4c56b76e92.svg"
+scarica img/icona-misura.svg   "https://www.figma.com/api/mcp/asset/213d1a36-d0f7-4173-a4f5-1b6a29deef91.svg"
+scarica img/cerchio-vantaggio.svg "https://www.figma.com/api/mcp/asset/636acdea-589f-410c-a4e8-36a7c99febc1.svg"
+# Dal file vecchio, non ritrovati nel nodo 1-14 (la home li usava ad agosto;
+# pallino.svg serve ancora all'elenco puntato di "Come puoi viaggiare", che il
+# disegno nuovo toglie ma che la home non ha ancora cambiato — PIANO.md).
 scarica img/pallino.svg        "https://www.figma.com/api/mcp/asset/a0fafc4e-70ba-40db-a122-46a0eae1cbe1.svg"
-scarica img/freccia.svg        "https://www.figma.com/api/mcp/asset/515bd49d-b839-47c2-b21a-18f22580ae55.svg"
-scarica img/icona-ricerca.svg  "https://www.figma.com/api/mcp/asset/ca6c47b8-3849-416d-bac0-e693874ab542.svg"
-scarica img/icona-supporto.svg "https://www.figma.com/api/mcp/asset/46806838-c601-4ff8-9fe2-441450b7c563.svg"
-scarica img/icona-misura.svg   "https://www.figma.com/api/mcp/asset/980e22e4-0024-4380-b73b-55468d08cdda.svg"
 scarica img/deco-1.svg         "https://www.figma.com/api/mcp/asset/239fdade-69c4-42e0-88f5-6f001f72547c.svg"
 scarica img/deco-2.svg         "https://www.figma.com/api/mcp/asset/f1aebaa2-c322-48db-8a46-659d15171113.svg"
 
-echo "Lettere del logo grande nel footer — FILE VECCHIO"
+echo "Lettere del logo grande nel footer — FILE VECCHIO (non confrontate col footer del file nuovo)"
 scarica logo/x.svg "https://www.figma.com/api/mcp/asset/291d793b-6d92-41d3-8958-1a4926dae91f.svg"
 scarica logo/p.svg "https://www.figma.com/api/mcp/asset/25e77a63-323e-4085-8bad-2fc1eef822e3.svg"
 scarica logo/e.svg "https://www.figma.com/api/mcp/asset/a17643ab-c20a-4296-a479-abd44c0231bc.svg"
@@ -62,7 +71,14 @@ scarica img/icona-chevron.svg  "https://www.figma.com/api/mcp/asset/ffa6ae26-fa3
 # che nel Figma si sovrappone all'icona tonda del tasto quiz, il secondo apre
 # "Filtri avanzati", che non esiste finché match_designers non filtra i servizi.
 
-echo "Vetrina del designer (FILE NUOVO Q9Kry…, nodo 2-743) — URL generate il 28 settembre 2026"
+echo "Vetrina del designer (FILE NUOVO Q9Kry…) — nodo 2-743 il 28 settembre, 72-48 dal 29"
+# **Quattro asset di 72-48 mancano, e la pagina ne fa a meno**: i segni delle
+# icone di "E dopo l'incontro?" (nodi 72:515, 72:535, 72:540, 72:545, livelli
+# separati dal tondo rosso al 20%, che è 72:523 e gemelli). Il 29 settembre il
+# connettore Figma ha esaurito le chiamate prima di arrivarci. Anche il "$" del
+# credito (72:434) in 72-48 è più grande, 12×18: resta credito-simbolo.svg
+# qui sotto, 7,8×12,4, finché non si riscarica. Quando si riscaricano:
+# get_design_context su quei nodi, righe qui, e components/dopo-la-call.tsx.
 # Le prime sei sono **byte per byte identiche** a quelle scaricate l'11 agosto
 # dal file vecchio (verificato con cmp il 28 settembre): il disegno nuovo ha
 # ridisegnato le pagine, non le icone. Cambia solo da dove si scaricano.
@@ -102,8 +118,11 @@ scarica img/credito-simbolo.svg   "https://www.figma.com/api/mcp/asset/f747fd93-
 # La stella rossa del voto medio e il calendario delle recensioni restano fuori:
 # non esistono recensioni, quindi non esistono le sezioni che li usano.
 
-echo "Quiz (FILE VECCHIO, nodi 346:932 e 346:896) — URL generate il 14 agosto 2026"
-scarica img/freccia-avanti.svg   "https://www.figma.com/api/mcp/asset/0f7cc49a-45d7-41b4-b83f-d256d4aeca5a.svg"
+echo "Quiz (FILE NUOVO Q9Kry…, nodo 2-2) — freccia avanti del 29 settembre, il resto del 14 agosto"
+# Il nodo nuovo è lo stesso disegno: la freccia avanti è byte per byte quella
+# di agosto (cmp), la foto è la stessa sorgente Unsplash con lo stesso ritaglio.
+# La freccia indietro e il render della foto restano le URL del file vecchio.
+scarica img/freccia-avanti.svg   "https://www.figma.com/api/mcp/asset/9a916cf4-c54d-467f-b0e2-501b3669adce.svg"
 scarica img/freccia-indietro.svg "https://www.figma.com/api/mcp/asset/6a6f605b-b50f-4260-8cb9-0a9d7f034eb2.svg"
 # La foto è il **rendering del nodo** 346:946 a scala 1 (568×709, jpeg), non la
 # sorgente Unsplash: quella è 2731×4096 e pesa 9 MB. Il ritaglio del disegno è

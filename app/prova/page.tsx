@@ -34,7 +34,7 @@ export default async function Prova() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-10">
       <header>
-        <p className="text-sm uppercase tracking-widest text-brand">XPETIS</p>
+        <p className="text-sm uppercase tracking-widest text-primario">XPETIS</p>
         <h1 className="text-3xl font-bold">Prova dell&apos;impianto</h1>
       </header>
 
@@ -59,7 +59,7 @@ export default async function Prova() {
             <p>
               Riga in <code>travelers</code>:{' '}
               {viaggiatore ? (
-                <strong className="text-brand">
+                <strong>
                   creata dal trigger — {viaggiatore.full_name ?? 'nome non fornito da Google'}
                 </strong>
               ) : (

@@ -73,6 +73,7 @@ archivio/             # file superati, tenuti per memoria: la tassonomia v1 (1.2
 PIANO.md              # stato, decisioni, task, deviazioni, stime
 REGISTRO.md           # una voce per sessione, dalla più recente alla più vecchia
 PUNTI_APERTI.md       # le domande aperte, scritte per il team non tecnico
+RUNBOOK.md            # cosa fare quando qualcosa si rompe, per chi non l'ha costruito
 ACCESSI.md            # inventario dei servizi esterni e dove vivono i segreti
 ONBOARDING_CALCOM_TD.md  # procedura per i 25 designer
 ```
@@ -121,28 +122,38 @@ Non è una revisione del vecchio: è un altro file.
 
 | Pagina | Nodo sul file nuovo | Stato nel codice |
 |---|---|---|
-| Vetrina del designer | `2-743` | Costruita dal file nuovo il 28 settembre (contiene anche la sezione «Viaggi di gruppo») |
-| Viaggi di gruppo | `3-1121` | **Una pagina per viaggio**, non l'elenco. **Non costruita**: vuole uno slug stabile che `td_group_trips` non ha, ed è una migration da decidere (`PIANO.md`) |
+| Homepage | `1-14` | **Controllata il 29 settembre, non rifatta**: uguale tranne «Affidarti…» (allineata) e «Come puoi viaggiare con XPETIS», **ristrutturata nel disegno e lasciata com'era** in attesa di una decisione (`PIANO.md`) |
+| Domanda del quiz | `2-2` (e i gemelli `2-36`…`2-192`) | Stesso impianto del file vecchio; in più «Concludi» sull'ultima. ⚠️ Il disegno mette «con chi viaggi» **terza**: vince `sort_order` (sesta, 0049) |
+| Vetrina del designer | **`72-48`** | Revisione di `2-743` (costruita il 28 settembre): cambia solo la fascia hero, «E dopo l'incontro?» fuori dalla scheda della call. Allineata il 29 settembre. `2-743` non si usa più |
+| Viaggio di gruppo | `3-1121` | **Una pagina per viaggio**, costruita il 29 settembre con lo slug della 0051: `/designer/<designer>/viaggio-di-gruppo/<slug>`. Solo le sezioni con sorgente (i sei campi del form); niente «Acquista il posto» |
 | Itinerario pronto da vivere | `3-1386` | Costruita dal file nuovo il 28 settembre. Indirizzo invariato (slug della 0033) |
-| Homepage | **da chiedere** | Dal file vecchio |
-| Ricerca / risultati | **da chiedere** | Dal file vecchio |
-| Quiz | **da chiedere** | Dal file vecchio |
+| Ricerca / risultati | **da chiedere** | Dal file vecchio. Sul file nuovo c'è un frame «Risultati» (`2-315`) che **nessuno ha indicato**: non si usa finché Simone non lo verifica |
 
-Solo i tre nodi con un numero sono verificati. Home, ricerca e quiz Simone li
-dice «praticamente identiche» e si revisionano dopo: **il loro nodo sul file
-nuovo va chiesto**, non ricavato. I nodi vecchi (`160-77`, `177-262`,
-`346-932`, `346-896`…) puntano al file superato `x1DYYagZ2moagmpEHZHYYE` e **non
-vanno riusati** sul file nuovo, dove non significano niente. Home, ricerca e
-quiz vengono ancora dal file vecchio.
+I nodi con un numero sono verificati da Simone (29 settembre). Ricerca va
+chiesta, non ricavata. I nodi vecchi (`160-77`, `177-262`, `346-932`,
+`346-896`…) puntano al file superato `x1DYYagZ2moagmpEHZHYYE` e **non vanno
+riusati** sul file nuovo, dove non significano niente. Solo la ricerca viene
+ancora dal file vecchio.
+
+⚠️ **Il tasto «Iscriviti» dell'header non esiste** (decisione di Simone, 29
+settembre): il Figma lo disegna su ogni pagina, e non si costruisce né si
+lascia spento.
+
+⚠️ **Il connettore Figma ha un tetto di chiamate** (piano Starter): il 29
+settembre si è esaurito a metà lavoro. Si legge prima la struttura
+(`get_metadata` sulla pagina, un colpo solo) e si chiede il design context solo
+dei nodi che servono.
 
 Pagamento: **plugin Stripe**, niente pagina disegnata. Prenotazione: **iframe
 Cal.com** della pagina del designer. (Deciso da Simone il 10 agosto 2026.)
 
 Gli asset si riscaricano con `bash scripts/scarica-asset-figma.sh`: le URL degli
-asset scadono in 7 giorni, la chiave del file no. Dal 28 settembre lo script
-scarica dal **file nuovo** gli asset di vetrina e itinerario pronto, e dice
-sezione per sezione quali (home, ricerca, quiz, header, footer) vengono
-**ancora dal file vecchio**, finché i loro nodi non arrivano.
+asset scadono in 7 giorni, la chiave del file no. Dal 29 settembre lo script
+scarica dal **file nuovo** gli asset di home, quiz, vetrina, viaggio di gruppo
+e itinerario pronto; **dal file vecchio** vengono ancora solo quelli della
+ricerca e le lettere del logo grande del footer (il footer del file nuovo è lo
+stesso disegno, ma quelle lettere non le ho confrontate). Quattro icone del
+riquadro «E dopo l'incontro?» mancano: vedi lo script.
 
 ## Decisioni architetturali già prese
 

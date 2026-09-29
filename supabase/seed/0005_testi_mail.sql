@@ -373,3 +373,18 @@ E'Il documento finale del viaggio ({{human_ref}}) è pronto: {{link_pagina}}\n\n
    array['human_ref', 'link_pagina'],
    'Il messaggio che il designer copia nel gruppo commerciale dopo la consegna del documento finale (0047). Il link è la pagina, mai il file: il file si scarica solo col login.')
 on conflict (key) do nothing;
+
+-- ===========================================================================
+-- Aggiunto con la 0050 — il digest giornaliero del team
+-- ===========================================================================
+-- Agli amministratori, una volta al giorno. È un testo per il team, non per un
+-- cliente: può essere asciutto. Le due regole che non si rompono: dire **come
+-- si zittisce un alert** (altrimenti il digest diventa rumore), e non
+-- promettere che la mail arriva ogni giorno — senza alert aperti non parte.
+insert into message_templates (key, template_kind, audience, subject_it, body_it, placeholders, notes) values
+  ('team_digest', 'mail', null,
+   '[XPETIS] Alert del {{data}}: {{n_nuovi}} nuovi, {{n_aperti}} ancora aperti',
+E'Nuovi dall''ultimo digest ({{n_nuovi}}):\n\n{{nuovi}}\n\nAncora aperti da prima ({{n_aperti}}):\n\n{{aperti}}\n\nLa coda completa, in ordine di quanto costa ignorarli, è la vista team_coda_alert su Studio.\n\nPer chiudere un alert: Studio, tabella team_alerts, colonna risolto su true. Chiuderlo lo riarma: finché uno resta aperto, gli alert nuovi dello stesso tipo non vengono scritti. Quelli che il database sa verificare si chiudono da soli.\n\nQuesta mail arriva agli indirizzi di app_config.team_notify_recipients, all''ora di team_digest_hour, e solo se c''è almeno un alert aperto.',
+   array['data', 'n_nuovi', 'n_aperti', 'nuovi', 'aperti'],
+   'Il digest giornaliero del team (0050), composto da clock_ramo_digest_team. {{nuovi}} e {{aperti}} sono elenchi composti dal database: vanno lasciati su un paragrafo loro. Deve continuare a dire come si chiude un alert.')
+on conflict (key) do nothing;

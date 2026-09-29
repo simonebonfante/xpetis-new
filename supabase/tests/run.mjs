@@ -2867,9 +2867,9 @@ console.log('\n== I testi delle mail ==')
                     'blocco_whatsapp_consegna', 'blocco_whatsapp_proposta', 'delivery_traveler',
                     'order_new_td', 'order_new_td_ai', 'order_paid_td', 'postcall_td', 'postcall_traveler',
                     'proposal_traveler', 'revision_delivered_traveler', 'revision_requested_td',
-                    'team_notifica', 'unpaid_cancelled_traveler']
+                    'team_digest', 'team_notifica', 'unpaid_cancelled_traveler']
     JSON.stringify(r.map(x => x.key)) === JSON.stringify(attesi)
-      ? ok('le ventotto righe del seed ci sono (sei della 0043, tre della 0044, due della 0045, sette della 0046, dieci della 0047)')
+      ? ok('le ventinove righe del seed ci sono (sei della 0043, tre della 0044, due della 0045, sette della 0046, dieci della 0047, una della 0050)')
       : fail('righe: ' + JSON.stringify(r.map(x => x.key)))
   }
   {
@@ -5333,9 +5333,10 @@ console.log('\n== I viaggi di gruppo (0048) ==')
     ? ok('tre viaggi di gruppo per ciascuno dei due designer demo, nella vetrina pubblica')
     : fail('group_trips: ' + JSON.stringify(r.map(x => [x.slug, x.group_trips.length])))
   const g = r.find(x => x.slug === 'giulia-neri').group_trips[0]
-  const chiavi = ['title', 'dates_label', 'duration_label', 'group_size_label', 'price_label', 'image_path']
+  // I sei campi del form, più lo slug dell'indirizzo dalla 0051.
+  const chiavi = ['slug', 'title', 'dates_label', 'duration_label', 'group_size_label', 'price_label', 'image_path']
   JSON.stringify(Object.keys(g).sort()) === JSON.stringify([...chiavi].sort())
-    ? ok('ogni viaggio porta i sei campi del form, e nient\'altro: ' + g.title + ' · ' + g.dates_label)
+    ? ok('ogni viaggio porta i sei campi del form e lo slug, nient\'altro: ' + g.title + ' · ' + g.dates_label)
     : fail('chiavi: ' + JSON.stringify(Object.keys(g)))
   const t = (await q(`select has_table_privilege('anon','td_group_trips','SELECT') as a,
                              has_table_privilege('authenticated','td_group_trips','SELECT') as u,
@@ -5353,6 +5354,397 @@ console.log('\n== I viaggi di gruppo (0048) ==')
   const mancanti = percorsi.filter(p => !existsSync(path.join(root, '..', 'seed-immagini', p.image_path)))
   mancanti.length === 0 ? ok(`le ${percorsi.length} immagini finte dei viaggi di gruppo esistono in seed-immagini/`)
                         : fail('immagini mancanti: ' + mancanti.map(p => p.image_path).join(', '))
+}
+
+console.log('\n== Lo slug dei viaggi di gruppo (0051) ==')
+{
+  const M = '11111111-1111-1111-1111-111111111111'
+  const G = '22222222-2222-2222-2222-222222222222'
+  const slug = async (td, pos) =>
+    (await q(`select slug from td_group_trips where td_id = $1 and position = $2`, [td, pos])).rows[0]?.slug
+
+  // Il seed: i sei viaggi sono nati dopo la migration, quindi dal trigger.
+  const s1 = await slug(G, 1)
+  s1 === 'peru-trekking-dell-huayhuash'
+    ? ok('gli slug del seed nascono dal titolo, senza accenti né apostrofi: ' + s1)
+    : fail('slug del seed: ' + s1)
+
+  // La collisione del Figma: tre viaggi che si chiamano tutti uguale.
+  await expectOk('tre viaggi con lo stesso titolo sullo stesso designer', `
+    insert into td_group_trips (td_id, position, title) values
+      ('${M}', 91, 'Argentina: Trekking in Patagonia'),
+      ('${M}', 92, 'Argentina: Trekking in Patagonia'),
+      ('${M}', 93, 'Argentina: Trekking in Patagonia')`)
+  const c = [await slug(M, 91), await slug(M, 92), await slug(M, 93)]
+  JSON.stringify(c) === JSON.stringify(['argentina-trekking-in-patagonia',
+                                        'argentina-trekking-in-patagonia-2',
+                                        'argentina-trekking-in-patagonia-3'])
+    ? ok('le collisioni prendono il suffisso: ' + c.join(', '))
+    : fail('collisioni: ' + JSON.stringify(c))
+
+  await expectOk('lo stesso titolo su un altro designer', `
+    insert into td_group_trips (td_id, position, title)
+    values ('${G}', 91, 'Argentina: Trekking in Patagonia')`)
+  ;(await slug(G, 91)) === 'argentina-trekking-in-patagonia'
+    ? ok("l'unicità è per designer, non globale") : fail('slug su Giulia: ' + await slug(G, 91))
+
+  // Le due proprietà per cui esiste la colonna: né il titolo né l'ordine
+  // muovono l'indirizzo.
+  await q(`update td_group_trips set title = 'Argentina, la Patagonia a piedi' where td_id = $1 and position = 92`, [M])
+  ;(await slug(M, 92)) === 'argentina-trekking-in-patagonia-2'
+    ? ok('correggere il titolo non muove lo slug') : fail('slug dopo il titolo: ' + await slug(M, 92))
+  await q(`update td_group_trips set position = 99 where td_id = $1 and position = 91`, [M])
+  await q(`update td_group_trips set position = 91 where td_id = $1 and position = 93`, [M])
+  ;(await slug(M, 91)) === 'argentina-trekking-in-patagonia-3' && (await slug(M, 99)) === 'argentina-trekking-in-patagonia'
+    ? ok('riordinare i viaggi non muove gli slug: il link vecchio porta allo stesso viaggio')
+    : fail('slug dopo il riordino: ' + (await slug(M, 91)) + ' / ' + (await slug(M, 99)))
+
+  await expectOk('uno slug scritto a mano si rispetta', `
+    insert into td_group_trips (td_id, position, title, slug)
+    values ('${M}', 94, 'Titolo qualunque', 'patagonia-2027')`)
+  ;(await slug(M, 94)) === 'patagonia-2027' ? ok('lo slug esplicito non viene riscritto')
+                                            : fail('slug esplicito: ' + await slug(M, 94))
+  await expectFail('due slug identici sullo stesso designer', `
+    insert into td_group_trips (td_id, position, title, slug)
+    values ('${M}', 95, 'Doppione', 'patagonia-2027')`, 'unique')
+  await expectOk('un titolo fatto solo di segni', `
+    insert into td_group_trips (td_id, position, title) values ('${M}', 96, '《》')`)
+  ;/^[0-9a-f]{8}$/.test(await slug(M, 96)) ? ok('ripiega su un pezzo dell\'uuid invece di uno slug vuoto')
+                                           : fail('slug di soli segni: ' + await slug(M, 96))
+
+  const v = (await q(`select group_trips from public_td_showcase where slug = 'marco-rossi'`)).rows[0].group_trips
+  v.every(x => typeof x.slug === 'string' && x.slug.length > 0)
+    ? ok('la vetrina pubblica serve lo slug di ogni viaggio di gruppo')
+    : fail('viaggi senza slug: ' + JSON.stringify(v))
+  const a = (await q(`select has_table_privilege('anon','public_td_showcase','SELECT') as a,
+                             has_table_privilege('anon','td_group_trips','SELECT') as t`)).rows[0]
+  a.a && !a.t ? ok('la vista resta leggibile, la tabella no') : fail(JSON.stringify(a))
+  await q(`delete from td_group_trips where position > 90`)
+}
+
+console.log('\n== Il quiz non mostra mai la chiave del form (0051) ==')
+{
+  // Più su l'harness rigioca la 0049 su tabelle popolate, e quella riscrive
+  // public_quiz_axes con la ricaduta su label_it. Su un database vero l'ordine
+  // è uno solo (0049, poi 0051): qui si rimette la vista della 0051, presa dal
+  // file, così la prova guarda quello che il database vero avrà.
+  const m0051 = readFileSync(path.join(root, 'migrations', '0051_slug_viaggi_di_gruppo.sql'), 'utf8')
+  await db.exec(m0051.slice(m0051.indexOf('create or replace view public_quiz_axes')))
+  const opz = async () => (await q(`select options from public_quiz_axes where code = 'companions'`)).rows[0].options
+  const o = await opz()
+  const attese = ['Da solo/a', 'In coppia', 'Famiglia con bambini/ragazzi',
+                  'Gruppo di amici / piccolo gruppo', 'Gruppo organizzato con altri viaggiatori']
+  JSON.stringify([1, 2, 3, 4, 5].map(n => o[String(n)])) === JSON.stringify(attese)
+    ? ok('«con chi viaggi» ha cinque risposte, con le parole del quiz')
+    : fail('opzioni companions: ' + JSON.stringify(o))
+  const k = (await q(`select kind, scale_min, scale_max, sort_order from public_quiz_axes where code = 'companions'`)).rows[0]
+  k.kind === 'categorical' && k.scale_min === 1 && k.scale_max === 5 && k.sort_order === 6
+    ? ok('ed è categoriale, scala 1-5, sesta: la pagina la distingue da kind, non contando')
+    : fail('companions: ' + JSON.stringify(k))
+  const cont = (await q(`select code from public_quiz_axes where kind = 'continuous' and scale_max <> 4`)).rows
+  cont.length === 0 ? ok('i cinque assi continui hanno quattro risposte') : fail('continui fuori scala: ' + JSON.stringify(cont))
+
+  // Un testo che manca: prima la vista mostrava la chiave, ora un buco.
+  await q(`update quiz_axis_options set answer_it = null where axis_code = 'companions' and value = 1`)
+  const buco = (await opz())['1']
+  buco === null ? ok('una risposta senza testo arriva null, non come «Viaggiatore solo»')
+                : fail('ricaduta: ' + JSON.stringify(buco))
+  await q(`update quiz_axis_options set answer_it = 'Da solo/a' where axis_code = 'companions' and value = 1`)
+  const g = (await q(`select has_table_privilege('anon','public_quiz_axes','SELECT') as a`)).rows[0]
+  g.a ? ok('public_quiz_axes non ha perso il grant') : fail('grant perso sul quiz')
+}
+
+// ===========================================================================
+// Il cruscotto del team (migration 0050)
+// ===========================================================================
+// Le viste si provano davvero facendole leggere a una persona (PIANO,
+// milestone 9). Qui si prova quello che una persona non vede: che non
+// espongano credenziali, che la spunta chiuda e riapra, che il digest parta una
+// volta sola e solo se c'è qualcosa, che un rimborso dimenticato si veda.
+console.log('\n== Il cruscotto del team (0050) ==')
+{
+  const TD   = '11111111-1111-1111-1111-111111111111'
+  const ANNA = '44444444-4444-4444-4444-444444444444'
+  const VISTE = ['team_coda_alert', 'team_ordini_aperti', 'team_prenotazioni_in_corso',
+                 'team_checklist_pubblicazione', 'team_pagamenti', 'team_rimborsi_stripe']
+
+  // ---------------------------------------------------------------- superficie
+  console.log('  -- cosa non si vede --')
+  for (const v of VISTE) {
+    const r = (await q(`select has_table_privilege('anon', $1, 'SELECT') as a,
+                               has_table_privilege('authenticated', $1, 'SELECT') as u`, [v])).rows[0]
+    !r.a && !r.u ? ok(`${v}: chiusa ad anon e authenticated`) : fail(`${v} aperta al browser`)
+  }
+  for (const t of ['team_alert_kinds', 'team_digests']) {
+    const r = (await q(`select has_table_privilege('anon',$1,'SELECT') as a,
+                               has_table_privilege('authenticated',$1,'SELECT') as u,
+                               (select relrowsecurity from pg_class where relname=$1) as rls`, [t])).rows[0]
+    !r.a && !r.u && r.rls ? ok(`${t}: RLS accesa, privilegi revocati`) : fail(`${t}: ` + JSON.stringify(r))
+  }
+  {
+    const vietate = /uid|token|video|client_reference|phone|telefono|email|secret|chiave|session/i
+    const r = (await q(`select table_name, column_name from information_schema.columns
+                         where table_schema = 'public' and table_name = any($1)`, [VISTE])).rows
+    const male = r.filter(c => vietate.test(c.column_name))
+    male.length === 0 ? ok(`nessuna colonna delle ${VISTE.length} viste ha la forma di una credenziale o di un contatto`)
+                      : fail('colonne vietate: ' + JSON.stringify(male))
+  }
+  for (const v of VISTE) {
+    try { await q(`select * from ${v}`); ok(`${v} si legge senza errori`) }
+    catch (e) { fail(`${v} non si legge`, e) }
+  }
+  {
+    const cal = 'hXBtFar1ZUCZci4qszEbs2', tok = 'aB3dE5gH7jK9mN1pQ3sT5vX7zA9cE1gH'
+    const uuid = '66666666-6666-6666-6666-666666666666'
+    const t = (await q(`select alert_testo_sicuro($1) as t`, [
+      `uid ${cal}, link /ordine/${tok}, select f('${uuid}'); sessione cs_test_a1B2c3D4e5F6g7H8i9J0k1L2 pi_3NabcdefGHIJKLmn0123 {{x}}`])).rows[0].t
+    !t.includes(cal) && !t.includes(tok) ? ok('il testo sicuro nasconde UID Cal.com e token') : fail('non nasconde: ' + t)
+    t.includes(uuid) && t.includes('cs_test_a1B2c3D4e5F6g7H8i9J0k1L2') && t.includes('pi_3NabcdefGHIJKLmn0123')
+      ? ok('e lascia UUID e id Stripe, che servono a chi agisce') : fail('toglie troppo: ' + t)
+    !t.includes('{{') ? ok('e disinnesca le graffe doppie, che render_template prenderebbe per segnaposto')
+                      : fail('graffe: ' + t)
+  }
+
+  // ---------------------------------------------------------------- catalogo
+  console.log('  -- il catalogo degli alert --')
+  {
+    const src = (await q(`select string_agg(p.prosrc, E'\n') as s from pg_proc p
+                            join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'`)).rows[0].s
+    const kinds = new Set([...src.matchAll(/'([a-z][a-z0-9_]+)',\s*'(critical|warning|info)'/g)].map(m => m[1]))
+    kinds.delete('info')   // `case … when 'info' then` non è un kind
+    const noti = new Set((await q(`select kind from team_alert_kinds`)).rows.map(r => r.kind))
+    const mancanti = [...kinds].filter(k => !noti.has(k))
+    kinds.size > 30 && mancanti.length === 0
+      ? ok(`tutti i ${kinds.size} kind scritti dalle funzioni sono nel catalogo, con titolo e cosa fare`)
+      : fail('kind non catalogati: ' + mancanti.join(', '))
+  }
+
+  // --------------------------------------------------------------- la spunta
+  console.log('  -- chiudere è una spunta --')
+  await q(`update team_alerts set risolto = true where not risolto`)
+  await q(`insert into team_alerts (kind, severity, entity_type, entity_id, message)
+           values ('calcom_cancellazione_orfana', 'warning', 'webhook_event', gen_random_uuid(),
+                   'Cancellazione Cal.com di una prenotazione che non abbiamo: uid hXBtFar1ZUCZci4qszEbs2, designer marco')`)
+  await q(`insert into team_alerts (kind, severity, message) values ('token_inventati', 'warning', 'prova')`)
+  await q(`insert into team_alerts (kind, severity, message) values ('stripe_importo_non_combacia', 'critical', 'prova soldi')`)
+  await q(`insert into team_alerts (kind, severity, message) values ('kind_inventato_per_la_prova', 'warning', 'prova ignoto')`)
+  {
+    const r = (await q(`select costo, kind, messaggio, cosa_fare from team_coda_alert`)).rows
+    r.map(x => x.kind).join(',') === 'stripe_importo_non_combacia,kind_inventato_per_la_prova,calcom_cancellazione_orfana,token_inventati'
+      ? ok('la coda è in ordine di costo: soldi, poi il tipo sconosciuto (a 2, non in fondo), igiene, da sapere')
+      : fail('ordine: ' + r.map(x => x.costo + ' ' + x.kind).join(' | '))
+    const orfana = r.find(x => x.kind === 'calcom_cancellazione_orfana')
+    orfana && !orfana.messaggio.includes('hXBtFar1ZUCZci4qszEbs2')
+      ? ok('l\'UID Cal.com dell\'alert orfano non esce dalla vista: ' + orfana.messaggio)
+      : fail('UID in vista: ' + orfana?.messaggio)
+    r.find(x => x.kind === 'kind_inventato_per_la_prova')?.cosa_fare.includes('team_alert_kinds')
+      ? ok('un tipo non catalogato dice di catalogarlo') : fail('tipo ignoto')
+  }
+  {
+    await q(`update team_alerts set risolto = true where kind = 'token_inventati' and not risolto`)
+    const a = (await q(`select risolto, resolved_at, resolved_by from team_alerts where kind='token_inventati' order by created_at desc limit 1`)).rows[0]
+    a.risolto && a.resolved_at && a.resolved_by === 'team (Studio)'
+      ? ok('spuntare risolto riempie resolved_at e resolved_by da sé') : fail('spunta: ' + JSON.stringify(a))
+    await q(`update team_alerts set risolto = false where kind = 'token_inventati' and resolved_by = 'team (Studio)'`)
+    const b = (await q(`select risolto, resolved_at, resolved_by from team_alerts where kind='token_inventati' order by created_at desc limit 1`)).rows[0]
+    !b.risolto && b.resolved_at === null && b.resolved_by === null
+      ? ok('togliere la spunta lo riapre') : fail('riapertura: ' + JSON.stringify(b))
+    await q(`update team_alerts set resolved_at = now(), resolved_by = 'orologio' where kind = 'token_inventati' and not risolto`)
+    const c = (await q(`select risolto from team_alerts where kind='token_inventati' order by created_at desc limit 1`)).rows[0]
+    c.risolto ? ok('una funzione che scrive resolved_at (come l\'orologio) accende la spunta') : fail('coerenza')
+    const n = (await q(`select chiudi_alert('kind_inventato_per_la_prova', 'prova') as n`)).rows[0].n
+    const d = (await q(`select resolved_by, resolution_note from team_alerts where kind='kind_inventato_per_la_prova'`)).rows[0]
+    n === 1 && d.resolved_by === 'team (chiudi_alert)' && d.resolution_note === 'prova'
+      ? ok('chiudi_alert chiude tutti quelli di un tipo e lo dice') : fail('chiudi_alert: ' + n + JSON.stringify(d))
+  }
+  {
+    // Il riarmo: un alert aperto zittisce i successivi dello stesso tipo.
+    await q(`update app_config set value = 1 where key = 'calcom_signature_alert_threshold'`)
+    await q(`insert into calcom_signature_rejections (bucket_at, n, last_at) values (date_trunc('hour', now()), 5, now())`)
+    await q(`select clock_ramo_firme_calcom()`); await q(`select clock_ramo_firme_calcom()`)
+    const n1 = Number((await q(`select count(*) from team_alerts where kind='calcom_firme_rifiutate' and not risolto`)).rows[0].count)
+    await q(`select chiudi_alert('calcom_firme_rifiutate')`)
+    await q(`select clock_ramo_firme_calcom()`)
+    const n2 = Number((await q(`select count(*) from team_alerts where kind='calcom_firme_rifiutate' and not risolto`)).rows[0].count)
+    n1 === 1 && n2 === 1 ? ok('chiudere riarma: aperto ne tiene uno solo, chiuso ne lascia scrivere uno nuovo')
+                         : fail(`riarmo: ${n1} poi ${n2}`)
+    await q(`select chiudi_alert('calcom_firme_rifiutate')`)
+    await q(`delete from calcom_signature_rejections`)
+    await q(`update app_config set value = 3 where key = 'calcom_signature_alert_threshold'`)
+  }
+
+  // --------------------------------------------------------- chiusura da sé
+  console.log('  -- gli alert che si chiudono da soli --')
+  {
+    const o = (await q(`insert into orders (traveler_id, td_id, service_type, last_actor)
+                        values ($1, $2, 'custom_itinerary', 'traveler') returning id, human_ref`, [ANNA, TD])).rows[0]
+    await q(`insert into team_alerts (kind, severity, entity_type, entity_id, message)
+             values ('ordine_richiesto', 'warning', 'order', $1, 'Nuova richiesta')`, [o.id])
+    {
+      const v = (await q(`select chi, cosa_manca, tocca_a from team_ordini_aperti where ordine = $1`, [o.human_ref])).rows[0]
+      v?.tocca_a === 'team' && v.chi.startsWith('Tocca a noi') && v.cosa_manca.includes('gruppo WhatsApp')
+        ? ok('ordine richiesto nella vista: «' + v.chi + '» — ' + v.cosa_manca) : fail('vista ordine: ' + JSON.stringify(v))
+    }
+    await q(`select clock_ramo_alert_superati()`)
+    let a = (await q(`select risolto from team_alerts where entity_id = $1`, [o.id])).rows[0]
+    !a.risolto ? ok('finché l\'ordine è richiesto, l\'alert resta aperto') : fail('chiuso troppo presto')
+    await q(`update orders set status = 'in_definition', last_actor = 'td' where id = $1`, [o.id])
+    await q(`select clock_ramo_alert_superati()`)
+    a = (await q(`select risolto, resolved_by from team_alerts where entity_id = $1`, [o.id])).rows[0]
+    a.risolto && a.resolved_by.startsWith('orologio')
+      ? ok('uscito da «richiesto», l\'orologio lo chiude: ' + a.resolved_by) : fail('non chiuso: ' + JSON.stringify(a))
+    const v = (await q(`select tocca_a, cosa_manca from team_ordini_aperti where ordine = $1`, [o.human_ref])).rows[0]
+    v?.tocca_a === 'designer' && v.cosa_manca === 'Scrivere la proposta'
+      ? ok('e la vista ora dice che aspetta il designer: ' + v.cosa_manca) : fail('vista dopo: ' + JSON.stringify(v))
+    await q(`update orders set status = 'cancelled', cancelled_at = now(), last_actor = 'team' where id = $1`, [o.id])
+  }
+  {
+    const r = (await q(`select count(*) filter (where cosa_manca is null or chi is null) as vuote, count(*) as n
+                          from team_ordini_aperti`)).rows[0]
+    Number(r.n) > 0 && Number(r.vuote) === 0
+      ? ok(`ogni ordine aperto (${r.n}) dice chi deve muoversi e cosa manca`) : fail('righe mute: ' + JSON.stringify(r))
+    const s = (await q(`select count(*) filter (where cosa_succede is null) as vuote, count(*) as n
+                          from team_prenotazioni_in_corso`)).rows[0]
+    Number(s.vuote) === 0 ? ok(`ogni prenotazione in corso (${s.n}) dice cosa succede`) : fail('prenotazioni mute')
+    const c = (await q(`select count(*) as n, count(*) filter (where stato = 'Pronto: si può pubblicare'
+                                                             and come_si_pubblica is null) as senza from team_checklist_pubblicazione`)).rows[0]
+    const t = (await q(`select count(*) as n from travel_designers`)).rows[0]
+    c.n === t.n && Number(c.senza) === 0
+      ? ok(`la checklist ha una riga per designer (${c.n}), e chi è pronto porta la riga per pubblicarlo`)
+      : fail('checklist: ' + JSON.stringify(c))
+  }
+
+  // ---------------------------------------------------------------- rimborsi
+  console.log('  -- i rimborsi --')
+  const BR = 'b0b0b0b0-0050-4050-8050-000000000001'
+  await q(`insert into bookings (id, traveler_id, td_id, service_type, status, cal_booking_uid, cal_event_type_slug,
+                                 starts_at, ends_at, original_starts_at, price_cents, confirmed_at, last_actor)
+           values ($1, $2, $3, 'consultation', 'confirmed', 'uid-rimborso-0050', 'consulenza-xpetis-30',
+                   now() + interval '3 days', now() + interval '3 days 30 minutes', now() + interval '3 days',
+                   6000, now(), 'n8n')`, [BR, ANNA, TD])
+  const PAY = (await q(`insert into payments (booking_id, kind, status, amount_cents, stripe_payment_intent_id,
+                                              client_reference_id, paid_at)
+                        values ($1, 'consultation', 'paid', 6000, 'pi_prova0050', 'uid-rimborso-0050', now())
+                        returning id`, [BR])).rows[0].id
+  {
+    const r = (await q(`select * from team_pagamenti where payment_id = $1`, [PAY])).rows[0]
+    r && r.id_stripe === 'pi_prova0050' && !JSON.stringify(r).includes('uid-rimborso-0050')
+      ? ok('team_pagamenti mostra l\'id Stripe da cercare sulla dashboard, e non l\'UID Cal.com del riferimento')
+      : fail('team_pagamenti: ' + JSON.stringify(r))
+  }
+  // Il messaggio che il ponte scrive dalla 0044 per un charge.refunded.
+  await q(`insert into event_log (entity_type, entity_id, event, actor, payload)
+           values ('webhook_event', gen_random_uuid(), 'stripe_rimborso', 'system',
+                   jsonb_build_object('tipo', 'charge.refunded', 'oggetto',
+                     jsonb_build_object('object', 'charge', 'payment_intent', 'pi_prova0050',
+                                        'amount_refunded', 2000, 'refunded', false)))`)
+  await q(`select clock_ramo_rimborsi_non_annotati()`); await q(`select clock_ramo_rimborsi_non_annotati()`)
+  {
+    const a = (await q(`select message from team_alerts where kind = 'rimborso_non_annotato' and entity_id = $1 and not risolto`, [PAY])).rows
+    a.length === 1 && a[0].message.includes('20,00') && a[0].message.includes("annota_rimborso('pi_prova0050', 2000")
+      ? ok('un rimborso fatto su Stripe e non annotato alza un alert, uno solo, con la riga pronta')
+      : fail('alert rimborso: ' + JSON.stringify(a))
+    const r = (await q(`select da_fare from team_pagamenti where payment_id = $1`, [PAY])).rows[0]
+    r.da_fare?.startsWith('DA ANNOTARE') ? ok('e team_pagamenti lo mette in cima con la riga da eseguire')
+                                         : fail('da_fare: ' + JSON.stringify(r))
+  }
+  await expectFail('annotare senza nota', `select annota_rimborso('pi_prova0050', 2000, '')`, 'nota')
+  await expectFail('annotare più dell\'incasso', `select annota_rimborso('pi_prova0050', 7000, 'x')`, 'controlla')
+  await expectFail('annotare un pagamento che non esiste', `select annota_rimborso('pi_inesistente', 100, 'x')`, 'nessun pagamento')
+  {
+    const t = (await q(`select annota_rimborso('pi_prova0050', 2000, 'Call spostata dal designer, rimborso parziale') as t`)).rows[0].t
+    const p = (await q(`select status, refund_amount_cents, refunded_at, refund_note from payments where id = $1`, [PAY])).rows[0]
+    const b = (await q(`select status, refund_amount_cents from bookings where id = $1`, [BR])).rows[0]
+    p.status === 'partially_refunded' && p.refund_amount_cents === 2000 && p.refunded_at && p.refund_note.includes('20,00 €')
+      ? ok('annotato: pagamento parzialmente rimborsato, con data e nota') : fail('pagamento: ' + JSON.stringify(p))
+    b.status === 'confirmed' && b.refund_amount_cents === 2000
+      ? ok('la prenotazione porta l\'importo ma NON cambia stato: quella è una decisione a parte')
+      : fail('prenotazione: ' + JSON.stringify(b))
+    t.includes('decidi lo stato') ? ok('e la risposta lo ricorda') : fail('risposta: ' + t)
+  }
+  await q(`select clock_ramo_alert_superati()`)
+  {
+    const a = (await q(`select risolto from team_alerts where kind = 'rimborso_non_annotato' and entity_id = $1`, [PAY])).rows[0]
+    a.risolto ? ok('annotato il rimborso, l\'alert si chiude da solo') : fail('alert rimborso ancora aperto')
+  }
+  await q(`select annota_rimborso($1, 4000, 'Resto rimborsato')`, [PAY])
+  {
+    const p = (await q(`select status, refund_amount_cents from payments where id = $1`, [PAY])).rows[0]
+    p.status === 'refunded' && p.refund_amount_cents === 6000
+      ? ok('il secondo rimborso si somma, per id della riga: pagamento rimborsato per intero') : fail(JSON.stringify(p))
+  }
+  await expectFail('rimborsare un pagamento già rimborsato per intero', `select annota_rimborso('pi_prova0050', 1, 'x')`, 'niente da rimborsare')
+
+  // ------------------------------------------------------------------ digest
+  console.log('  -- il digest --')
+  const salva = (await q(`select key, value, value_text from app_config
+                           where key in ('team_digest_hour', 'team_notify_recipients')`)).rows
+  const digest = async () => (await q(`select clock_ramo_digest_team() as n`)).rows[0].n
+  const posta = async () => (await q(`select * from outbound_messages where message_kind = 'team_digest' order by recipient`)).rows
+  await q(`update team_alerts set risolto = true where not risolto`)
+  await q(`delete from team_digests`)
+  await q(`update app_config set value = 0 where key = 'team_digest_hour'`)
+  await q(`update app_config set value_text = 'uno@example.com, due@example.com' where key = 'team_notify_recipients'`)
+  {
+    const n = await digest()
+    const g = (await q(`select inviato from team_digests`)).rows
+    n === 0 && g.length === 1 && !g[0].inviato && (await posta()).length === 0
+      ? ok('nessun alert aperto: il giorno è segnato e nessuna mail parte') : fail(`digest vuoto: ${n} ${JSON.stringify(g)}`)
+  }
+  await q(`delete from team_digests`)
+  await q(`insert into team_alerts (kind, severity, message, created_at)
+           values ('calcom_designer_sconosciuto', 'warning', 'vecchio: account mario-xpetis', now() - interval '12 days')`)
+  await q(`insert into team_digests (giorno, created_at) values (current_date - 1, now() - interval '1 day')`)
+  await q(`insert into team_alerts (kind, severity, entity_type, entity_id, message)
+           values ('calcom_cancellazione_orfana', 'warning', 'webhook_event', gen_random_uuid(),
+                   'Cancellazione orfana: uid hXBtFar1ZUCZci4qszEbs2, designer marco')`)
+  {
+    const n = await digest()
+    const m = await posta()
+    n === 2 && m.length === 2 && m.map(x => x.recipient).join(',') === 'due@example.com,uno@example.com'
+      ? ok('due destinatari, due mail in coda') : fail(`digest: ${n} ` + JSON.stringify(m.map(x => x.recipient)))
+    const t = m[0]?.body_text ?? ''
+    ;/1 nuovi, 1 ancora aperti/.test(m[0]?.subject ?? '') ? ok('l\'oggetto conta nuovi e vecchi: ' + m[0].subject) : fail('oggetto: ' + m[0]?.subject)
+    t.includes('Cancellazione di una call che non abbiamo') && t.includes('Cosa fare:')
+      && t.includes('Prenotazione da un account Cal.com che non conosciamo — da 12 giorni')
+      && !t.includes('vecchio: account mario')
+      ? ok('i nuovi per esteso con cosa fare, i vecchi in una riga con l\'età') : fail('corpo: ' + t)
+    !t.includes('hXBtFar1ZUCZci4qszEbs2') && !m[0].body_html.includes('hXBtFar1ZUCZci4qszEbs2')
+      ? ok('l\'UID Cal.com non arriva nelle caselle') : fail('UID nel digest')
+    t.includes('colonna risolto') ? ok('la mail dice come si zittisce un alert') : fail('manca come si chiude')
+    const again = await digest()
+    again === 0 && (await posta()).length === 2 ? ok('secondo giro nello stesso giorno: niente') : fail('digest doppio')
+  }
+  {
+    await q(`delete from team_digests where giorno = (now() at time zone 'Europe/Rome')::date`)
+    await q(`update app_config set value = -1 where key = 'team_digest_hour'`)
+    const n = await digest()
+    const g = Number((await q(`select count(*) from team_digests where giorno = (now() at time zone 'Europe/Rome')::date`)).rows[0].count)
+    n === 0 && g === 0 ? ok('ora negativa: spento per scelta, nessuna riga') : fail('spento: ' + n + ' ' + g)
+    await q(`update app_config set value = 0 where key = 'team_digest_hour'`)
+    await q(`update app_config set value_text = '' where key = 'team_notify_recipients'`)
+    await digest()
+    const a = Number((await q(`select count(*) from team_alerts where kind = 'notifica_team_non_configurata' and not risolto`)).rows[0].count)
+    a === 1 ? ok('senza destinatari il digest non si perde in silenzio: lo dice un alert') : fail('destinatari vuoti: ' + a)
+  }
+  {
+    await q(`delete from app_config where key = 'team_digest_hour'`)
+    await q(`select * from clock_tick(0)`)
+    const a = (await q(`select message from team_alerts where kind = 'orologio_ramo_non_configurato' and not risolto`)).rows[0]
+    a?.message.includes('team_digest_hour') ? ok('senza la riga il ramo è dichiarato spento dall\'orologio')
+                                           : fail('ramo digest non dichiarato: ' + a?.message)
+    await q(`insert into app_config (key, value, config_group, label_it) values ('team_digest_hour', 8, 'integrations', 'x')`)
+    await q(`select * from clock_tick(0)`)
+  }
+  for (const r of salva) await q(`update app_config set value = $2, value_text = $3 where key = $1`, [r.key, r.value, r.value_text])
+  await q(`update team_alerts set risolto = true where not risolto`)
+
+  for (const f of ['chiudi_alert(text, text)', 'annota_rimborso(text, integer, text)', 'clock_ramo_digest_team()',
+                   'clock_ramo_alert_superati()', 'clock_ramo_rimborsi_non_annotati()', 'alert_testo_sicuro(text)']) {
+    const r = (await q(`select has_function_privilege('anon', $1, 'EXECUTE') as a,
+                               has_function_privilege('authenticated', $1, 'EXECUTE') as u`, [f])).rows[0]
+    !r.a && !r.u ? ok(`${f}: chiusa ad anon e authenticated`) : fail(`${f} aperta`)
+  }
 }
 
 console.log(failures === 0 ? '\nTutto verde.\n' : `\n${failures} asserzioni fallite.\n`)

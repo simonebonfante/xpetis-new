@@ -444,6 +444,14 @@ DMARC su `_dmarc.xpetis.it` partendo da `p=none` resta da verificare se c'è.
 ⚠️ Di record SPF **ne esiste uno solo per dominio**: se ce n'è già uno, va fuso,
 non aggiunto.
 
+**Le notifiche interne e il digest (0045, 0050)** vanno agli indirizzi di
+`app_config.team_notify_recipients`: per la Beta i tre indirizzi **personali**
+di Simone, Alessandro e Andrea (confermato il 28 settembre 2026), poi una
+casella dedicata. Gli indirizzi non stanno nel repository: la riga nasce vuota
+nel seed e si scrive da Studio. Dal 29 settembre ci passa anche il **digest
+giornaliero** (`team_digest_hour`): al massimo una mail al giorno per indirizzo,
+che conta sul tetto dei 100 di Resend condiviso con la landing page.
+
 **WhatsApp:** **+39 347 891 1018**, deciso il 6 settembre 2026. È un numero
 **provvisorio e personale**, prestato al progetto per non tenere fermo lo
 sviluppo: va sostituito con un numero dedicato prima del pubblico. Restano da

@@ -12,7 +12,28 @@ import {
 } from '@/lib/quiz-risposte'
 
 /**
- * Le sei schermate del quiz, nodi Figma 346:932 e 346:896.
+ * Le sei schermate del quiz — Figma nuovo `Q9Krydv6xD8mFJCtU9NHzr`, nodo 2-2
+ * ("Domanda 1") e i cinque gemelli 2-36…2-192 (fino al 28 settembre: file
+ * vecchio, nodi 346:932 e 346:896). Il disegno nuovo è lo stesso impianto al
+ * pixel — card, foto, barra, stella, frecce: verificato il 29 settembre, foto e
+ * freccia byte per byte — con una differenza: l'ultima schermata dice
+ * **"Concludi"** invece di "Continua".
+ *
+ * ## Quattro risposte su cinque domande, cinque sulla sesta
+ *
+ * «Sono tutte uguali» vale per il disegno, non per i dati. Le cinque domande
+ * `continuous` hanno quattro risposte ordinate (1-4, il verso conta); la sesta,
+ * «Con chi vivrai questo viaggio?», è `categorical` e ne ha **cinque**, senza
+ * ordine e senza punteggio. Qui niente dà per scontato il quattro: le risposte
+ * si costruiscono dalla scala che il database dichiara per quell'asse
+ * (`scale_min`…`scale_max`, `lib/quiz.ts`), e l'harness controlla che la sesta
+ * sia `categorical` con scala 1-5. Il Figma disegna la schermata di «con chi»
+ * con cinque cerchi a 45 px, lo stesso passo delle altre: la card regge.
+ *
+ * ⚠️ **L'ordine delle domande è quello dei dati, non del Figma.** Il disegno
+ * mette «con chi» **terza**; la 0049, dal file del quiz, la mette **sesta**.
+ * L'ordine è contenuto, e il contenuto lo decide il Flusso: vince
+ * `sort_order`. Così anche "Concludi" cade sull'ultima dei dati, qualunque sia.
  *
  * Una domanda per schermata, tutte obbligatorie: il Flusso non ammette quiz a
  * metà, e `match_designers()` dà 0 a ogni asse senza risposta — un quiz
@@ -43,8 +64,13 @@ import {
  *
  * L'ordine in pagina, dall'alto (valore 1) verso il basso (valore 4), è anche
  * quello che il file del quiz dichiara (`scoring_note`): file e database dicono
- * la stessa cosa, e il punto 1 non dipende più solo da questo componente. Il
- * Figma vecchio resta al contrario; il nodo del quiz sul file nuovo è da chiedere.
+ * la stessa cosa, e il punto 1 non dipende più solo da questo componente. **Il
+ * Figma nuovo (2-2) ora dice lo stesso**: «Voglio decidere io» in alto,
+ * «Pensateci voi» in fondo. Il vecchio era al contrario.
+ *
+ * Il testo in pagina è sempre `answer_it` (via `public_quiz_axes`), mai
+ * `label_it`: su «con chi viaggi» `label_it` è la chiave del form Vetrina TD, e
+ * dalla 0051 la vista non ci ricade nemmeno quando un testo manca.
  */
 export function QuizDomande({
   assi,
@@ -196,9 +222,9 @@ export function QuizDomande({
               <span />
             )}
 
-            {/* Il Figma non disegna né lo stato spento né l'ultima schermata,
-                quindi l'etichetta resta "Continua" fino in fondo e il tasto si
-                limita a smorzarsi finché la domanda non ha risposta. */}
+            {/* L'ultima schermata dice "Concludi" (Figma nuovo, 2-192). Lo stato
+                spento non è disegnato: il tasto si smorza finché la domanda
+                non ha risposta. */}
             <button
               type="button"
               onClick={avanti}
@@ -207,7 +233,7 @@ export function QuizDomande({
                 risposto ? 'hover:brightness-110' : 'cursor-not-allowed opacity-40'
               }`}
             >
-              <span className="text-[18px] tracking-[-0.342px]">Continua</span>
+              <span className="text-[18px] tracking-[-0.342px]">{ultima ? 'Concludi' : 'Continua'}</span>
               <Image src="/img/freccia-avanti.svg" alt="" width={40} height={40} />
             </button>
           </div>

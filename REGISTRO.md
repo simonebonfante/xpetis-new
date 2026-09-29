@@ -9,6 +9,172 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**29 settembre 2026 — le ultime pagine sul Figma nuovo**
+
+Quattro nodi verificati da Simone: home `1-14`, quiz `2-2`, viaggio di gruppo
+`3-1121`, vetrina `72-48`. Skill design-to-code letta prima, poi il connettore.
+`0051_slug_viaggi_di_gruppo.sql`, la pagina
+`/designer/[slug]/viaggio-di-gruppo/[viaggio]`, `components/dopo-la-call.tsx`,
+`components/scheda-designer.tsx`. Harness a 1002 prove ok, build verde.
+
+**Il primo gesto è stato un `get_metadata` sulla pagina intera**, e ha pagato:
+in un colpo c'erano tutti i frame, compresi due che nessuno aveva nominato
+(«Risultati» `2-315` e «Pagamento» `4-1715`, lasciati stare), le sei domande
+del quiz con i loro testi, e i due nodi della vetrina da confrontare per
+struttura con un `diff`. È stato anche quello che ha salvato il lavoro: **dopo
+home, quiz e viaggio di gruppo il connettore ha risposto «limite del piano
+Starter»**, a metà dei nodi del riquadro nuovo della vetrina. Da lì ho lavorato
+coi metadati (posizioni e misure esatte) e lo screenshot 1:1, e l'ho scritto
+dove conta: i corpi dei testi di quel riquadro sono stimati, e quattro icone
+mancano.
+
+**Home: un controllo, e una fermata.** Foto e stelle byte per byte uguali;
+allineata solo la riga «Affidarti…». «Come puoi viaggiare con XPETIS» invece è
+cambiata di struttura e di contenuto, con due link verso pagine che non
+esistono: **non l'ho riscritta**, come chiedeva il prompt. «Iscriviti»: scritto
+in tre posti che non esiste.
+
+**Quiz: «sono tutte uguali» è vero per il disegno.** Stesso impianto, e una
+cosa in più («Concludi»). Ma il Figma mette «con chi viaggi» **terza**, la 0049
+sesta: l'ordine è contenuto, e vince il dato. Il componente non contava il
+quattro (le risposte vengono dalla scala dell'asse), quindi niente da
+correggere lì; l'harness ora lo prova sul `kind`. Una cosa invece l'ho trovata
+guardando la vista: `public_quiz_axes` ricadeva su `label_it` quando mancava
+`answer_it`, cioè mostrava la chiave del form proprio nel caso in cui qualcuno
+sarebbe andato a «sistemarla». La 0051 toglie la ricaduta. **L'harness non la
+vedeva**: la sua prova della 0049 rigioca quella migration e riscrive la vista,
+quindi la mia prova falliva per la ragione sbagliata. Ora la vista della 0051
+si rimette dal file prima di guardarla — ed è scritto, perché la prossima
+migration che tocca il quiz ci ricascherebbe.
+
+**Il viaggio di gruppo: sei campi, e una pagina con sei campi.** Lo slug è la
+0033 riscritta per un'altra tabella, con le collisioni prese dal Figma stesso
+(tre viaggi che si chiamano tutti «Argentina: Trekking in Patagonia»). Della
+pagina ho costruito quello che ha una sorgente; tre sezioni, la fascia d'età,
+la nota sul prezzo, il paese, la descrizione e la galleria restano fuori, con
+cosa servirebbe per ognuna in `PIANO.md`. «Acquista il posto» no. «Contatta il
+Travel Designer» l'ho riscritto «Prenota una call con …»: il designer non ha un
+contatto, e un tasto che dice «contatta» e apre una cassa è una piccola bugia.
+**Scartato**: riusare per i gruppi la riga «volo non incluso • IVA inclusa»
+degli itinerari — sarebbe stato dire per loro cosa comprende il prezzo.
+
+**La vetrina: `72-48` è una revisione, non una variante**, e il `diff` dei
+metadati l'ha detto subito: sotto la hero niente cambia. Nella hero «E dopo
+l'incontro?» esce dalla scheda della call. **Quindi `box-servizio.tsx` stavolta
+l'ho toccato**, e prima di farlo ho riletto l'elenco di ieri: nella diff nessuna
+riga di codice su `calLink`, la guardia, `PrenotaConsulenza`, `utente`,
+`percorsoVetrina`; `prenota-consulenza.tsx` e `lib/cal-embed.ts` a zero. Il
+«50€» sul riquadro del su misura non l'ho messo: il form non dà quel prezzo, e
+che sia uguale a quello della call sa di segnaposto.
+
+**Un errore mio, preso in tempo.** La prima versione delle card di gruppo
+costruiva il link anche senza slug, e sul database di sviluppo (senza 0051) il
+`curl` ha trovato sei `/viaggio-di-gruppo/undefined`. Ora senza slug il tasto
+non c'è. E una prova per Simone scritta male: il riordino in un solo `update`
+avrebbe urtato il vincolo sulle posizioni; ora è in due passi.
+
+**Verificato**: harness, build (con la guardia dei token morti), render con
+`curl` di home, quiz, vetrine e itinerario sul database di sviluppo. **Non
+verificato**: la pagina del viaggio con dati veri (serve la 0051 applicata),
+niente in un browser, niente da collegato. Prove 147-160.
+
+---
+
+**29 settembre 2026 — la milestone 9: il cruscotto del team**
+
+Il quarto principio dice che l'umano entra sull'eccezione; fino a oggi ci
+entrava senza strumenti. `0050_cruscotto_team.sql`, `RUNBOOK.md`, due righe di
+seed (`team_digest_hour`, il testo `team_digest`), 62 asserzioni nuove. Niente
+TypeScript, niente n8n.
+
+**Le viste.** Quattro più una: `team_ordini_aperti`, `team_prenotazioni_in_corso`,
+`team_coda_alert`, `team_checklist_pubblicazione`, e `team_pagamenti` che serve
+al rimborso. La prima colonna è sempre *chi deve muoversi e da quanto*
+(«Aspetta l'agenzia da 9 giorni»), la seconda *cosa manca*. Il «da quanto» viene
+da `order_status_history` e non da `updated_at`: un ordine fermo da nove giorni
+a cui il designer ha corretto una virgola della bozza è ancora fermo da nove
+giorni. Le ho guardate girare sui dati dell'harness e ho corretto due cose che
+si leggevano male (una scadenza senza data, un «..» in fondo alle note di
+disputa).
+
+**Il digest e la chiusura, insieme.** Il brief lo chiedeva, e la ragione è
+più forte di come era scritta: quasi tutti i rami scrivono un alert **solo se
+non ce n'è uno aperto dello stesso tipo**. Un alert non chiuso non si limita a
+ripetersi nel digest — **zittisce i successivi**. Quindi chiudere è una spunta
+sulla tabella (`team_alerts.risolto`, un trigger riempie data e autore), quattro
+tipi si chiudono da soli quando il database può verificare che la condizione è
+passata, e il digest separa i nuovi (per esteso, con cosa fare) dai vecchi (una
+riga per tipo, con l'età). Nessuna mail se non c'è niente. **Scartato** il link
+«chiudi» nella mail: gli scanner antispam aprono i link, e un link che chiude al
+GET chiuderebbe tutto da solo. Ho verificato che Studio mostra le viste in sola
+lettura prima di decidere dove mettere la spunta.
+
+**Il catalogo.** `team_alert_kinds`: titolo, costo di ignorarlo (1-4), cosa si
+fa, per ognuno dei 37 tipi che le funzioni scrivono. L'harness legge `pg_proc` e
+fallisce se ne compare uno nuovo non catalogato, come fa già con gli importi.
+
+**Il buco che non cercavo.** Scrivendo le viste ho controllato cosa c'è nei
+messaggi degli alert, e due della 0048 (`calcom_cancellazione_orfana`,
+`calcom_riprogrammazione_orfana`) ci scrivono l'UID Cal.com — la credenziale per
+cancellare una call. Nella tabella resta (è il diario), ma ovunque un messaggio
+esce — viste, digest, e anche la notifica immediata della 0045, riemessa — passa
+da `alert_testo_sicuro()`, che nasconde le sequenze di 16+ caratteri
+alfanumerici non attaccate a un `_`: UID e token sì, UUID e id Stripe no.
+
+**Il rimborso.** Si fa a mano sulla dashboard (deviazione 9), si annota con
+`annota_rimborso('pi_…', centesimi, nota)`. Non si annota da solo anche se
+Stripe manda `charge.refunded`, perché si accompagna a una decisione (rifissare,
+annullare) che resta a una persona: ma se ci si dimentica, l'orologio confronta
+quei messaggi (che il ponte scrive in `event_log` dalla 0044) con quanto
+annotato, e alza `rimborso_non_annotato`. ⚠️ La forma di quel messaggio è quella
+documentata da Stripe: un `charge.refunded` vero non è mai passato di qui. È la
+prova 143.
+
+**Il runbook.** Sei guasti, la procedura di rimborso, e una tabella «cosa NON
+rilanciare» che è la parte che conta di più: soprattutto il *Retry* di
+un'esecuzione vecchia dell'orologio, che rigioca compiti calcolati ore prima.
+Le cinque trappole del 27-28 settembre (seed rieseguito, slug vecchio,
+viaggiatore cancellato, UUID morto, `order by id`) **non erano nel registro**:
+le ho scritte dal brief e dal codice come meccanismo — come ci si ricasca — non
+come cronaca. Se la cronaca di quel giorno dice qualcosa di diverso, va
+corretta lì.
+
+**Non verificato:** nessuna vista vista su Studio, nessun digest arrivato in una
+casella, nessun rimborso vero. Il criterio di questa milestone l'ho scritto in
+`PIANO.md` e non è l'harness: le viste si provano facendole leggere ad
+Alessandro, il runbook seguendolo. Prove 134-146.
+
+---
+
+**28 settembre 2026 — il bottone «Entra con Google» era invisibile**
+
+Su `/accedi`, cioè la porta da cui entrano tutti, la scritta era bianca su
+crema: `bg-brand` e `hover:bg-brand-scuro` erano rimasti dell'8 settembre, e la
+palette allineata al Figma (deviazione 8) quei token non li ha più. Corretto
+con la pillola che `/accedi` usa già nello stato «Sei già dentro»
+(`bg-primario … text-neutro hover:brightness-110`). Anche `/prova` aveva due
+`text-brand`. L'etichetta ora è `text-primario`. La riga «creata dal trigger»
+invece resta in grassetto semplice: era verde per dire «bene», e in rosso
+sarebbe stata uguale a «assente», che le sta accanto.
+
+La correzione è banale. **La lezione no: una classe Tailwind inesistente non
+fallisce, sparisce.** Non la vedono `tsc`, l'harness e `next build`. È la terza
+volta che il progetto viene morso da qualcosa che nessun controllo vede, dopo il
+verso degli assi e l'`Origin: null` del 23 settembre. Ora c'è una guardia
+stretta, `scripts/controlla-classi-morte.mjs`, agganciata come `prebuild`
+(quindi gira anche su Vercel) e lanciabile da sola con `npm run check:classi`.
+Fallisce se in `app/`, `components/` o `lib/` compare `brand` o `brand-scuro`
+come token (`bg-brand`, `hover:…-brand-scuro`, `…-brand/50`,
+`var(--color-brand)`). L'ho provata rimettendo le classi vecchie nel bottone:
+le trova tutte e tre ed esce con 1. **Ho scartato un controllo generico su
+tutte le classi**: sarebbe rumoroso e finirebbe spento. Quando un token cambia
+nome, il vecchio nome si aggiunge a `TOKEN_MORTI`.
+
+Resta la prova con gli occhi, in `PIANO.md`: nessuna guardia dice che un
+bottone *si vede*.
+
+---
+
 **28 settembre 2026 — le pagine ridisegnate sul Figma nuovo (prompt D)**
 
 Tre nodi del file `Q9Krydv6xD8mFJCtU9NHzr`: vetrina `2-743`, viaggi di gruppo

@@ -86,6 +86,7 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0047_all_inclusive.sql` | L'All Inclusive intero: `payment_account()` risponde anche per `deposit` e `balance`, la chiave ristretta dell'agenzia da Vault (`agency_stripe_key`), le regole dell'ordine (`ai_order_rules`: congelamento, acconto calcolato, tempi del saldo, consegna col documento finale), il token monouso dell'agenzia e `agency_decisions`, la pagina e il clic dell'agenzia, la cascata, le due rate nel ponte Stripe (`stripe_checkout_ai`), le pagine del designer e del viaggiatore riemesse con lo smistamento, il documento finale col login (`final_document_for_traveler`), due rami dell'orologio |
 | `0048_tre_event_type_e_gruppi.sql` | Le tre reti sui tre event type (deviazione 10 riscritta): `td_services_one_service_per_slug` (designer + slug unici), `calcom_expected_slugs()` e il ramo nuovo di `td_publish_blockers` sugli slug fuori elenco, il trigger che li vieta su un designer già pubblicato, e `calcom_webhook` riemessa col confronto fra durata dello slot e listino (`calcom_durata_non_combacia`). E `td_group_trips`, i viaggi di gruppo, con la colonna `group_trips` in coda a `public_td_showcase` |
 | `0049_testi_quiz.sql` | Il quiz del viaggiatore da `xpetis_quiz_viaggiatore_.json`: la domanda di ogni asse in `question_it`, le risposte nella colonna nuova `quiz_axis_options.answer_it` (su "con chi viaggi" agganciate alla chiave del form, non al numero), l'ordine nuovo con "con chi viaggi" sesta, e `public_quiz_axes` che in `options` porta la risposta da leggere. Nessun codice, valore o estremo toccato |
+| `0051_slug_viaggi_di_gruppo.sql` | Lo slug stabile dei viaggi di gruppo (`td_group_trips.slug`, stesse regole della 0033, unico per designer) servito in `public_td_showcase.group_trips`, per la pagina `/designer/<designer>/viaggio-di-gruppo/<slug>`; e `public_quiz_axes` che non ricade più su `label_it` quando manca `answer_it` |
 
 ## La geografia
 
@@ -205,6 +206,13 @@ Le risposte già salvate (`quiz_responses.answers`, `{ codice_asse: valore }`)
 restano leggibili: codici e valori non cambiano, cambia solo il testo che le
 racconta.
 
+**Dalla 0051 `public_quiz_axes.options` porta soltanto `answer_it`**, senza
+ricadere su `label_it` quando manca. Una risposta senza testo arriva `null`, e
+il quiz la mostra come buco dichiarato: meglio che mostrare in pagina la chiave
+del form, che è il primo passo perché qualcuno la «corregga». L'harness rigioca
+la 0049 su tabelle popolate, e quel giro riscrive la vista: la prova della 0051
+la rimette dal file prima di guardarla.
+
 ## I servizi
 
 Il form ne offre cinque. `group_trip` e `private_guiding` esistono nell'enum
@@ -299,7 +307,11 @@ campo serve davvero si aggiunge alla vista, con una migration.
 la chiave `gruppo` del form nuovo, con due campi in più — `dates_label` e
 `group_size_label` — e **tutto testo**, come lo dà il form: `"14 – 25 set
 2025"`, `"10 persone"`, `"1.380€"`. Solo vetrina: nessuna cassa, nessun ordine.
-Niente `slug`, perché oggi un viaggio di gruppo non ha una pagina sua. ⚠️ **Un
+**Dalla 0051 ha lo `slug`**, con le regole di `td_ready_itineraries.slug`
+parola per parola (dal titolo all'inserimento, mai toccato da un UPDATE, unico
+per designer, suffisso sulle collisioni): è l'indirizzo della pagina del viaggio
+(Figma `3-1121`). ⚠️ Stabile finché la riga è la stessa: l'importatore, quando
+si scrive, deve aggiornare i viaggi e non cancellarli e reinserirli. ⚠️ **Un
 viaggio di gruppo scade e niente lo nasconde**: con la data come testo il
 database non sa che è passata. Domanda aperta in `PIANO.md`, milestone 3.
 La vista lo espone nella colonna `group_trips`, in coda.
@@ -1159,6 +1171,78 @@ Mail: `order_new_td_ai`, `agency_proposal_confirm`, `agency_confirmed_td`,
 
 **Non c'è**: la chiusura `delivered → completed` (resta al team), i rimborsi via
 API, la riconciliazione mensile, una seconda agenzia.
+
+## Il cruscotto del team (0050)
+
+Il team lavora da **Supabase Studio**, non da un pannello nostro: il cruscotto
+sono viste, scritte per una persona di fretta. Il criterio di tutte è **cosa
+manca perché questa cosa vada avanti**, e chi deve muoversi — non lo stato
+grezzo. Nomi di colonna in italiano, perché le legge il team.
+
+| Vista | Cosa dice |
+|---|---|
+| `team_coda_alert` | Gli alert aperti in ordine di **costo** (1 soldi o cliente, 2 fermo, 3 igiene, 4 da sapere), con titolo, cosa fare e a cosa si riferiscono |
+| `team_ordini_aperti` | Per ogni ordine non chiuso: «Tocca a noi / Aspetta il designer / il viaggiatore / l'agenzia **da N giorni**» e la frase di cosa manca. Il «da quando» è l'ingresso nello stato, da `order_status_history`, non `updated_at` |
+| `team_prenotazioni_in_corso` | Chi deve pagare e entro quando, le call a breve, quelle che si chiudono da sole, quelle in disputa |
+| `team_checklist_pubblicazione` | I designer in fila: pronti da pubblicare (con la riga per farlo), in vetrina con problemi, poi i più vicini al traguardo. I blocchi sono `td_publish_blockers` |
+| `team_pagamenti` | Gli incassi con l'id Stripe (`pi_…`) per cercarli sulla dashboard, e lo stato del rimborso. In cima quelli che Stripe dice rimborsati e noi no |
+| `team_rimborsi_stripe` | Di servizio: per pagamento, quanto Stripe dice rimborsato (da `event_log`) contro quanto abbiamo annotato |
+
+**Cosa non compare, in nessuna:** `cal_booking_uid`, `video_url`, token,
+`client_reference_id` (sulle consulenze **è** l'UID Cal.com), telefoni, email
+dei viaggiatori. Uno screenshot di Studio finisce in una chat. E il messaggio di
+un alert, ovunque esca dalla tabella (vista, digest, notifica immediata), passa
+da `alert_testo_sicuro()`, che nasconde le sequenze con la forma di un UID Cal.com
+o di un token: due alert della 0048 (`calcom_cancellazione_orfana`,
+`calcom_riprogrammazione_orfana`) scrivono l'UID nel testo.
+
+**`team_alert_kinds`** è il catalogo: per ogni `kind` titolo, costo e cosa si
+fa, modificabile da Studio. Un tipo che manca non sparisce (costo 2, «tipo non
+catalogato»), e l'harness legge il sorgente di tutte le funzioni e fallisce se
+un `kind` non è in elenco.
+
+### Chiudere un alert
+
+Una **spunta**: `team_alerts.risolto`, sulla tabella (Studio mostra le viste in
+sola lettura). Il trigger `team_alerts_coerenza` riempie `resolved_at` e
+`resolved_by`, e togliere la spunta riapre. Le funzioni che scrivono
+`resolved_at` (l'orologio, dalla 0042) accendono la spunta. Per un tipo intero,
+`chiudi_alert(kind, nota)`.
+
+⚠️ **Chiudere riarma.** Quasi tutti i rami scrivono un alert solo se non ce n'è
+uno aperto dello stesso tipo: un alert lasciato aperto zittisce i successivi.
+
+`clock_ramo_alert_superati()` chiude da solo quelli la cui condizione il
+database sa verificare: `ordine_richiesto` (l'ordine è uscito da `requested`),
+`verifica_agenzia_scaduta` (uscito dalla verifica, o link rinnovato),
+`saldo_scaduto` (non più `awaiting_balance`), `rimborso_non_annotato`
+(annotato). Le firme rifiutate no: che smettano di arrivare non vuol dire che il
+designer sia stato sistemato.
+
+### Il digest
+
+Un ramo dell'orologio, `clock_ramo_digest_team()`, per ultimo nel giro. Una
+volta al giorno dopo `app_config.team_digest_hour` (ora di Roma; negativa =
+spento), agli indirizzi di `team_notify_recipients`, accodato come ogni mail.
+`team_digests` è unica per data: è l'idempotenza e l'entità della mail. I nuovi
+(dopo il digest precedente) per esteso, con cosa fare; i vecchi in una riga per
+tipo con l'età del più vecchio. **Nessuna mail se non c'è niente di aperto.**
+Testo in `message_templates.team_digest`.
+
+`ordine_richiesto` **non** diventa immediato: resta `team_notify_events =
+'ordine_pagato'`. Accenderlo è una parola: `'ordine_pagato, ordine_richiesto'`.
+
+### I rimborsi
+
+Si fanno a mano sulla dashboard Stripe dell'agenzia (deviazione 9: la chiave è
+ristretta e non rimborsa). Si annotano con
+`annota_rimborso('pi_…' | id di payments, centesimi di QUESTO rimborso, nota)`,
+che aggiorna `payments` (e la prenotazione, per una consulenza) e **non** cambia
+lo stato di prenotazione o ordine: quella è la decisione che accompagna il
+rimborso. Se ci si dimentica, `clock_ramo_rimborsi_non_annotati()` confronta i
+`charge.refunded` che il ponte mette in `event_log` dalla 0044 con
+`refund_amount_cents`, e alza `rimborso_non_annotato`. La procedura intera è in
+`RUNBOOK.md`.
 
 ## La pubblicazione di un profilo
 

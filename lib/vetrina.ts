@@ -101,12 +101,13 @@ export type ItinerarioPronto = {
  * interpretano — chi mostra non indovina. Sono vetrina: nessuna cassa, nessun
  * ordine nasce da qui.
  *
- * **Non c'è uno slug**, e quindi non c'è una pagina: il nodo Figma 3-1121 ne
- * disegna una per viaggio, ma un indirizzo stabile vuole una colonna che
- * `td_group_trips` non ha (è la storia della 0033 per gli itinerari). Finché
- * non si decide, la card in vetrina non ha tasto.
+ * **Lo slug è dalla 0051**, ed è la ragione per cui la pagina del viaggio
+ * (Figma `3-1121`) esiste: come per gli itinerari (0033), nasce dal titolo al
+ * primo inserimento e non si muove più, né correggendo il titolo né
+ * riordinando i viaggi.
  */
 export type ViaggioDiGruppo = {
+  slug: string
   title: string
   dates_label: string | null
   duration_label: string | null
@@ -145,6 +146,23 @@ export function trovaItinerario(
 ): ItinerarioPronto | null {
   if (!slug) return null
   return itinerari.find((i) => i.slug === slug) ?? null
+}
+
+/**
+ * L'indirizzo della pagina di un viaggio di gruppo, e il modo di risolverlo:
+ * il gemello di `percorsoItinerario` / `trovaItinerario`, con lo stesso
+ * contratto. Nell'URL c'è lo slug del viaggio (0051), mai la sua posizione.
+ */
+export function percorsoViaggioDiGruppo(slugDesigner: string, slugViaggio: string): string {
+  return `/designer/${slugDesigner}/viaggio-di-gruppo/${slugViaggio}`
+}
+
+export function trovaViaggioDiGruppo(
+  viaggi: ViaggioDiGruppo[],
+  slug: string | undefined,
+): ViaggioDiGruppo | null {
+  if (!slug) return null
+  return viaggi.find((v) => v.slug === slug) ?? null
 }
 
 export type Vetrina = {

@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { PrenotaConsulenza } from '@/components/prenota-consulenza'
+import { serviziDopoLaCall } from '@/components/dopo-la-call'
 import {
   formattaPrezzo,
   siCompraInVetrina,
@@ -10,7 +11,17 @@ import {
 
 /**
  * La scheda bianca della vetrina, dentro la fascia hero (Figma nuovo
- * `Q9Krydv6xD8mFJCtU9NHzr`, nodo 18:5792 della vetrina 2-743).
+ * `Q9Krydv6xD8mFJCtU9NHzr`: nodo 18:5792 della vetrina 2-743, rivisto nella
+ * 72-48 del 29 settembre).
+ *
+ * ## 29 settembre: la revisione `72-48`
+ *
+ * Un cambio di forma solo: **"E dopo l'incontro?" esce dalla scheda** e diventa
+ * un riquadro suo sotto la presentazione (`components/dopo-la-call.tsx`, che la
+ * pagina mette accanto). Nella scheda resta la riga del credito, spostata sotto
+ * il tasto. Il tasto, `calLink`, la guardia su `cal_username` e la chiamata a
+ * `PrenotaConsulenza` sono le stesse righe: `prenota-consulenza.tsx` e
+ * `lib/cal-embed.ts` non sono stati toccati nemmeno stavolta.
  *
  * ## Cosa è cambiato col Figma del 27 settembre, e cosa no
  *
@@ -19,8 +30,8 @@ import {
  * compariva solo sui due acquistabili e sugli altri c'era una frase. Il disegno
  * nuovo dà ragione al Flusso (§3) da sé: **il selettore ha solo le due
  * consulenze** — breve e approfondita, deviazione 10 — e i servizi che si
- * comprano dopo la call diventano quattro riquadri non cliccabili sotto il
- * tasto, "E dopo l'incontro?". Il selettore mostra l'approfondita solo a chi la
+ * comprano dopo la call diventano quattro riquadri non cliccabili, "E dopo
+ * l'incontro?" (dal 29 settembre fuori dalla scheda). Il selettore mostra l'approfondita solo a chi la
  * offre: un designer senza approfondita ha una pillola sola.
  *
  * **Il comportamento, no.** Il tasto *Prenota la call* è sempre
@@ -78,23 +89,6 @@ const PILLOLA: Partial<Record<TipoServizio, string>> = {
 }
 
 /**
- * I quattro riquadri di "E dopo l'incontro?", nell'ordine del disegno. Titolo e
- * riga sono testo del Figma: li rivede Gaia, come ogni testo di prodotto.
- *
- * Compare **solo quello che il designer ha attivo**: il Figma ne disegna
- * quattro perché disegna un designer che li ha tutti. Mostrare "Viaggio privato
- * con me" a chi non accompagna sarebbe promettere un servizio che la mail
- * post-call non offrirà mai, perché i suoi bottoni nascono da quegli stessi
- * servizi attivi.
- */
-const DOPO_LA_CALL: { tipo: TipoServizio; titolo: string; riga: string }[] = [
-  { tipo: 'custom_itinerary', titolo: 'Itinerario su misura', riga: 'Ti scrivo il viaggio giorno per giorno' },
-  { tipo: 'all_inclusive', titolo: 'All inclusive', riga: 'Progetto e prenoto il viaggio' },
-  { tipo: 'group_trip', titolo: 'Viaggio di gruppo', riga: 'Piccoli gruppi su date fisse' },
-  { tipo: 'private_guiding', titolo: 'Viaggio privato con me', riga: 'Vengo con te sul posto' },
-]
-
-/**
  * Le pillole con l'icona ("30 minuti", "Videocall").
  *
  * Larghezza e altezza vanno passate una per icona e mai date per uguali: gli
@@ -138,7 +132,7 @@ export function BoxServizio({
 }: Props) {
   const prezzo = formattaPrezzo(attivo.price_cents)
   const acquistabili = servizi.filter((s) => siCompraInVetrina(s.service_type))
-  const dopoLaCall = DOPO_LA_CALL.filter((d) => servizi.some((s) => s.service_type === d.tipo))
+  const dopoLaCall = serviziDopoLaCall(servizi)
 
   // Il link dell'embed esiste solo se esistono entrambi i pezzi. Un servizio
   // acquistabile senza calendario collegato è una riga incompleta che il team
@@ -246,59 +240,42 @@ export function BoxServizio({
         </p>
       )}
 
-      {/* ------------------------------------------------ E dopo l'incontro?
-          Presentazione, non vendita: nessun riquadro è un link, perché nessuno
-          di questi servizi si compra da qui. Il Flusso li fa nascere dopo la
-          consulenza, dai bottoni della mail post-call. */}
-      {dopoLaCall.length > 0 && (
-        <div className="mt-6 border-t border-dashed border-scuro pt-5">
-          <h3 className="font-titoli text-[12px] font-bold leading-snug">
-            E dopo l&apos;incontro? Decidete insieme se continuare.
-          </h3>
-          <p className="mt-3 text-piccolo leading-[1.25]">
-            L&apos;incontro serve anche a capire se siete la combinazione giusta per quel viaggio.
-            Poi scegli come proseguire:
-          </p>
+      {/* Il credito consulenza (Flusso §6): quello che si paga per la call
+          si scala dal primo servizio comprato dopo. **Il sito lo dice, non lo
+          calcola**: lo applica il designer nella proposta, e il numero qui è
+          solo il prezzo di questa scheda. Senza prezzo (su preventivo) la frase
+          non avrebbe un numero da dire, e senza servizi dopo la call non
+          avrebbe da dove scalarlo: in entrambi i casi sparisce.
 
-          <ul className="mt-4 grid grid-cols-2 gap-[5px]">
-            {dopoLaCall.map((d) => (
-              <li key={d.tipo} className="rounded-[5px] bg-crema px-[11px] py-[10px] text-piccolo leading-[1.25]">
-                <p className="font-bold">{d.titolo}</p>
-                <p>{d.riga}</p>
-              </li>
-            ))}
-          </ul>
-
-          {/* Il credito consulenza (Flusso §6): quello che si paga per la call
-              si scala dal primo servizio comprato dopo. **Il sito lo dice, non
-              lo calcola**: lo applica il designer nella proposta, e il numero
-              qui è solo il prezzo di questa scheda. Senza prezzo (su
-              preventivo) la frase non avrebbe un numero da dire, e sparisce.
-              Il simbolo è il "$" del Figma anche se la valuta è l'euro: è un
-              asset, e si cambia nel disegno. */}
-          {prezzo && (
-            <p className="mt-3 flex items-center gap-4 rounded-[10px] bg-primario/30 py-2 pl-[7px] pr-3 text-piccolo leading-[1.25]">
-              <span className="relative grid size-[29px] shrink-0 place-items-center">
-                <Image
-                  src="/img/credito-cerchio.svg"
-                  alt=""
-                  width={29}
-                  height={29}
-                  className="absolute inset-0 size-[29px]"
-                />
-                <Image
-                  src="/img/credito-simbolo.svg"
-                  alt=""
-                  width={7.798}
-                  height={12.39}
-                  style={{ width: 7.798, height: 12.39 }}
-                  className="relative"
-                />
-              </span>
-              I {prezzo} dell&apos;incontro verranno scalati dal costo del servizio che sceglierai
-            </p>
-          )}
-        </div>
+          Figma `72-48`: la riga sta **sotto il tasto**, su fondo bianco, e i
+          riquadri dei servizi sono usciti dalla scheda (`dopo-la-call.tsx`).
+          Il simbolo è il "$" del disegno anche se la valuta è l'euro. Nel
+          `72-48` è più grande (12×18 invece di 7,8×12,4): non riscaricato, il
+          connettore Figma aveva finito le chiamate — resta quello di prima. */}
+      {prezzo && dopoLaCall.length > 0 && (
+        <p className="mb-6 mt-[27px] flex items-center gap-[15px] text-[12px] leading-[1.25]">
+          <span className="relative grid size-[29px] shrink-0 place-items-center">
+            <Image
+              src="/img/credito-cerchio.svg"
+              alt=""
+              width={29}
+              height={29}
+              className="absolute inset-0 size-[29px]"
+            />
+            <Image
+              src="/img/credito-simbolo.svg"
+              alt=""
+              width={7.798}
+              height={12.39}
+              style={{ width: 7.798, height: 12.39 }}
+              className="relative"
+            />
+          </span>
+          <span className="max-w-[307px]">
+            I {prezzo} dell&apos;incontro verranno scalati dal costo del servizio che eventualmente
+            sceglierai
+          </span>
+        </p>
       )}
     </div>
   )

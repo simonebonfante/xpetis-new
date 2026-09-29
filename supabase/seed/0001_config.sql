@@ -375,7 +375,7 @@ on conflict (key) do nothing;
 insert into app_config (key, value, value_text, config_group, label_it, notes) values
   ('team_notify_recipients', null, '', 'integrations',
    'Chi riceve le notifiche interne del team (indirizzi separati da virgola)',
-   'Deciso il 23 settembre 2026: gli amministratori, cioè Simone, Alessandro e Andrea. Una mail per indirizzo, accodata come tutte le altre: valgono email_enabled e email_redirect_to. Vuota = nessuna notifica, e al primo evento in elenco un alert lo dice.'),
+   'Deciso il 23 settembre 2026: gli amministratori, cioè Simone, Alessandro e Andrea. ⚠️ Il 28 settembre Simone ha confermato che per la Beta restano i TRE INDIRIZZI PERSONALI, e che poi si passerà a una casella dedicata (team@xpetis.it o simile). Finché è così: quando entra una persona nuova va aggiunta a mano qui, e nessuno sa chi ha già guardato cosa — il digest non tiene traccia di chi ha letto. Una mail per indirizzo, accodata come tutte le altre: valgono email_enabled e email_redirect_to. Vuota = nessuna notifica, e al primo evento in elenco un alert lo dice.'),
   ('team_notify_events', null, 'ordine_pagato', 'integrations',
    'Di quali eventi si avvisa il team per mail (nomi separati da virgola)',
    'Un nome è il kind di un alert di team_alerts (es. ordine_richiesto) oppure ordine_pagato. Aggiungerne uno è tutto quello che serve: nessun deploy. NON metterci gli alert di igiene operativa: una mail per ogni anomalia insegna al team a ignorarle. Vuota = nessun evento.')
@@ -430,4 +430,21 @@ insert into app_config (key, value, value_text, config_group, label_it, notes) v
   ('calcom_slugs_consultation_deep', null, 'consulenza-xpetis-60, consulenza-xpetis-90', 'integrations',
    'Slug Cal.com ammessi per la consulenza approfondita',
    'Da 60 oppure 90 minuti, solo per chi la offre. Separati da virgola. Lo slug deve corrispondere alla durata scritta nel servizio: se non combacia, lo dice il ponte alla prima prenotazione (alert calcom_durata_non_combacia).')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Il digest giornaliero del team (migration 0050)
+-- ---------------------------------------------------------------------------
+-- Una mail al giorno agli indirizzi di `team_notify_recipients`, con gli alert
+-- aperti: i nuovi per esteso, i vecchi in una riga per tipo. Parte al primo
+-- giro dell'orologio dopo quest'ora (ora di Roma), e **non parte se non c'è
+-- niente da dire**. Negativa = spento per scelta; assente = l'orologio lo
+-- segnala come ramo non configurato.
+--
+-- ⚠️ Il digest vive se gli alert si chiudono: su Studio, tabella
+-- `team_alerts`, colonna `risolto`. Senza, ripete gli stessi ogni mattina.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('team_digest_hour', 8, null, 'integrations',
+   'Ora del digest giornaliero degli alert (0-23, ora di Roma; negativa = spento)',
+   'Stima, da confermare con chi lo legge. Il digest parte al primo giro dell''orologio dopo quest''ora, una volta al giorno (team_digests è unica per data), agli indirizzi di team_notify_recipients. Se non ci sono alert aperti non parte niente.')
 on conflict (key) do nothing;

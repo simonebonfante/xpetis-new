@@ -403,6 +403,55 @@ verdi.
 5. 🔴 **Le prove nel browser 121-133** sono tue: io non ho aperto una pagina.
 
 
+**Aggiornamento del 29 settembre 2026 — la milestone 9, il cruscotto del team.**
+`0050_cruscotto_team.sql` e `RUNBOOK.md`. Harness verde, **62 asserzioni nuove**.
+Nessuna riga di TypeScript e nessun workflow n8n toccati: il digest è un
+ramo dell'orologio.
+
+1. ✅ **Quattro viste operative su Studio** (`team_ordini_aperti`,
+   `team_prenotazioni_in_corso`, `team_coda_alert`,
+   `team_checklist_pubblicazione`) più `team_pagamenti`. Dicono chi deve
+   muoversi e cosa manca, non lo stato grezzo.
+2. ✅ **Chiudere un alert è una spunta** (`team_alerts.risolto`), e quattro tipi
+   si chiudono da soli. ⚠️ Chiudere riarma: un alert lasciato aperto zittisce i
+   successivi dello stesso tipo — è scritto nel digest stesso.
+3. ✅ **Il digest giornaliero**, alle 8 (stima, `team_digest_hour`), solo se c'è
+   qualcosa di aperto. `ordine_richiesto` resta **non** immediato.
+4. ✅ **Il rimborso**: a mano sulla dashboard, annotato con una riga
+   (`annota_rimborso`), e se non si annota lo dice l'orologio.
+5. 🔴 **Trovato e chiuso un buco**: due alert della 0048 scrivevano nel
+   messaggio l'UID Cal.com, cioè la credenziale per cancellare una call. Da
+   oggi non esce da nessuna vista, digest o notifica.
+6. 🔴 **Le prove vere sono tue e di Alessandro**: le viste si provano facendole
+   leggere, il runbook seguendolo. Prove 134-146 in milestone 9.
+
+**Aggiornamento del 29 settembre 2026 — le ultime pagine sul Figma nuovo.**
+Quattro nodi (home `1-14`, quiz `2-2`, viaggio di gruppo `3-1121`, vetrina
+`72-48`). `0051_slug_viaggi_di_gruppo.sql`, harness verde a **1002 prove ok**,
+build verde. Dettaglio in milestone 3, «Le ultime pagine».
+
+1. ⛔ **Homepage: mi sono fermato su una sezione.** Uguale al disegno tranne
+   «Come puoi viaggiare con XPETIS», che il Figma **ristruttura** (etichette,
+   titoli-domanda, testi nuovi, un link per card verso due pagine che non
+   esistono). Non l'ho riscritta: **decidi tu**. Allineata solo la riga
+   «Affidarti a un Travel Designer significa».
+2. ✅ **Quiz: stesso disegno**, più «Concludi» sull'ultima. ⚠️ **Il Figma mette
+   «con chi viaggi» terza, i dati sesta**: vince la 0049. La sesta ha cinque
+   risposte, e dalla 0051 la vista non mostra mai la chiave del form.
+3. ✅ **Il viaggio di gruppo ha la sua pagina**, con lo slug della 0051. Si
+   vede **solo quello che il form dà**: tre sezioni del disegno non ci sono.
+   Niente «Acquista il posto».
+4. ✅ **Vetrina: `72-48` è una revisione di `2-743`**, cambia solo la fascia
+   hero («E dopo l'incontro?» esce dalla scheda). ⚠️ **`box-servizio.tsx`
+   stavolta è toccato** — tolto il blocco spostato, la riga del credito sotto il
+   tasto. Nessuna riga del funnel: `prenota-consulenza.tsx` e `lib/cal-embed.ts`
+   a zero righe.
+5. ⚠️ **Il connettore Figma ha finito le chiamate a metà**: quattro icone del
+   riquadro «E dopo l'incontro?» non scaricate, la pagina ne fa a meno.
+6. 🔴 **Prima delle prove, applica la `0051`** (`supabase db push`). Senza, le
+   card dei viaggi di gruppo restano senza tasto e le pagine rispondono 404.
+   Prove 147-160 in milestone 3.
+
 ### Cosa resta a te
 
 - ~~🔴 **COMMITTARE**~~ → **fatto il 18 settembre 2026**, commit `be2e668`
@@ -617,6 +666,12 @@ verdi.
   l'8** con un pagamento vero in sandbox. Endpoint, `whsec_` in Vault e workflow
   n8n sono a posto. Il passaggio al conto dell'agenzia resta la riga
   `app_config.consultation_stripe_account`, come previsto.
+- 🔴 **Aprire `/accedi` da scollegato e vedere il bottone «Entra con Google»**
+  (28 settembre 2026, dieci secondi). Era bianco su crema per un `bg-brand` che
+  il tema non ha più; ora è la pillola rossa di `/accedi` stesso. Nessuno
+  strumento può fare questa prova al posto tuo: la guardia nuova
+  (`scripts/controlla-classi-morte.mjs`, gira prima di ogni `npm run build`)
+  impedisce solo che *quei* nomi tornino.
 - **Guardare le quattro pagine accanto al Figma** e dirmi cosa non torna: è la
   cosa che vale più di tutte adesso, perché io non ho un browser e le pagine sono
   verificate sul dato, non sull'occhio.
@@ -647,6 +702,34 @@ verdi.
 5. Chiudere la milestone 3 dalla mia parte: ricerca accento-insensibile
    ("peru" non trova "Perù"), maschera contestuale dei filtri, test del match sui
    25 profili.
+
+---
+
+## Come si leggono le tabelle delle prove
+
+**Deciso il 28 settembre 2026.** In questo file ci sono oltre **130 prove
+numerate**, e meno della metà risulta eseguita. **Non è debito, ed è importante
+non leggerlo così.**
+
+Quelle tabelle sono nate una alla volta, ognuna insieme al lavoro che
+descriveva, e insieme elencano *ogni* caso storto che qualcuno ha immaginato
+mentre scriveva quel pezzo. Provarle tutte in fila non succederà e non serve:
+sono una **suite di regressione**. Si rigioca la sezione che riguarda la zona
+che si è appena toccata, non l'insieme.
+
+**La prova che conta, e che si rifà per intera, è il giro A→Z**: dalla ricerca
+alla consegna, passando per login, embed Cal.com, pagamento della consulenza,
+orologio, mail post-call, ordine, proposta, secondo pagamento, consegna del file
+e revisione. Sono una quindicina di gesti e circa un'ora.
+
+**Eseguito e passato integralmente il 28 settembre 2026**, con i tre punti di
+controllo — dopo ogni pagamento e dopo la mail — tutti puliti e `team_alerts`
+vuoto. È la prova che il prodotto sta in piedi da capo a fondo; le tabelle sono
+la memoria di cosa può rompersi nei singoli pezzi.
+
+⚠️ Quando si tocca una zona, **si rigioca la sua sezione di prove e si segna**.
+Una prova dichiarata passata senza essere stata fatta vale meno di una
+dichiarata non eseguita.
 
 ---
 
@@ -1334,7 +1417,7 @@ match sui 25 profili) e una fila di domande che aspettano te o Chiara.
 - [ ] **[S]** ⚠️ **Ricontrollare i tre designer onboardati con la regola
       vecchia**, seguendo `ONBOARDING_CALCOM_TD.md` §8. Nessuno dei loro dati è
       ancora a database, quindi oggi nessuna rete li ha guardati
-- [ ] **[S]** I nodi di **home, ricerca e quiz** sul file Figma nuovo
+- [~] **[S]** I nodi di **home, ricerca e quiz** sul file Figma nuovo → home `1-14` e quiz `2-2` arrivati il 29 settembre. **Manca la ricerca**
 
 **❓ Domande aperte**
 
@@ -1456,8 +1539,9 @@ stata ritoccata da Studio: **non forzare**, il messaggio dice quale.
       sono nuove (il bollo del credito). Home, ricerca, quiz, header e footer
       restano dichiarati «file vecchio»
 - [x] **[C]** Nessuna migration, nessuna vista nuova. Build verde, harness verde
-- [ ] **[S]** ⛔ **La pagina del viaggio di gruppo (`3-1121`) non è costruita, e
-      mi sono fermato apposta.** Il nodo è **una pagina per viaggio** (filo di
+- [x] **[S]** ~~⛔ **La pagina del viaggio di gruppo (`3-1121`) non è costruita, e
+      mi sono fermato apposta.**~~ → **costruita il 29 settembre** con la `0051`
+      (vedi «Le ultime pagine sul Figma nuovo»). Il testo di allora: Il nodo è **una pagina per viaggio** (filo di
       briciole «Viaggi di gruppo > Argentina: Trekking in Patagonia», «Altri
       viaggi di gruppo» in fondo), quindi vuole un indirizzo stabile, e
       `td_group_trips` uno slug non ce l'ha. È la stessa storia della `0033`: un
@@ -1482,7 +1566,7 @@ finché non si ha il nodo della ricerca sul file nuovo.
 | Il terzo gruppo di filtri («Quale tipo di supporto cerchi?») | Ricerca | **Aperta** |
 | Il «4.6» sulla foto e la sezione recensioni | Ancora disegnati, con testi d'esempio | **Aperta** (milestone 8): restano fuori, non esistono recensioni |
 | «Membro XPETIS» | Ridisegnata, con «1 anno» | **Resta fuori.** Ridisegnarla non decide di esporre `joined_at`: se la vuoi, è una colonna in `public_td_showcase`, cioè una migration |
-| Come si mostrano i viaggi di gruppo | Disegnati: sezione in vetrina + pagina per viaggio | **Chiusa la sezione** (la sorgente è la 0048). **Aperta la pagina**, per lo slug |
+| Come si mostrano i viaggi di gruppo | Disegnati: sezione in vetrina + pagina per viaggio | **Chiuse tutte e due**: la sezione dalla 0048, la pagina dal 29 settembre con lo slug della 0051 |
 | «Acquista l'itinerario» nella fascia scura | Ancora lì, identico | **Aperta**: vince il Flusso, il tasto non c'è |
 | Le sezioni dell'itinerario senza sorgente (tappe, informazioni utili, tappe principali, galleria a tre, paese, descrizione lunga) | Ancora tutte lì | **Chiusa il 23 agosto** (il form non si tocca): il disegno nuovo non cambia niente |
 | La riga di tag dei viaggi firma | Ancora «America Latina / 18 mesi / In solitaria», per viaggio | **Aperta**: il form non li raccoglie per viaggio, restano i paesi del designer |
@@ -1556,6 +1640,159 @@ esiste nel seed un designer senza viaggi di gruppo**, né uno senza
 | 131 | Da `/ricerca` con una destinazione e un filtro, apri una vetrina, scorri in fondo, «Torna ai risultati» | Torni alla **stessa** lista, filtri compresi. Aperta da un link diretto, lo stesso tasto porta a `/ricerca` | — |
 | 132 | «Prenota una call con …» (sotto i viaggi firma) e «Prenota la call con …» (in fondo) | Portano alla scheda della call in cima | Ancora `#servizi` |
 | 133 | Guarda le due pagine accanto al Figma, su telefono e su desktop | Dimmi cosa non torna | La hero va su tre colonne solo sopra i 1400 px; sotto, la scheda della call scende sotto la storia |
+
+### Le ultime pagine sul Figma nuovo (29 settembre 2026)
+
+Quattro nodi del file `Q9Krydv6xD8mFJCtU9NHzr`, verificati da Simone: home
+`1-14`, quiz `2-2`, viaggio di gruppo `3-1121`, vetrina `72-48`. Letti col
+connettore dopo la skill design-to-code, finché il connettore ha risposto (vedi
+sotto).
+
+- [x] **[C]** **Homepage `1-14` controllata, non rifatta.** Uguali: header,
+      hero (foto byte per byte), «Il valore di un viaggio», chiusura, footer.
+      Allineata: «Affidarti a un Travel Designer significa» — titoletto
+      Merriweather 28 invece di una riga di testo, card alte 86, le icone nuove
+      dentro un tondo rosso al 20%
+- [ ] **[S]** ⛔ **«Come puoi viaggiare con XPETIS» non l'ho toccata: la
+      struttura è cambiata**, e la regola del prompt era fermarsi. Il disegno
+      nuovo, card per card: un'etichetta maiuscola («CONSULENZA E ITINERARIO SU
+      MISURA», «ITINERARI PRONTI», «VIAGGI DI GRUPPO»), un titolo-domanda rosso
+      («Hai già in mente una destinazione? Costruiscila con il Travel
+      Designer.»), un testo nuovo, **niente elenco puntato**, e un link in fondo:
+      «→ Trova il tuo Travel Designer», «→ Scopri gli itinerari», «→ Scopri i
+      viaggi di gruppo». Cambia anche il testo sotto il titolo («Ogni viaggio
+      parte da una persona…»). **Due dei tre link portano a pagine che non
+      esistono**: non c'è un indice degli itinerari pronti né dei viaggi di
+      gruppo fra designer diversi (sono una lettura nuova, cioè una vista
+      nuova). Se la vuoi rifatta: dimmi dove vanno i due link, o se si
+      costruiscono senza
+- [x] **[C]** ⚠️ **Il tasto «Iscriviti» non esiste, per tua decisione.** Il
+      Figma lo disegna nell'header di **ogni** pagina del file nuovo, accanto ad
+      «Accedi». Non si costruisce e non si lascia spento: se fra un mese qualcuno
+      lo vede nel disegno e lo aggiunge, è contro questa riga. Scritto anche in
+      `components/header.tsx` e in `CLAUDE.md`
+- [x] **[C]** **Quiz `2-2`: lo stesso impianto al pixel** — card, foto (stessa
+      sorgente, stesso ritaglio), barra, stella, frecce (byte per byte). Una
+      differenza: l'ultima schermata dice **«Concludi»**, ora anche da noi. I
+      testi del disegno combaciano con `answer_it` riga per riga (salvo un «”»
+      di troppo nel Figma alla quinta domanda: vincono i dati)
+- [x] **[C]** **Quattro risposte su cinque domande, cinque sulla sesta.** Il
+      componente non contava già il quattro: le risposte vengono dalla scala
+      dell'asse (`scale_min`…`scale_max`). L'harness ora prova che «con chi
+      viaggi» è `categorical`, scala 1-5, sesta, con le cinque parole del quiz,
+      e che i continui sono tutti a quattro
+- [x] **[C]** **`0051`: `public_quiz_axes` non ricade più su `label_it`.** Una
+      risposta senza testo arriva `null` e il quiz la mostra come buco
+      («etichetta da scrivere»), non come «Viaggiatore solo». È la chiave che
+      l'import dei 25 riconosce, e una chiave che si vede in pagina è una chiave
+      che qualcuno prima o poi «migliora»
+- [x] **[C]** **`0051`: `td_group_trips.slug`**, stesse regole della 0033 parola
+      per parola, servito nella vetrina. **La pagina del viaggio di gruppo**,
+      `/designer/<designer>/viaggio-di-gruppo/<slug>`, e le card della vetrina
+      che ci portano («Ottieni maggiori informazioni»). Senza la 0051 applicata
+      le card restano senza tasto, invece di puntare a `/undefined`
+- [x] **[C]** **Vetrina `72-48` confrontata con `2-743`**: è una **revisione**
+      (id dei nodi successivi), non una variante. Sotto «Cosa vuol dire
+      viaggiare per me» i due nodi sono lo stesso disegno. Le differenze, tutte
+      nella fascia hero: (1) «E dopo l'incontro?» **esce dalla scheda della
+      call** e diventa un riquadro crema sotto la storia, con riquadri grandi e
+      titoli in Merriweather; (2) la riga del credito resta nella scheda, **sotto
+      il tasto**, su fondo bianco, e dice «che **eventualmente** sceglierai»; (3)
+      la scheda scende di 122 px, sotto il nome; (4) la storia si stringe da 455
+      a 428. Solo queste, aggiornate
+- [x] **[C]** ⚠️ **`box-servizio.tsx` stavolta è toccato, ed ecco perché**: il
+      blocco «E dopo l'incontro?» ci viveva dentro, e il disegno lo porta fuori.
+      È uscito in `components/dopo-la-call.tsx`; la riga del credito è scesa
+      sotto il tasto. **Nella diff nessuna riga di codice** su `calLink`, la
+      guardia su `cal_username`, `PrenotaConsulenza`, `utente` o
+      `percorsoVetrina`: solo commenti. `prenota-consulenza.tsx` e
+      `lib/cal-embed.ts`: `git diff` vuoto
+- [x] **[C]** La scheda del designer (foto, headline, nome) è uscita
+      dall'itinerario pronto in `components/scheda-designer.tsx`, perché la
+      pagina del viaggio di gruppo la disegna uguale. Stesse righe
+- [ ] **[S]** ⚠️ **Il connettore Figma ha esaurito le chiamate** (piano
+      Starter) dopo home, quiz e viaggio di gruppo. Della vetrina `72-48` ho la
+      struttura completa e lo screenshot 1:1, ma non il design context del
+      riquadro nuovo: **misure dai metadati, corpi dei testi stimati dallo
+      screenshot** (titolo 36, titoli dei riquadri 22, righe 14). E mancano
+      **i quattro segni delle icone** dei riquadri (nodi 72:515, 72:535,
+      72:540, 72:545): il riquadro è senza icone, e lo script degli asset lo
+      dice. Anche il «$» del credito nel `72-48` è più grande (12×18): resta
+      quello di prima. Da riprendere quando il limite si azzera
+
+**❓ Domande nuove**
+
+- ❓ **Il prezzo sul riquadro «Itinerario su misura»** («50€» nel `72-48`).
+  **Non l'ho messo**: il form dà un prezzo solo per la call, e il su misura lo
+  prezza il designer nella proposta, già al netto del credito. Un numero lì non
+  ha sorgente e la proposta potrebbe smentirlo. Che il «50€» sia lo stesso della
+  call fa pensare a un segnaposto del disegno. Per Chiara e Alessandro
+- ❓ **La pagina del viaggio di gruppo mostra i sei campi, e basta.** Non ci
+  sono, per mancanza di sorgente: **«Questo viaggio fa per me?»** (sei temi a
+  stelle: Natura, Trekking, On the Road, City, Cultura, Chill), **«Le tappe del
+  viaggio»** (giorni, titolo, descrizione per tappa), **«Informazioni utili»**
+  (valigia, cosa comprende la quota, sanità e visti), **«Fascia d'età»**, la
+  riga **«volo non incluso • IVA inclusa»**, **il paese**, **la descrizione
+  lunga** e **la galleria a tre**. Servirebbe, per ciascuna, un campo nel form
+  Vetrina TD (per viaggio, non per designer): per «fa per me?» sei voti 1-5 e
+  l'elenco chiuso dei temi; per le tappe una lista di (giorni, titolo, testo);
+  per le informazioni tre testi; età minima e massima; cosa comprende il prezzo;
+  il paese dalla tassonomia; più foto. **Per Alessandro**: si allarga il form o
+  la pagina resta così?
+- ❓ **«Acquista il posto» non c'è.** Il Flusso non prevede di comprare un
+  viaggio di gruppo dal sito; il Figma sì. Resta la domanda di prima, ora con
+  la pagina costruita. Per Alessandro e Andrea
+- ❓ **«Contatta il Travel Designer» l'ho scritto «Prenota una call con …»**, e
+  porta alla scheda della call. Il designer non ha un contatto pubblico
+  (principio 1): l'unica porta verso di lui è la consulenza, che si paga, e un
+  tasto «contatta» che apre una prenotazione a pagamento promette una cosa e ne
+  fa un'altra. Se il viaggio di gruppo deve avere un contatto diverso (una
+  mail del team, WhatsApp), è una decisione. Per Alessandro e Gaia
+- ❓ **Le date sulla card del viaggio di gruppo**: le avevo aggiunte il 28 perché
+  la pagina non c'era. Ora le date stanno anche nella pagina, e il Figma della
+  card non le mostra. Le lascio per l'altra ragione (una partenza passata si
+  vede passata sulla vetrina). Toglierle? Per Chiara
+- ❓ **L'importatore dei 25**, quando si scriverà, deve **aggiornare** i viaggi di
+  gruppo e gli itinerari per titolo, non cancellarli e reinserirli: lo slug
+  nasce all'inserimento, e con un titolo cambiato nel frattempo il link già
+  dato su WhatsApp morirebbe. Nota per chi lo scrive
+- ❓ **Il frame «Risultati» (`2-315`)** c'è sul file nuovo, ma nessuno l'ha
+  indicato come la ricerca. Non l'ho usato. È quello?
+
+**🔴 Le prove nel browser (29 settembre 2026)**
+
+**Prima, sul database di sviluppo:** `supabase db push` — la
+`0051_slug_viaggi_di_gruppo.sql`. Non l'ho applicata io. Aggiunge una colonna e
+riempie gli slug dei sei viaggi del seed; se si ferma, non forzare e dimmi il
+messaggio.
+
+**Cosa ho verificato io, e cosa no.** Harness verde (l'ordine degli slug, le
+collisioni, il riordino e il titolo che non li muovono, la vista del quiz senza
+ricaduta). Build verde con la guardia dei token morti. Con `curl` sul database
+di sviluppo **senza la 0051**: home, quiz, vetrine e itinerario rispondono 200;
+la vetrina ha il riquadro «E dopo l'incontro?», la riga del credito, una pillola
+per Marco e due per Giulia; le card di gruppo **senza tasto** e nessun link a
+`/undefined`; la pagina del viaggio risponde 404, come deve senza slug. **Non ho
+visto la pagina del viaggio di gruppo renderizzata con dati veri**, perché
+richiede la 0051 sul database. **Non ho un browser**: niente è stato guardato,
+niente cliccato, nessun embed aperto, niente da collegato.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 147 | **Il quiz completo.** Apri `/quiz` e rispondi a tutte e sei | Sei schermate: controllo, ritmo, scomodità, luogo, sociale e **ultima «Con chi vivrai questo viaggio?» con CINQUE risposte** («Da solo/a», «In coppia», «Famiglia con bambini/ragazzi», «Gruppo di amici / piccolo gruppo», «Gruppo organizzato con altri viaggiatori»). Sull'ultima il tasto dice **«Concludi»** | Se ne vedi quattro, o «Viaggiatore solo», fermati: è la regressione che il prompt temeva |
+| 148 | Arriva ai risultati con una risposta alla sesta, poi «Modifica le risposte» e cambia **solo la sesta** | L'URL cambia `companions:<n>` e l'elenco dei designer **può cambiare**: la sesta non dà punteggio a scala, ma pesa nel match (1 se il designer l'ha dichiarata, 0 se no) | Marco ha dichiarato 2 e 4 (coppia, amici), Giulia 1 (da solo): 1 contro 2 dovrebbe spostarli |
+| 149 | `select axis_code, value, label_it, answer_it from quiz_axis_options where axis_code = 'companions' order by value;` | `label_it` **invariato** («Viaggiatore solo», «Coppia», …) | È la chiave del form |
+| 150 | **Prenotare, da scollegato.** `/designer/giulia-neri`, «Consulenza approfondita», «Prenota la call» | Vai a `/accedi`; dopo il login torni sulla scheda approfondita (150€ / 60 minuti). **Nessun iframe da scollegato** | Il box è stato toccato: questa è la prova |
+| 151 | Da collegato, «Prenota la call» | Embed Cal.com di Giulia, nome ed email precompilati, e nel campo nascosto (o in `payload.responses.xpetis_user_id` del webhook) **il tuo UUID** | Il codice XPETIS precompilato |
+| 152 | Completa la prenotazione; poi rifallo e guarda sotto l'iframe prima che la pagina cambi | Si va a `/attesa?td=giulia-neri`; e sotto l'iframe c'è «Vai al pagamento» | I due eventi e il paracadute |
+| 153 | **Il riquadro nuovo.** Su `/designer/marco-rossi` sopra i 1400 px | Scheda della call a destra, in alto più bassa del nome; «E dopo l'incontro?» **a sinistra sotto la storia**, crema su marrone, con Itinerario su misura e All inclusive. Sotto il tasto della scheda: «I 50€ dell'incontro verranno scalati… eventualmente sceglierai» | Senza icone nei riquadri, di proposito |
+| 154 | Stessa pagina su telefono | Presentazione, **poi la scheda della call**, poi «E dopo l'incontro?» | L'ordine del codice è quello del telefono |
+| 155 | `/designer/giulia-neri` | «E dopo l'incontro?» con **solo All inclusive** (Giulia non ha il su misura) | — |
+| 156 | **Card → pagina.** Su `/designer/giulia-neri`, «Ottieni maggiori informazioni» sul primo viaggio di gruppo | Si apre `/designer/giulia-neri/viaggio-di-gruppo/peru-trekking-dell-huayhuash`: titolo, «Progettato da Giulia Neri • 14 giorni», la foto, la scheda con prezzo, Date, Durata, Persone previste, il tasto «Prenota una call con Giulia Neri», la scheda della designer, «Altri viaggi di gruppo» con gli altri due | **Nessuna** sezione «Questo viaggio fa per me?», tappe, informazioni utili; **nessun** «Acquista il posto» |
+| 157 | **Un link vecchio resta lo stesso viaggio.** Copia l'indirizzo della 156. Da Studio inverti l'ordine, in due passi (in uno solo urterebbe il vincolo sulle posizioni): `update td_group_trips set position = position + 10 where td_id = '22222222-2222-2222-2222-222222222222';` poi `update td_group_trips set position = 14 - position where td_id = '22222222-2222-2222-2222-222222222222';`. Riapri l'indirizzo copiato | **Lo stesso viaggio** (Huayhuash), anche se in vetrina ora è l'ultimo | ⚠️ Per tornare indietro rigira **le stesse due righe**: l'inversione di un'inversione |
+| 158 | Correggi il titolo da Studio: `update td_group_trips set title = 'Perù: il trekking dell''Huayhuash' where slug = 'peru-trekking-dell-huayhuash';` e riapri lo stesso indirizzo | 200, titolo nuovo, **indirizzo invariato** | Rimetti il titolo com'era |
+| 159 | `/designer/giulia-neri/viaggio-di-gruppo/1` e `/designer/marco-rossi/viaggio-di-gruppo/peru-trekking-dell-huayhuash` | **404** tutti e due: niente ordinali, e un viaggio sotto il designer sbagliato non esiste | — |
+| 160 | La home accanto al Figma `1-14` | «Affidarti a un Travel Designer significa» come titoletto, icone rosse nei tondi; «Come puoi viaggiare» **ancora la versione vecchia**, di proposito | Il resto: dimmi cosa non torna |
 
 ---
 
@@ -2321,6 +2558,16 @@ dipendenza dalla vista operativa minima per marcare gli alert risolti. E vale
 ancora l'avvertenza sopra: l'elenco nomina gli eventi uno per uno proprio per
 non diventare «una mail per ogni anomalia».
 
+**Aggiornamento del 29 settembre 2026 — il digest c'è, e con lui il modo di
+zittirlo (`0050`).** La dipendenza scritta qui sopra è chiusa: un alert si
+chiude con una spunta (`team_alerts.risolto`) e quattro tipi si chiudono da
+soli, fra cui `ordine_richiesto` quando il designer comincia la proposta. Il
+digest parte una volta al giorno e solo se c'è qualcosa di aperto; porta
+`ordine_richiesto` fra gli altri, quindi una richiesta del sabato sera si vede
+**la domenica mattina**, non il martedì. Il canale **immediato** per
+`ordine_richiesto` resta spento, per scelta: è la riga qui sopra. Vedi
+milestone 9.
+
 ---
 
 ### ❓ Domande aperte nate dall'imbocco (8 settembre 2026)
@@ -2352,8 +2599,9 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
       viaggiatore, 3ª del TD, nuova data oltre i 20 giorni, cancellazione sotto
       le 24 ore che pretende il rimborso) → alert in `team_alerts`
 - [ ] **[C]** Workflow reminder del giorno prima
-- [ ] **[C]** Procedura di rimborso documentata: come si esegue su Stripe e come
-      si flagga su Studio
+- [x] **[C]** Procedura di rimborso documentata: come si esegue su Stripe e come
+      si flagga su Studio. **Fatto il 29 settembre 2026**, cambiata dalla
+      deviazione 9: `RUNBOOK.md` §7 e `annota_rimborso()` (0050)
 - [ ] **[S]** In onboarding, istruire i designer a usare *Reschedule* e mai
       *Request reschedule* (cintura e bretelle: il riconoscimento automatico c'è
       comunque)
@@ -2662,17 +2910,96 @@ delete from team_alerts where kind in ('verifica_agenzia_scaduta', 'saldo_scadut
 
 - [ ] **[S]** Onboarding Cal.com dei 25 TD → **S-13**
 - [ ] **[S]** Condizioni generali, privacy e cookie policy → **S-14**
-- [ ] **[C]** Viste operative su Studio: ordini aperti, cosa manca a ciascuno,
-      coda degli alert, checklist di pubblicazione dei TD
+- [x] **[C]** Viste operative su Studio: ordini aperti, cosa manca a ciascuno,
+      coda degli alert, checklist di pubblicazione dei TD. **Fatto il 29
+      settembre 2026** → `0050_cruscotto_team.sql`. Più `team_pagamenti`, che
+      serve al rimborso e servirà alla riconciliazione
+- [x] **[C]** Il digest giornaliero degli alert, e il modo di zittirli (la
+      spunta `risolto`, la chiusura automatica di quattro tipi). **Fatto il 29
+      settembre 2026**, ramo `clock_ramo_digest_team` dell'orologio
 - [ ] **[C]** Come si modifica un profilo TD a regime: Studio a mano oppure una
       form interna minima (da decidere dopo l'import, quando sappiamo quanto è
       pesante correggerli)
 - [ ] **[C]** Prova end-to-end su ambiente di test: dalla ricerca alla
       recensione, per tutti e tre i servizi
-- [ ] **[C]** Runbook: cosa fare quando un workflow fallisce, come si rilancia,
-      dove si guarda
+- [x] **[C]** Runbook: cosa fare quando un workflow fallisce, come si rilancia,
+      dove si guarda. **Scritto il 29 settembre 2026** → `RUNBOOK.md`, con la
+      procedura di rimborso e le cinque trappole dello stato dei dati
 - [ ] **[B]** Taratura dei parametri di matching sui dati reali
 - [ ] **[Team]** Beta privata: primo viaggiatore vero su un TD vero
+
+### Il cruscotto del team (29 settembre 2026)
+
+**Il criterio di prova di questa milestone non è l'harness.** L'harness dice
+che le viste non espongono credenziali, che la spunta chiude e riapre, che il
+digest parte una volta sola e solo se c'è qualcosa, che un rimborso dimenticato
+si vede. Non può dire se una vista **si capisce**.
+
+> **Le viste si provano facendole leggere.** Una vista operativa non è giusta
+> perché la query torna: è giusta se Alessandro, che non ha scritto niente di
+> tutto questo, la apre e capisce **in dieci secondi** cosa deve fare. Se deve
+> chiedere cosa vuol dire una colonna, la colonna è sbagliata.
+>
+> **Il runbook si prova seguendolo**, non rileggendolo: si rompe una cosa
+> apposta in sviluppo e lo si dà a qualcuno che non l'ha scritto.
+
+**Cosa ho scelto io, e perché.**
+
+- **La spunta sta sulla tabella, non sulla vista.** Studio mostra le viste in
+  sola lettura; quindi si legge in `team_coda_alert` e si spunta in
+  `team_alerts`. Sono due schede invece di una, ed è il prezzo di non
+  costruire un pannello. **Scartata** l'alternativa di un link «risolto» dentro
+  la mail del digest: i filtri antispam delle caselle aziendali aprono i link
+  per controllarli, e un link che chiude al primo GET chiuderebbe tutto da solo;
+  servirebbe una pagina a token con un tasto, cioè una route e un token in più.
+  Si può fare dopo, se due schede si rivelano troppe.
+- **Il costo di un alert è un catalogo, non la severità.** `team_alert_kinds`,
+  una riga per tipo, con cosa si fa. È la stessa correzione già scritta nel
+  punto aperto del 23 settembre: `severity` confonde gravità e urgenza.
+- **Il digest contiene tutti gli alert aperti**, non solo quelli di igiene, ma
+  i vecchi in una riga sola. Un digest che taceva gli alert costosi perché
+  «quelli sono immediati» avrebbe lasciato fuori proprio quelli che nessuno ha
+  ancora chiuso. Per escludere un tipo, `team_alert_kinds.nel_digest`.
+- **Il rimborso non si annota da solo**, anche se il messaggio di Stripe
+  arriva: si accompagna sempre a una decisione (rifissare la call, annullare
+  l'ordine) che resta a una persona. Il database si limita a non lasciar
+  passare il silenzio.
+
+**Cosa NON è stato fatto, di proposito:** la form interna dei profili TD, la
+taratura del matching, le recensioni. E `ordine_richiesto` resta **non**
+immediato: accenderlo è una parola in una riga, ed è tua.
+
+```sql
+update app_config set value_text = 'ordine_pagato, ordine_richiesto'
+ where key = 'team_notify_events';
+```
+
+#### Per applicarla
+
+1. La migration `0050`.
+2. Rigiocare **solo** `supabase/seed/0001_config.sql` (la riga
+   `team_digest_hour`) e `supabase/seed/0005_testi_mail.sql` (il testo
+   `team_digest`). ⚠️ **Non** gli altri seed: il 0003 riscrive le foto (è la
+   trappola n. 1 del runbook).
+3. `team_notify_recipients` con i tre indirizzi, se non c'è già.
+
+#### Le prove
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 134 | Applicata la `0050` e rigiocati i due seed: `select * from clock_tick(0);` | Nessun errore, nessun `orologio_ramo_non_configurato` | Se c'è, manca `team_digest_hour` |
+| 135 | **Dai ad Alessandro `team_ordini_aperti`** senza spiegargli niente, e chiedigli cosa deve fare oggi | Lo dice in dieci secondi, leggendo le prime due colonne | Se chiede cosa vuol dire una colonna, segnalo: si cambia la colonna, non si spiega |
+| 136 | Lo stesso con `team_coda_alert` | Sa quale guardare per primo e cosa fare | Idem |
+| 137 | Lo stesso con `team_prenotazioni_in_corso` e `team_checklist_pubblicazione` | Idem | La checklist diventa il foglio di lavoro dell'import dei 25 |
+| 138 | Su Studio, in `team_alerts`, **spunta** `risolto` su un alert | Si riempiono `resolved_at` e `resolved_by = 'team (Studio)'`; sparisce da `team_coda_alert` | È il gesto su cui si regge il digest: se è scomodo da Studio, dimmelo |
+| 139 | Togli la spunta | L'alert torna aperto, `resolved_at` vuoto | — |
+| 140 | Con `team_notify_recipients` pieno, `email_redirect_to` sul tuo indirizzo e almeno un alert aperto: `update app_config set value = <l'ora di adesso> where key = 'team_digest_hour';` e aspetta un giro | In `outbound_messages` una riga `team_digest` per indirizzo, con i nuovi per esteso e i vecchi in una riga | Se `email_enabled` è 1 arriva davvero: **leggila sul telefono**, è lì che si legge alle 8 |
+| 141 | Secondo giro, stesso giorno | Nessuna riga nuova | `team_digests` ha la riga di oggi |
+| 142 | Chiudi tutti gli alert, `delete from team_digests where giorno = current_date;`, aspetta un giro | **Nessuna mail**; la riga di oggi in `team_digests` con `inviato = false` | Una mail «tutto bene» ogni mattina è la mail che si impara a non aprire |
+| 143 | In sandbox: paga una consulenza, poi **rimborsa dalla dashboard Stripe** una parte, e non annotare | Al giro dopo, `rimborso_non_annotato` in cima alla coda con la riga `annota_rimborso(...)` pronta; in `team_pagamenti` la riga in cima con `DA ANNOTARE` | ⚠️ È la prima volta che un `charge.refunded` vero attraversa il ponte: la forma del messaggio (`amount_refunded`, `payment_intent`) è quella documentata da Stripe, non vista. Se l'alert non compare, guarda `select payload from event_log where event = 'stripe_rimborso' order by created_at desc limit 1;` |
+| 144 | Esegui la riga dell'alert | `payments` a `partially_refunded` con data e nota; l'alert si chiude al giro dopo | La prenotazione **non** cambia stato |
+| 145 | **Il runbook, seguito.** In sviluppo, sbaglia di una lettera la parola segreta sul webhook di `marco-rossi-xpetis` e fai una prenotazione. Poi dai `RUNBOOK.md` a qualcuno che non l'ha scritto, con il solo sintomo «le prenotazioni di Marco non arrivano» | Arriva alla causa passando da §2 e §3, senza chiederti niente | Rimetti la parola giusta. Dove si è perso, lì il runbook è sbagliato |
+| 146 | Apri su Studio `team_coda_alert` con un `calcom_cancellazione_orfana` (o `calcom_riprogrammazione_orfana`) aperto | Nel messaggio c'è `[codice nascosto]` al posto dell'UID | Nella tabella `team_alerts` l'UID resta: è il diario |
 
 ---
 

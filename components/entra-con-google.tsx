@@ -22,7 +22,7 @@ export function EntraConGoogle({ next = '/' }: { next?: string }) {
   return (
     <button
       onClick={entra}
-      className="rounded-full bg-brand px-6 py-3 font-semibold text-white transition hover:bg-brand-scuro"
+      className="rounded-full bg-primario px-5 py-2 text-corpo text-neutro transition hover:brightness-110"
     >
       Entra con Google
     </button>
