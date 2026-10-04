@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
 
@@ -17,7 +18,7 @@ import { leggiUtente } from '@/lib/supabase/utente'
  * sul tasto *Prenota la call*, e il perché sta in
  * `components/prenota-consulenza.tsx`.
  *
- * ## Le tre voci di navigazione, e le tre risposte diverse (8 settembre 2026)
+ * ## Le voci di navigazione (8 settembre 2026, riviste il 4 ottobre)
  *
  * Puntavano tutte a un 404, ma non erano lo stesso problema. La differenza è il
  * corollario di `CLAUDE.md`: l'assenza di una cosa nel Figma non è una
@@ -28,12 +29,11 @@ import { leggiUtente } from '@/lib/supabase/utente'
  *  · **Scopri i Travel Designer** → `/ricerca`, che esiste ed è disegnata
  *    (Figma 177:262). Non c'era niente da inventare: quella *è* la pagina che
  *    scopre i designer. `/designer` reindirizza qui per i link già dati in giro.
- *  · **Entra a far parte di XPETIS** → **inerte**, e resta inerte. Il Flusso non
- *    descrive una pagina di reclutamento dei Travel Designer, il Figma non la
- *    mostra, e i 25 designer arrivano da un form esterno (`Vetrina TD (2).html`)
- *    gestito a mano dal team. Costruirne una vorrebbe dire decidere per il
- *    business chi può candidarsi e cosa succede dopo. È una domanda aperta in
- *    `PIANO.md`, non un pezzo mancante.
+ *  · **Entra a far parte di XPETIS** → **tolta** (decisione di Simone, 4
+ *    ottobre 2026). Era rimasta spenta dall'8 settembre: il Flusso non descrive
+ *    una pagina di reclutamento dei Travel Designer, e i designer arrivano dal
+ *    tool vetrina v6 gestito dal team. Una voce spenta in testa a ogni pagina
+ *    non serviva a nessuno. Il Figma la disegna ancora: non si rimette.
  *
  * ## Da collegato, e il costo di saperlo
  *
@@ -125,21 +125,25 @@ export async function Header() {
   return (
     <header className="pointer-events-none absolute inset-x-0 top-6 z-20 px-4 lg:top-10 lg:px-[100px]">
       <div className="pointer-events-auto mx-auto flex h-16 max-w-[1312px] items-center justify-between gap-4 rounded-full bg-neutro px-6 lg:gap-6 lg:px-8">
-        <Link href="/" className="font-testo text-h4 font-bold text-scuro">
-          XPETIS
+        {/* Il logo, non la scritta (Simone, 4 ottobre 2026). È quello della barra
+            del tool vetrina v6, lo stesso disegno del logo grande del footer:
+            copiato in `public/logo/logo-xpetis.svg` col viewBox stretto sul
+            disegno (l'originale aveva quasi metà di margine) e senza il blocco
+            di metadati. 890 × 200 sono le proporzioni vere. */}
+        <Link href="/" className="shrink-0" aria-label="XPETIS, torna alla home">
+          <Image
+            src="/logo/logo-xpetis.svg"
+            alt="XPETIS"
+            width={890}
+            height={200}
+            className="h-6 w-auto lg:h-7"
+          />
         </Link>
 
         <nav className="hidden items-center gap-10 text-corpo lg:flex">
           <Link href="/ricerca" className="hover:text-primario">
             Scopri i Travel Designer
           </Link>
-          <span
-            aria-disabled="true"
-            title="Le candidature dei Travel Designer passano ancora dal team: scrivici a info@xpetis.it."
-            className="cursor-default opacity-50"
-          >
-            Entra a far parte di XPETIS
-          </span>
         </nav>
 
         {user ? (

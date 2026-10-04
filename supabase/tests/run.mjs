@@ -133,16 +133,22 @@ console.log('\n== Tassonomia geografica ==')
     ['continenti',  'geo_continents',  st.continents],
     ['macro-aree',  'geo_macro_areas', st.macro_areas],
     ['stati',       'geo_countries',   st.states],
-    ['regioni',     'geo_regions',     st.regions],
     ['città',       'geo_cities',      st.cities],
   ]) {
     const n = Number((await q(`select count(*) from ${table}`)).rows[0].count)
     n === expected ? ok(`${label}: ${n}, come dichiara la tassonomia`)
                    : fail(`${label}: attesi ${expected}, trovati ${n}`)
   }
+  // Le regioni non esistono più (0057, 4 ottobre 2026): né la tabella, né il
+  // livello nel suggeritore, né nel file.
+  const t = (await q(`select to_regclass('public.geo_regions') as t`)).rows[0].t
+  const l = Number((await q(`select count(*) from geo_search where level = 'region'`)).rows[0].count)
+  t === null && l === 0 && !('regions' in st) && !readFileSync(path.join(root, '..', SORGENTE_GEO), 'utf8').includes('"regions"')
+    ? ok('nessuna regione: né la tabella, né nel suggeritore, né nel file della tassonomia (0057)')
+    : fail(`regioni ancora presenti: tabella ${t}, nel suggeritore ${l}`)
 }
 {
-  // selectable: macro_area, state, italian_region. searchable_only: continent, city, foreign_region.
+  // selectable: macro_area, state. searchable_only: continent, city.
   const sel = async (table, where = 'true') =>
     Number((await q(`select count(*) from ${table} where is_filterable and ${where}`)).rows[0].count)
   const tot = async (table, where = 'true') =>
@@ -155,43 +161,29 @@ console.log('\n== Tassonomia geografica ==')
     ? ok('tutti gli stati filtrano') : fail('stati')
   await sel('geo_cities') === 0 ? ok('nessuna città filtra: porta al suo stato') : fail('città')
 
-  await sel('geo_regions') === 0
-    ? ok('nessuna regione filtra: decisione dell\'8 agosto, niente quinto filtro')
-    : fail('regioni filtrabili')
-
-  // L'unica differenza fra ciò che la tassonomia dichiara e ciò che filtriamo
-  // sono le 20 regioni italiane. Se cambia, questo test lo dice.
+  // Fino al 4 ottobre l'unica differenza fra ciò che la tassonomia dichiara e
+  // ciò che filtriamo erano le 20 regioni italiane (deviazione 7). Senza regioni
+  // la tassonomia e il prodotto coincidono su ogni riga.
   const diff = (await q(`
     select level, count(*)::int as n from geo_search
      where is_selectable is distinct from is_filterable
      group by level order by level`)).rows
-  JSON.stringify(diff) === JSON.stringify([{ level: 'region', n: 20 }])
-    ? ok('la sola differenza tassonomia/prodotto sono le 20 regioni italiane')
+  diff.length === 0
+    ? ok('tassonomia e prodotto coincidono: ciò che è selezionabile è ciò che filtra')
     : fail('differenze: ' + JSON.stringify(diff))
 
-  const it = Number((await q(`select count(*) from geo_regions
-                               where kind='italian_region' and is_selectable`)).rows[0].count)
-  it === 20
-    ? ok('la tassonomia continua a dichiararle selezionabili: il dato non si perde')
-    : fail('regioni italiane selectable: ' + it)
-
-  const itr = Number((await q(`select count(*) from geo_regions where country_code='italia'`)).rows[0].count)
-  itr === 20 ? ok('l\'Italia ha le sue 20 regioni') : fail('regioni italiane: ' + itr)
+  const cittaItalia = Number((await q(`select count(*) from geo_cities where country_code='italia'`)).rows[0].count)
+  cittaItalia === 20 ? ok('l\'Italia ha le sue 20 città, attaccate al paese') : fail('città italiane: ' + cittaItalia)
 }
 {
-  // Una città può stare in due regioni dello stesso stato. Nella prima
-  // tassonomia era il caso di Jaipur; la v2 l'ha potata e non ne ha nessuna,
-  // ma la regola dello schema resta (unicità per regione, non per stato) e si
-  // prova con una città inventata. La potatura qui sotto la toglie.
-  const due = (await q(`select id from geo_regions where country_code='italia'
-                         order by slug limit 2`)).rows.map(r => r.id)
-  await expectOk('la stessa città in due regioni dello stesso stato', `
-    insert into geo_cities (country_code, region_id, slug, name_it, is_selectable) values
-      ('italia', ${due[0]}, 'citta-di-confine', 'Città di confine', false),
-      ('italia', ${due[1]}, 'citta-di-confine', 'Città di confine', false)`)
-  await expectFail('ma non due volte nella stessa regione', `
-    insert into geo_cities (country_code, region_id, slug, name_it, is_selectable)
-    values ('italia', ${due[0]}, 'citta-di-confine', 'Città di confine', false)`, 'unique')
+  // Dalla 0057 una città è unica dentro il suo paese.
+  await expectOk('la stessa città in due paesi diversi', `
+    insert into geo_cities (country_code, slug, name_it, is_selectable) values
+      ('italia', 'citta-di-confine', 'Città di confine', false),
+      ('francia', 'citta-di-confine', 'Città di confine', false)`)
+  await expectFail('ma non due volte nello stesso paese', `
+    insert into geo_cities (country_code, slug, name_it, is_selectable)
+    values ('italia', 'citta-di-confine', 'Città di confine', false)`, 'unique')
 }
 {
   // LA POTATURA (v2, 27 settembre 2026). Sul database vero il seed si rigira
@@ -199,9 +191,8 @@ console.log('\n== Tassonomia geografica ==')
   // resterebbero nel suggeritore. Qui si simula: due città che il file non ha
   // più (quella inventata qui sopra, e Siena, che c'era nella v1), poi si
   // rigira il seed.
-  await db.exec(`insert into geo_cities (country_code, region_id, slug, name_it, is_selectable)
-                 select 'italia', id, 'siena', 'Siena', false from geo_regions
-                  where country_code='italia' and slug='toscana'`)
+  await db.exec(`insert into geo_cities (country_code, slug, name_it, is_selectable)
+                 values ('italia', 'siena', 'Siena', false)`)
   const seed = readFileSync(path.join(root, 'seed', '0002_geo.sql'), 'utf8')
   await expectOk('il seed geografico si rigira sopra dati esistenti', seed)
   const n = Number((await q('select count(*) from geo_cities')).rows[0].count)
@@ -214,21 +205,13 @@ console.log('\n== Tassonomia geografica ==')
   const n3 = Number((await q('select count(*) from geo_cities')).rows[0].count)
   n3 === n ? ok('idempotente') : fail(`terzo giro: ${n3}`)
 
-  // Le due guardie: una destinazione non sparisce senza dirlo.
+  // La guardia: una destinazione non sparisce senza dirlo.
   // Il seed è una transazione sola: dopo una guardia che ferma, il database è
   // com'era prima, e la transazione rimasta aperta si chiude a mano.
-  await expectFail('una città la cui regione non esiste ferma il seed',
-    seed.replace("('italia', 'toscana', 'firenze'", "('italia', 'toscana_inventata', 'firenze'"),
-    'Città senza regione')
-  await db.exec('rollback')
-  seed.includes("('italia', 'toscana', 'firenze'")
-    ? ok('(la guardia è stata provata su Firenze, che la v2 contiene)')
-    : fail('Firenze non è nel seed: la prova della guardia non ha provato niente')
   await db.exec(`insert into geo_countries (code, macro_area_code, name_it, is_selectable, sort_order)
                  values ('atlantide', 'europa_sud', 'Atlantide', true, 999)`)
-  await db.exec(`insert into geo_cities (country_code, region_id, slug, name_it, is_selectable)
-                 select 'italia', id, 'siena', 'Siena', false from geo_regions
-                  where country_code='italia' and slug='toscana'`)
+  await db.exec(`insert into geo_cities (country_code, slug, name_it, is_selectable)
+                 values ('italia', 'siena', 'Siena', false)`)
   await expectFail('uno stato che il file non ha ferma il seed, e non viene cancellato', seed, 'atlantide')
   await db.exec('rollback')
   const dopo = (await q(`select (select count(*) from geo_countries where code='atlantide')::int as a,
@@ -940,8 +923,8 @@ console.log('\n== Ricerca accento-insensibile (0035) ==')
                          where c.column_name='name_norm' and c.table_schema='public'
                            and t.table_type='BASE TABLE'
                          order by c.table_name`)).rows
-  gen.length === 5 && gen.every(c => c.is_generated === 'ALWAYS')
-    ? ok('name_norm è una colonna generata su tutte e cinque le tabelle geo')
+  gen.length === 4 && gen.every(c => c.is_generated === 'ALWAYS')
+    ? ok('name_norm è una colonna generata su tutte e quattro le tabelle geo')
     : fail('colonne name_norm: ' + JSON.stringify(gen))
 }
 await expectOk('correggere un nome aggiorna il normalizzato nello stesso statement', `
@@ -955,10 +938,9 @@ await expectOk('correggere un nome aggiorna il normalizzato nello stesso stateme
 }
 {
   const idx = (await q(`select indexname from pg_indexes where schemaname='public'
-                         and indexname in ('geo_countries_norm_trgm','geo_regions_norm_trgm',
-                                           'geo_cities_norm_trgm')`)).rows
-  idx.length === 3
-    ? ok('i tre indici trigramma sulle tabelle grosse esistono')
+                         and indexname in ('geo_countries_norm_trgm', 'geo_cities_norm_trgm')`)).rows
+  idx.length === 2
+    ? ok('i due indici trigramma sulle tabelle grosse esistono')
     : fail('indici trovati: ' + JSON.stringify(idx.map(i => i.indexname)))
 }
 {
@@ -980,21 +962,21 @@ await expectOk('correggere un nome aggiorna il normalizzato nello stesso stateme
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
     .replace(/[øðłıđæœßþħŋŧĸſɛ]/g, (c) => senzaSegno[c] ?? c)
-    .replace(/[%_]/g, '')
-    .replace(/\s+/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
     .trim()
   const righe = (await q(`
     select name_it, name_norm from geo_continents
     union all select name_it, name_norm from geo_macro_areas
     union all select name_it, name_norm from geo_countries
-    union all select name_it, name_norm from geo_regions
     union all select name_it, name_norm from geo_cities`)).rows
-  const perse = righe.filter(r => !r.name_norm.includes(normalizza(r.name_it)))
+  // Dalla 0058 la regola è la stessa da tutte e due le parti, punteggiatura
+  // compresa: i due normalizzati devono essere **uguali**, non solo contenuti.
+  const perse = righe.filter(r => r.name_norm !== normalizza(r.name_it))
   // Il numero dei nomi lo dà la tassonomia, non una soglia scritta a mano: con
   // la v1 era «> 1500», e la potatura della v2 (581 nomi) l'avrebbe fatto
   // diventare rosso per la ragione sbagliata.
   const st = JSON.parse(readFileSync(path.join(root, '..', SORGENTE_GEO), 'utf8')).statistics
-  const attesi = st.continents + st.macro_areas + st.states + st.regions + st.cities
+  const attesi = st.continents + st.macro_areas + st.states + st.cities
   righe.length === attesi && perse.length === 0
     ? ok(`browser e database normalizzano allo stesso modo su tutti i ${righe.length} nomi della tassonomia`)
     : fail(`nomi su cui le due normalizzazioni divergono (${perse.length} su ${righe.length}): `
@@ -1013,7 +995,7 @@ await expectOk('correggere un nome aggiorna il normalizzato nello stesso stateme
   for (const r of righe) for (const c of r.name_it) if (c.charCodeAt(0) > 127) lettere.add(c)
   const divergenti = []
   for (const c of lettere) {
-    const d = (await q('select lower(unaccent_immutable($1)) as n', [c])).rows[0].n
+    const d = (await q('select nome_cercabile($1) as n', [c])).rows[0].n
     if (d !== normalizza(c)) divergenti.push(`${c}: database «${d}», browser «${normalizza(c)}»`)
   }
   divergenti.length === 0
@@ -5770,7 +5752,7 @@ console.log('\n== Il cruscotto del team (0050) ==')
 console.log('\n== I dieci paesi del tool vetrina v6 (3 ottobre 2026) ==')
 {
   // La lista del tool (stati.ts, di Alessandro) ha dieci paesi che la v2 non
-  // aveva. Stessa forma dei paesi piccoli: una regione omonima, nessuna città.
+  // aveva. Nessuna città (e dal 4 ottobre nessuna regione, per nessuno).
   const attesi = {
     andorra: 'europa_sud', angola: 'africa_sub_sahariana', eritrea: 'africa_sub_sahariana',
     gambia: 'africa_sub_sahariana', bangladesh: 'asia_centrale_e_subcontinente_indiano',
@@ -5780,17 +5762,14 @@ console.log('\n== I dieci paesi del tool vetrina v6 (3 ottobre 2026) ==')
   }
   const r = (await q(`
     select k.code, k.macro_area_code, k.is_selectable,
-           (select count(*) from geo_regions g where g.country_code = k.code)::int as regioni,
-           (select count(*) from geo_regions g where g.country_code = k.code and g.slug = k.code
-                                              and g.kind = 'foreign_region')::int as omonima,
            (select count(*) from geo_cities c where c.country_code = k.code)::int as citta
       from geo_countries k where k.code = any($1)`, [Object.keys(attesi)])).rows
   const storti = Object.keys(attesi).filter(c => {
     const x = r.find(y => y.code === c)
-    return !x || x.macro_area_code !== attesi[c] || !x.is_selectable || x.regioni !== 1 || x.omonima !== 1 || x.citta !== 0
+    return !x || x.macro_area_code !== attesi[c] || !x.is_selectable || x.citta !== 0
   })
   storti.length === 0
-    ? ok('i dieci paesi nuovi ci sono, sotto la macro-area del tool, con una regione omonima e nessuna città')
+    ? ok('i dieci paesi nuovi ci sono, sotto la macro-area del tool, senza città')
     : fail('paesi nuovi storti: ' + JSON.stringify(storti) + ' ' + JSON.stringify(r))
 }
 
@@ -6459,6 +6438,33 @@ console.log('\n== I demo sulla struttura v6 (seed 0006) ==')
     : fail('Giulia: ' + JSON.stringify({ it: vg.ready_itineraries.length, gr: vg.group_trips.length, rg, s: vg.services.map(x => x.service_type) }))
   const bl = (await q(`select td_publish_blockers($1) as b`, [G])).rows[0].b
   bl.length === 0 ? ok('Giulia minima resta pubblicabile: nessun blocco') : fail('blocchi di Giulia: ' + JSON.stringify(bl))
+}
+
+
+console.log('\n== La ricerca senza regioni e senza punteggiatura (0057, 0058) ==')
+{
+  // Il testo come lo prepara il browser (`normalizzaRicerca`, lib/geo.ts).
+  const cerca = async (testo) => {
+    const n = testo.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    return (await q(`select level, name_it from geo_search where name_norm like $1 order by level, name_it`, ['%' + n + '%'])).rows
+  }
+  const sea = await cerca('sud est asiatico')
+  const seaTrattino = await cerca('Sud-Est')
+  sea.some(r => r.level === 'macro_area' && r.name_it.includes('Sud-Est Asiatico'))
+    && seaTrattino.some(r => r.level === 'macro_area' && r.name_it.includes('Sud-Est Asiatico'))
+    ? ok('«sud est asiatico» e «Sud-Est» trovano la macro-area «…Sud-Est Asiatico» (era il difetto)')
+    : fail('sud est: ' + JSON.stringify(sea))
+  const ci = await cerca("costa d'avorio")
+  ci.length === 1 && ci[0].name_it === "Costa d'Avorio"
+    ? ok("l'apostrofo non conta: «costa d'avorio» trova la Costa d'Avorio") : fail('costa: ' + JSON.stringify(ci))
+  const bb = await cerca('barbados')
+  bb.length === 1 && bb[0].level === 'country'
+    ? ok('«barbados» compare una volta sola, come paese: niente più eco della regione omonima')
+    : fail('barbados: ' + JSON.stringify(bb))
+  const to = await cerca('toscana')
+  to.length === 0 ? ok('«toscana» non trova niente: le regioni italiane non ci sono più') : fail('toscana: ' + JSON.stringify(to))
+  const f = (await q(`select has_function_privilege('anon', 'nome_cercabile(text)', 'EXECUTE') as a`)).rows[0]
+  !f.a ? ok('nome_cercabile(): chiusa ad anon (la usano solo le colonne generate)') : fail('nome_cercabile aperta')
 }
 
 console.log(failures === 0 ? '\nTutto verde.\n' : `\n${failures} asserzioni fallite.\n`)

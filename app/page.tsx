@@ -215,6 +215,9 @@ export default function Homepage() {
                   testo={modalita.numero}
                   stella="stella-piccola"
                   dimensione={71}
+                  // Il numero, da solo: al 12% della stella sarebbe di 9 px,
+                  // illeggibile (segnalato da Simone il 4 ottobre 2026).
+                  corpo={30}
                   className="absolute -top-8 left-8"
                 />
                 <h3 className="font-titoli text-h4 font-bold text-primario">{modalita.titolo}</h3>

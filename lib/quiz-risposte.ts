@@ -118,6 +118,22 @@ export function scriviQuizInSessione(quiz: Quiz): void {
   }
 }
 
+/**
+ * Dimentica le risposte dell'anonimo in questa scheda: serve ad «Azzera» della
+ * pagina risultati (4 ottobre 2026). Senza, il quiz ripulito dall'URL
+ * ricomparirebbe precompilato alla prima visita di `/quiz`. Il quiz già
+ * salvato sul profilo (deviazione 3) non si tocca: è il briefing delle
+ * prenotazioni fatte, e il prossimo quiz lo sostituisce da sé.
+ */
+export function cancellaQuizDaSessione(): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.removeItem(CHIAVE_RISPOSTE)
+  } catch {
+    /* vedi sopra */
+  }
+}
+
 /** Cosa è già finito sul profilo, per non riscrivere la stessa riga a ogni pagina. */
 export function leggiQuizSalvato(): string | null {
   if (typeof window === 'undefined') return null

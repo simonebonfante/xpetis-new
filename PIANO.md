@@ -762,7 +762,7 @@ tassonomia geografica.
 | 4 | Il TD non può cancellare una consulenza pagata, può solo riprogrammare (§5) | Il tasto *Request reschedule* di Cal.com **è** una cancellazione secca. Lo riconosciamo dai due segni (motivo che inizia per `Please reschedule.`, `cancelledBy` uguale alla mail del designer), blocchiamo l'ordine, alert critico al team, rimborso eseguito a mano | Cal.com non manda nessuna prenotazione nuova e non lega la vecchia alla nuova: su una call già pagata il viaggiatore resterebbe senza call e senza soldi | 4 ago |
 | 5 | Non ne parla | Le mail native di Cal.com restano accese e i testi XPETIS sono scritti per convivere con loro | Spegnerle potrebbe richiedere un piano a pagamento su 25 account. Costo zero e nessuna dipendenza dal piano | 4 ago |
 | 6 | "La barra di ricerca normalizza qualunque input a un paese" (§1) | Filtrano **paesi e macro-aree**. Città e continenti sono solo navigazione: la città porta al suo paese, il continente alle sue macro-aree | La tassonomia dichiara selezionabili anche le macro-aree, e cercare "Sud America" è una richiesta legittima | 8 ago |
-| 7 | *(deviazione dalla tassonomia)* Le 20 regioni italiane sono dichiarate selezionabili | **Non filtrano.** Nessun quinto livello di filtro: come trattarle si deciderà | Il dato della tassonomia non si perde: `is_selectable` conserva la sua intenzione, `is_filterable` dice cosa filtra oggi. Sono le uniche 20 righe su cui i due valori differiscono, e l'harness lo verifica. **27 set: il file nuovo della tassonomia (`xpetis_destinazioni_v2.json`) afferma il contrario** — `selectable: [macro_area, state, italian_region]` e una regola `italy_special` che fa suggerire le 20 regioni cercando «Italia» — esattamente come diceva già il primo file. **Simone conferma: le regioni italiane non sono un filtro.** Non è una svista da correggere: è la seconda conferma di una decisione deliberata. L'avviso è scritto anche in `supabase/scripts/genera_geo.mjs`, dove l'import legge quel campo, e finisce nell'intestazione del seed generato, così chi rilegge il JSON non la «sistema» | 8 ago, 27 set |
+| ~~7~~ | ~~*(deviazione dalla tassonomia)* Le 20 regioni italiane sono dichiarate selezionabili~~ | **Superata il 4 ottobre 2026: le regioni non esistono più**, nessuna, né italiane né estere (migration `0057`, decisione di Simone: «Andrea mi ha passato un file sbagliato, le regioni vanno buttate»). La gerarchia è continente → macro-area → paese → città, e la tassonomia e il prodotto coincidono su ogni riga | Il file `xpetis_destinazioni_v2.json` è stato corretto da noi: le città attaccate direttamente al paese, le regole di selezione senza regioni. Se un file nuovo tornasse con le regioni, il generatore del seed si ferma | 8 ago, 27 set, **4 ott** |
 | 8 | "Colore brand: verde `#1b5e24`" (§0) | La palette è **crema `#F0EEDF`, nero `#1C1C1A`, primario `#E53619`**, con Merriweather Bold sui titoli e Ronzino Regular sul testo | Sono i token del Figma, e concordano con il form Vetrina TD, che usa le stesse due tinte. Il verde non compare in nessuno dei due: è un dato più vecchio del design | 9 ago |
 | 9 | Consulenze e itinerario su misura incassano sul conto XPETIS; solo l'All Inclusive sul conto dell'agenzia (§4) | **Incassa l'agenzia affiliata su tutto.** È lei ad avere ragione sociale e partita IVA; XPETIS come entità legale non esiste e non esisterà nel primo periodo | Senza partita IVA Stripe non attiva i pagamenti veri, e costituire una società non è nei tempi. Conseguenza operativa: **il tasto "rimborsa" è in mano all'agenzia**, quindi rimborsi, no-show e arbitrati diventano richieste a qualcun altro, con i suoi tempi. **27 set: il conto Stripe è uno, dell'agenzia**, aperto insieme e dedicato a XPETIS, con un ruolo admin per Simone (così i rimborsi li fa il team, dalla dashboard). Chiave **ristretta** in Vault, un solo endpoint webhook. Niente Stripe Connect: vorrebbe XPETIS attivata su Stripe come entità legale, cioè lo stesso muro. Vedi `ACCESSI.md` | 6 set, 27 set |
 | 10 | La consulenza dura **30 minuti** (§3) | **Due servizi, tre event type** *(riscritta il 27 set)*: la **breve** `consultation` dura **sempre 30** (`consulenza-xpetis-30`) e ce l'ha **ogni** designer; l'**approfondita** `consultation_deep` dura **60 oppure 90** (`consulenza-xpetis-60` / `-90`) ed è **opzionale**, solo per chi la offre. ~~*21 set: «30 oppure 60, a scelta del designer, sulla base»: `consultation` era la consulenza base qualunque fosse la sua durata, e `consultation_deep` la seconda, anche lei senza durata fissa*~~ → **non è più vero: la base è tornata fissa a 30, la durata variabile sta sull'approfondita** | Richiesta dei designer in onboarding il 21 settembre, rivista il 27. Lo schema la regge (`td_services.duration_minutes` è per servizio). ⚠️ **L'onboarding è partito con la regola del 21**: tre designer hanno un event type da 30 *o* da 60 come consulenza base, e il 60 sulla breve oggi è un errore. Cosa ricontrollare su di loro è in `ONBOARDING_CALCOM_TD.md` §8, non va dato per fatto. ⚠️ **Il form della vetrina dice «Consulenza singola (30 min)» ed è bloccato**: il prezzo della breve regge, quello dell'approfondita il form non lo raccoglie e vive nella lista condivisa, con la durata. Con tre slug invece di due i modi di sbagliare triplicano: le tre reti della 0048 (slug unico per designer, slug fuori elenco che blocca la pubblicazione, durata dello slot confrontata col listino) | 21 set, 27 set |
@@ -1244,6 +1244,48 @@ Le query le ho provate su PGlite, non sul database vero.
 | 189 | Apri il secondo («Thailandia: Isan e Mekong…») | «fino a 10 partecipanti»; una partenza «Confermato»; sotto il prezzo solo «a persona», **senza** «volo non incluso» | Sui gruppi non c'è ripiego |
 | 190 | Apri il terzo («Giappone in autunno…») | La pagina c'è, con «Prezzo su richiesta», **senza** «Partenze» e **senza** «Prossima partenza». Sulla vetrina la sua card non ha la riga della prossima partenza | Ha solo una partenza del 2025 |
 | 191 | Apri `/designer/giulia-neri`, poi `/designer/giulia-neri/itinerario/cordillera-blanca-santa-cruz-e-laguna-69` | La vetrina ha **solo** foto e dati, la scheda della call con **una** pillola, «E dopo l'incontro?» col solo All Inclusive, «Cosa vuol dire viaggiare per me» coi viaggi firma, «Come funziona» e la scheda finale: **nessuna sezione vuota**, nessun titolo sopra il nulla. Il vecchio itinerario dà **404** | È il «demo minimo» del prompt |
+
+**🔴 Le prove della tassonomia senza regioni e della ricerca (4 ottobre 2026)**
+
+Quattro richieste di Simone, in un giro: sulla pagina `/ricerca` il tasto della
+barra dice **«Cerca»** e i filtri hanno **«Azzera i filtri»** (spegne temi e
+contesti; poi, su richiesta, **sempre visibile e azzera anche quiz e
+destinazione**); **le regioni non esistono più**
+(`0057`); e **la ricerca non guarda la punteggiatura** (`0058`): «sud est
+asiatico» trova «Asia Orientale e Sud-Est Asiatico», «costa d'avorio» la Costa
+d'Avorio. La regola sta in una funzione sola nel database (`nome_cercabile`),
+gemella di `normalizzaRicerca()` nel sito, e l'harness le confronta su ogni
+nome della tassonomia.
+
+**In quest'ordine, dalla radice del progetto.** Il passaggio l'ho provato su
+PGlite partendo dallo stato del database di oggi (254 regioni, città legate
+alle regioni): regioni sparite, 188 città tenute, paesi dei designer intatti.
+**Non** sul database vero.
+
+1. `supabase db push` — la `0057_geo_senza_regioni.sql` e la
+   `0058_ricerca_senza_punteggiatura.sql`. ⚠️ **Prima** del seed: il seed nuovo
+   cerca le città per (paese, slug), che esiste solo dopo la `0057`. Se lo
+   lanci prima, si ferma e non cambia niente (è una transazione sola).
+2. Il seed geografico rigenerato:
+   ```bash
+   supabase db query --linked -f supabase/seed/0002_geo.sql
+   ```
+3. Il sito: il codice nuovo (tasto, azzera, normalizzazione) va insieme al
+   database. Prima delle migration «sud est» non trova ancora niente, perché la
+   colonna su cui si cerca ha ancora i trattini.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 192 | `select (select count(*) from geo_continents) as continenti, (select count(*) from geo_macro_areas) as macro_aree, (select count(*) from geo_countries) as stati, (select count(*) from geo_cities) as citta, to_regclass('public.geo_regions') as tabella_regioni;` | **6 · 14 · 139 · 188**, e `tabella_regioni` **vuota** (la tabella non esiste più) | |
+| 193 | `select count(*) as citta_senza_paese from geo_cities c where not exists (select 1 from geo_countries k where k.code = c.country_code);` | **0** | Ogni città è attaccata a un paese vero |
+| 194 | `select level, name_it from geo_search where name_norm like '%sud est%' order by level;` | Una riga: **Asia Orientale e Sud-Est Asiatico**, macro_area | Era il difetto |
+| 195 | Rilancia il seed del punto 2 | Nessun errore, conteggi invariati | Idempotente |
+| 196 | Nel suggeritore (home o `/ricerca`) scrivi `sud est asiatico`, poi `sud-est` | Tutte e due le volte la macro-area «Asia Orientale e Sud-Est Asiatico» | |
+| 197 | Scrivi `barbados`, poi `toscana`, poi `firenze` | Barbados **una volta sola** (prima compariva anche come «Regione»); Toscana **niente**; Firenze come città, che porta all'Italia | Le regioni italiane non ci sono più: è voluto |
+| 198 | Su `/ricerca` guarda la barra | Il tasto dice **«Cerca»** | |
+| 199 | Da `/ricerca` con una destinazione, un paio di filtri accesi e il quiz fatto, clicca **«Azzera filtri, quiz e destinazione»** (in fondo ai filtri, sempre visibile) | Torni a `/ricerca` senza niente: barra vuota, nessun filtro acceso, ricerca senza quiz. Poi apri `/quiz`: le risposte vecchie **non** sono precompilate | Il quiz già salvato sul tuo profilo (deviazione 3) non si cancella: è il briefing delle prenotazioni fatte, e il prossimo quiz lo sostituisce |
+| 199bis | Guarda l'header, su qualunque pagina | Il **logo** XPETIS (X rossa), non la scritta; cliccato, porta alla home | Preso dalla barra del tool vetrina v6, stesso disegno del logo del footer |
+| 200 | `select slug, string_agg(tc.country_code, ', ' order by tc.country_code) as paesi from td_countries tc join travel_designers td on td.id = tc.td_id group by td.slug order by td.slug;` | Gli stessi paesi di prima per ogni designer | Le regioni non toccavano i paesi dei designer: se ne manca uno, fermati |
 
 **Vetrine v6 (3 ottobre 2026).** Il tool vetrina v6 di Andrea e Alessandro
 (`xpetis-vetrine-tool/`, esempio completo in `vetrina-luca-ferraina/`) sostituisce
@@ -2886,7 +2928,7 @@ Tutte e tre sono **assenze nel Figma che non sono decisioni** — il corollario 
 
 | Domanda | Perché è aperta | Chi decide |
 |---|---|---|
-| **La pagina "Entra a far parte di XPETIS" esiste?** L'header e il footer la linkano entrambi. Il Flusso non descrive nessuna pagina di reclutamento dei Travel Designer, il Figma non la mostra, e i 25 arrivano da un form esterno (`Vetrina TD (2).html`) gestito a mano dal team. Costruirla vorrebbe dire decidere chi può candidarsi e cosa succede dopo: non è una scelta tecnica. **Per ora le due voci sono spente con una spiegazione**, non linkano un 404 | Serve sapere se il reclutamento è pubblico o su invito | Alessandro, Andrea |
+| **La pagina "Entra a far parte di XPETIS" esiste?** L'header e il footer la linkano entrambi. Il Flusso non descrive nessuna pagina di reclutamento dei Travel Designer, il Figma non la mostra, e i 25 arrivano da un form esterno (`Vetrina TD (2).html`) gestito a mano dal team. Costruirla vorrebbe dire decidere chi può candidarsi e cosa succede dopo: non è una scelta tecnica. **Per ora le due voci sono spente con una spiegazione**, non linkano un 404. **4 ottobre 2026: quella dell'header è tolta** (decisione di Simone: spenta non serviva); resta spenta «Entra nella Community» nel footer | Serve sapere se il reclutamento è pubblico o su invito | Alessandro, Andrea |
 | **`/viaggi-di-gruppo`, `/about`, `/privacy`, `/contatti`**: quattro voci del footer che portano a 404. Le ho **lasciate come link** di proposito, al contrario di quella sopra: quelle pagine *devono* esistere — la privacy per obbligo di legge — e spegnerle direbbe "non ci saranno", che è falso. Aspettano un contenuto, non una decisione tecnica | I testi non sono lavoro mio; la privacy passa da S-14 | Gaia (testi), legale (privacy) |
 | **La sezione "Viaggi di gruppo" della vetrina** resta senza sorgente, come già segnato in milestone 3. La voce del footer punta allo stesso buco | — | Chiara, Gaia |
 | **Come si vede l'header di chi è collegato?** Il Figma non lo mostra, e per il corollario di `CLAUDE.md` l'assenza non è una decisione. La versione costruita l'8 settembre è la minima onesta — *"Ciao \<nome\>"* e un bottone *Esci* — e le domande sono tre: **nome o avatar** (Google dà `avatar_url`, non l'ho usato: un'immagine tonda nella pillola è una scelta di disegno, non una mia); **testo o tendina**; **dove sta l'uscita**, se dentro una tendina o in chiaro come adesso. ⚠️ Qualunque tendina va riempita con voci che **esistono**. Dal 18 settembre *"Le mie prenotazioni"* esiste ed è nell'header: da desktop per esteso, da telefono sotto il saluto, che è diventato un link. **Se nasce una tendina, quella voce è la prima che ci va dentro** | Serve una riga di Figma, o un ok a quella che c'è | Chiara |

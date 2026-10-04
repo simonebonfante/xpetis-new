@@ -8,7 +8,8 @@ import { normalizzaRicerca } from '@/lib/geo'
 import { createClient } from '@/lib/supabase/client'
 
 type Voce = {
-  level: 'continent' | 'macro_area' | 'country' | 'region' | 'city'
+  // Le regioni non esistono più (0057, 4 ottobre 2026).
+  level: 'continent' | 'macro_area' | 'country' | 'city'
   ref: string
   name_it: string
   country_code: string | null
@@ -23,7 +24,6 @@ const ETICHETTA: Record<Voce['level'], string> = {
   continent: 'Continente',
   macro_area: 'Area',
   country: 'Paese',
-  region: 'Regione',
   city: 'Città',
 }
 
@@ -40,7 +40,7 @@ type Props = {
   larga?: boolean
   /** La lente grigia che nel Figma sta a sinistra, solo sulla pagina ricerca. */
   lente?: boolean
-  /** "Cerca" in home, "Modifica" sulla pagina risultati. */
+  /** L'etichetta del tasto: «Cerca», in home e sulla pagina risultati. */
   etichettaAzione?: string
   /**
    * In home il tasto compare solo a destinazione scelta (Flusso §1: una ricerca
@@ -128,7 +128,7 @@ export function RicercaDestinazione({
   async function seleziona(voce: Voce) {
     if (voce.level === 'continent') return scendiNelContinente(voce)
 
-    // Città e regioni non filtrano: portano al loro paese.
+    // Le città non filtrano: portano al loro paese.
     if (!voce.is_filterable) {
       if (!voce.country_code) return
       const supabase = createClient()

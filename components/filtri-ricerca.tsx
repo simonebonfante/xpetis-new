@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
 
+import { cancellaQuizDaSessione } from '@/lib/quiz-risposte'
+
 type Tag = { code: string; label_it: string }
 
 /**
@@ -68,6 +70,15 @@ export function FiltriRicerca({
     avvia(() => router.push(`${pathname}?${params}`, { scroll: false }))
   }
 
+  // «Azzera» (Simone, 4 ottobre 2026): sempre visibile, e riporta la ricerca
+  // all'inizio — niente filtri, niente quiz, niente destinazione. Il quiz si
+  // toglie anche dalla memoria della scheda, altrimenti `/quiz` lo
+  // riproporrebbe già compilato.
+  function azzera() {
+    cancellaQuizDaSessione()
+    avvia(() => router.push(pathname, { scroll: false }))
+  }
+
   return (
     <aside
       className={`h-fit rounded-[25px] bg-neutro p-9 transition-opacity ${
@@ -100,6 +111,14 @@ export function FiltriRicerca({
         ammessi={ammessi}
         onScatto={(c) => scatta('contesti', c)}
       />
+
+      <button
+        type="button"
+        onClick={azzera}
+        className="mt-8 w-full rounded-[10px] border border-scuro px-5 py-2 text-corpo text-scuro transition hover:bg-crema"
+      >
+        Azzera filtri, quiz e destinazione
+      </button>
     </aside>
   )
 }

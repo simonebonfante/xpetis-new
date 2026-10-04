@@ -78,7 +78,10 @@ echo "Vetrina del designer (FILE NUOVO Q9Kry…) — nodo 2-743 il 28 settembre,
 # tool vetrina v6 (xpetis-vetrine-tool/…/markup/VetrinaMarkup.tsx), dove sono
 # SVG in linea: copiati una volta in public/img/dopo-*.svg, insieme alle due
 # stelle di "Questo viaggio fa per me?" (stella-fa-per-me-*.svg). Non sono URL
-# Figma: questo script non li riscarica e non li deve sovrascrivere. Anche il "$" del
+# Figma: questo script non li riscarica e non li deve sovrascrivere. Lo stesso
+# vale per il logo dell'header, public/logo/logo-xpetis.svg (4 ottobre 2026),
+# preso dalla barra del tool (public/vetrine/img/logo-xpetis.svg) col viewBox
+# stretto sul disegno. Anche il "$" del
 # credito (72:434) in 72-48 è più grande, 12×18: resta credito-simbolo.svg
 # qui sotto, 7,8×12,4, finché non si riscarica. Quando si riscaricano:
 # get_design_context su quei nodi, righe qui, e components/dopo-la-call.tsx.

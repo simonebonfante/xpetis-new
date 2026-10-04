@@ -8,6 +8,12 @@ type Props = {
    */
   stella?: 'stella' | 'stella-grande' | 'stella-piccola' | 'stella-marrone'
   dimensione?: number
+  /**
+   * La dimensione del testo in px. Di default il 12% della stella, che va bene
+   * per le scritte lunghe («Dove ti portiamo?»); un numero solo, come i 1-2-3
+   * delle modalità, su una stella da 71 diventerebbe di 9 px: lì si passa qui.
+   */
+  corpo?: number
   rotazione?: number
   className?: string
 }
@@ -20,6 +26,7 @@ export function BadgeStella({
   testo,
   stella = 'stella',
   dimensione = 183,
+  corpo,
   rotazione = 0,
   className = '',
 }: Props) {
@@ -43,7 +50,7 @@ export function BadgeStella({
           className="absolute inset-0 flex items-center justify-center px-[18%] text-center font-titoli font-bold text-neutro"
           style={{
             transform: `rotate(${rotazione}deg)`,
-            fontSize: Math.round(dimensione * 0.12),
+            fontSize: corpo ?? Math.round(dimensione * 0.12),
             lineHeight: 1.25,
           }}
         >

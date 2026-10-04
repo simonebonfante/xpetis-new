@@ -9,6 +9,49 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**4 ottobre 2026 — la ricerca: «Cerca», «Azzera i filtri», niente regioni, niente punteggiatura**
+
+Quattro richieste di Simone. Le prime due sono di pagina: il tasto della barra
+su `/ricerca` dice «Cerca» invece di «Modifica», e i filtri hanno «Azzera i
+filtri», che compare solo con qualcosa acceso e spegne temi e contesti
+lasciando destinazione e quiz.
+
+**Le regioni.** «Andrea mi ha passato un file sbagliato: le regioni vanno
+buttate, non ci devono essere assolutamente.» Tutte, quindi anche le 20
+italiane, e con loro la deviazione 7. Il lavoro vero era che le città
+pendevano dalle regioni, nel file e nel database: le ho riattaccate ai paesi
+nel JSON (nessuna città stava in due regioni dello stesso paese, controllato
+prima), il generatore ora si ferma se le regioni tornano, e la `0057` cancella
+`geo_regions`, porta l'unicità delle città su (paese, slug) e toglie il livello
+dal suggeritore. Sul suggeritore il guadagno si vede subito: «barbados» non
+compare più due volte, paese e «regione» omonima.
+
+**Il trattino.** «sud est asiatico» non trovava «Sud-Est Asiatico» perché la
+0035 aveva tolto accenti e maiuscole ma non la punteggiatura. Proposta e fatta:
+ogni segno diventa uno spazio, da tutte e due le parti — `normalizzaRicerca()`
+nel sito e una funzione sola nel database, `nome_cercabile()`, usata dalle
+quattro colonne generate (prima l'espressione era ripetuta quattro volte).
+L'harness ora pretende che i due normalizzati siano **uguali** su ogni nome,
+non solo l'uno contenuto nell'altro.
+
+L'harness applica le migration su tabelle vuote e i seed dopo, quindi non vede
+il passaggio vero: l'ho ricostruito su PGlite partendo dal seed vecchio preso
+da git (254 regioni), poi `0057`, `0058` e il seed nuovo. Regioni sparite, 188
+città tenute, paesi dei designer intatti. Harness a 1118 (alcune prove sulle
+regioni sono semplicemente sparite con loro). Prove 192-200.
+
+Subito dopo, due correzioni di Simone. L'header aveva la scritta «XPETIS» al
+posto del logo: messo il logo della barra del tool, `public/logo/logo-xpetis.svg`,
+col viewBox stretto sul disegno — calcolato con `getBBox()` in Chrome headless,
+perché l'originale aveva quasi metà di margine — e senza il blocco di metadati.
+E «Azzera» deve esserci **sempre** e azzerare **anche quiz e destinazione**: ora
+riporta a `/ricerca` nuda e toglie il quiz anche da `sessionStorage`, altrimenti
+`/quiz` lo riproponeva compilato. La barra della destinazione teneva il testo in
+uno stato suo, inizializzato una volta: con una `key` sulla destinazione si
+ricrea vuota.
+
+---
+
 **4 ottobre 2026 — il doppio calendario, e cosa vuol dire «correggere i 25»**
 
 Simone: sulla vetrina, cliccando prima «Consulenza breve» e poi «Consulenza
@@ -38,6 +81,13 @@ cerchietto attorno alla «$» — un SVG bianco al 28%, disegnato per stare su q
 rosa — spariva. Aggiunto in `box-servizio.tsx` col valore indicato da Simone
 (il tool lo scrive come primario al 30%, su bianco #F7C3BA), angoli da 10 e il
 padding del tool.
+
+E due ritocchi in home e nell'header, chiesti da Simone. I numeri 1-2-3 nelle
+stelle di «Come puoi viaggiare con XPETIS» erano di 9 px: `BadgeStella`
+calcolava il testo al 12% della stella, proporzione giusta per «Dove ti
+portiamo?» e sbagliata per un numero solo. Nuovo parametro `corpo`, e i numeri
+a 30 px. «Entra a far parte di XPETIS», spenta dall'8 settembre, è tolta
+dall'header; la gemella del footer («Entra nella Community») resta spenta.
 
 ---
 

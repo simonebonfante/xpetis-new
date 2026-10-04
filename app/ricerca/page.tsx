@@ -180,10 +180,15 @@ export default async function PaginaRicerca({ searchParams }: Props) {
         {/* La barra persistente del Flusso: destinazione modificabile. */}
         <div className="mt-[70px]">
           <RicercaDestinazione
+            // La barra tiene il testo in uno stato suo: con la `key` si ricrea
+            // quando la destinazione cambia, e dopo «Azzera» torna vuota.
+            key={destinazione ? `${destinazione.livello}:${destinazione.ref}` : 'nessuna'}
             larga
             lente
             azioneSempre
-            etichettaAzione="Modifica"
+            // «Cerca», come in home (Simone, 4 ottobre 2026): il tasto rifà la
+            // ricerca, e «Modifica» faceva pensare a un'altra cosa.
+            etichettaAzione="Cerca"
             destinazioneIniziale={destinazione}
             mantieni={restoQuery.toString()}
           />

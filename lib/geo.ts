@@ -16,6 +16,12 @@
  * 0035: 1.613 con la prima versione, 581 dalla v2 del 27 settembre 2026). Se un
  * giorno arriva un nome su cui divergono, il test lo dice: è già servito il
  * primo giorno.
+ *
+ * **Dalla 0058 (4 ottobre 2026) anche la punteggiatura non conta**: ogni segno
+ * che non è una lettera o una cifra — trattino, apostrofo, virgola, punto —
+ * diventa uno spazio. «sud est asiatico» non trovava «Asia Orientale e Sud-Est
+ * Asiatico» per colpa del trattino. Nel database la stessa regola sta nella
+ * funzione `nome_cercabile()`, una sola per tutte le colonne.
  */
 
 /**
@@ -71,7 +77,8 @@ export function normalizzaRicerca(testo: string): string {
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
     .replace(/[øðłıđæœßþħŋŧĸſɛ]/g, (c) => LETTERE_SENZA_SEGNO[c] ?? c)
-    .replace(/[%_]/g, '')
-    .replace(/\s+/g, ' ')
+    // Ogni segno diventa uno spazio, come `nome_cercabile()` (0058). Toglie
+    // anche `%` e `_`, che nel `like` sarebbero caratteri jolly.
+    .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 }

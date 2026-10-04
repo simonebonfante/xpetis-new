@@ -91,6 +91,8 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0054_vetrina_v6_viste.sql` | `public_td_showcase` estesa (anni di appartenenza, voto delle sole verificate sopra soglia, paesi e prossima partenza nelle card), le viste nuove `public_td_ready_itinerary`, `public_td_group_trip` (solo partenze future, a Roma), `public_td_reviews` (verificate + dichiarate); `td_publish_blockers` con la breve senza prezzo e la Sessione di durata non ammessa (`calcom_expected_minutes`) |
 | `0055_import_vetrine.sql` | L'importatore lato database: `td_import_runs` (archivio, chiuso) e `td_import_showcase(payload, p_scrivi)` — tutto il designer o niente, prova a secco che scrive e annulla, riconciliazione per titolo, idempotente |
 | `0056_nome_corto.sql` | `public_td_showcase.short_name`: la prima parola del nome, o il nome professionale intero (D8), per le frasi «… con Luca» |
+| `0057_geo_senza_regioni.sql` | Le regioni non esistono più (4 ottobre 2026): `geo_regions` cancellata, le città attaccate al paese (unicità per paese e slug), `geo_search` senza il livello `region`. La deviazione 7 è superata |
+| `0058_ricerca_senza_punteggiatura.sql` | `nome_cercabile()`: le colonne `name_norm` tolgono anche la punteggiatura (trattini, apostrofi: «sud est» trova «Sud-Est»), con una funzione sola invece di quattro espressioni |
 | `0051_slug_viaggi_di_gruppo.sql` | Lo slug stabile dei viaggi di gruppo (`td_group_trips.slug`, stesse regole della 0033, unico per designer) servito in `public_td_showcase.group_trips`, per la pagina `/designer/<designer>/viaggio-di-gruppo/<slug>`; e `public_quiz_axes` che non ricade più su `label_it` quando manca `answer_it` |
 
 ## La geografia
@@ -99,6 +101,12 @@ Il seed `0002_geo.sql` **non si scrive a mano**: lo genera
 `scripts/genera_geo.mjs` dalla tassonomia, che resta la fonte. Se la tassonomia
 cambia, si rilancia lo script. L'harness confronta i conteggi nel database
 contro le statistiche dichiarate dal file stesso, non contro numeri copiati.
+
+**Dal 4 ottobre 2026 non ci sono regioni** (0057): il file era sbagliato, e
+Simone ha deciso di toglierle tutte, italiane comprese. La gerarchia è
+continente → macro-area → paese → città: **6 · 14 · 139 · 188**. Le città stanno
+nel file direttamente sotto il loro paese, e il generatore si ferma se un file
+nuovo tornasse con le regioni. Quanto segue sulle regioni è la storia.
 
 **Dal 27 settembre 2026 la fonte è `xpetis_destinazioni_v2.json`**: 6
 continenti, 14 macro-aree, 129 stati, 244 regioni **identici** alla prima
@@ -117,13 +125,11 @@ database vero:
 - una **riga in più** negli altri quattro livelli ferma il seed invece di
   cancellare: uno stato ha dietro `td_countries` e `quiz_responses`, e toglierlo
   è una decisione;
-- una **città senza la sua regione** ferma il seed: la `join` che le aggancia la
-  scarterebbe in silenzio, e una destinazione sparirebbe senza errori;
 - tutto sta in **una transazione**: fermato da una guardia, non lascia mezza
   potatura.
 
 L'harness rigira il seed sopra dati esistenti, controlla che converga, che un
-terzo giro non cambi niente e che le due guardie fermino davvero.
+terzo giro non cambi niente e che la guardia fermi davvero.
 
 Tre cose della tassonomia che lo schema provvisorio non prevedeva.
 
@@ -132,16 +138,20 @@ Tre cose della tassonomia che lo schema provvisorio non prevedeva.
 riempito da una fonte esterna quando servirà, non dedotto dal nome.
 
 **Non tutto è selezionabile.** La tassonomia dichiara che si scelgono come
-destinazione le **macro-aree**, gli **stati** e le **regioni italiane**;
-continenti, città e regioni estere vivono solo nel suggeritore. È
+destinazione le **macro-aree** e gli **stati** (fino al 4 ottobre anche le
+regioni italiane); continenti e città vivono solo nel suggeritore. È
 un'informazione di prodotto e sta nel database (`is_selectable` su ogni
 livello), non nel codice del sito. La vista `geo_search` la espone insieme allo
 stato a cui ogni voce porta.
 
-**Una città può stare in due regioni.** Nella prima tassonomia Jaipur era dentro
-"India del Nord" e dentro "Rajasthan", ed era corretto. L'unicità delle città è
-quindi per regione, non per stato. La v2 non ha più nessun caso così (Jaipur è
-stata potata), ma la regola resta e l'harness la prova con una città inventata.
+**Una città è unica dentro il suo paese** (dalla 0057). Prima l'unicità era per
+regione, perché nella prima tassonomia Jaipur stava in due regioni dell'India;
+senza regioni la domanda non si pone più.
+
+**La ricerca non guarda accenti, maiuscole e punteggiatura** (0035, 0058):
+`name_norm` è `nome_cercabile(name_it)`, e `normalizzaRicerca()` in
+`lib/geo.ts` fa la stessa cosa sul testo del viaggiatore. L'harness verifica
+che i due normalizzati siano **uguali** su ogni nome della tassonomia.
 
 ## Il verso degli assi
 
