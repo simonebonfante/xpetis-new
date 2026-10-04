@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 
 import { leggiUtente } from '@/lib/supabase/utente'
-import { CHIAVI, leggiNumeroConfig } from '@/lib/config'
+import { CHIAVI, leggiNumeroConfig, leggiTestiConfig } from '@/lib/config'
+import { accorcia } from '@/lib/vetrina-vista'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { BoxServizio } from '@/components/box-servizio'
@@ -15,6 +16,7 @@ import { RecensioniVetrina } from '@/components/recensioni-vetrina'
 import { FotoVetrina } from '@/components/foto-vetrina'
 import { TornaAiRisultati } from '@/components/torna-ai-risultati'
 import {
+  leggiRecensioni,
   leggiVetrina,
   paragrafi,
   percorsoItinerario,
@@ -26,39 +28,37 @@ import {
 } from '@/lib/vetrina'
 
 /**
- * La vetrina del Travel Designer — Figma nuovo `Q9Krydv6xD8mFJCtU9NHzr`, nodo
- * **72-48** dal 29 settembre (costruita il 28 dal nodo 2-743, di cui 72-48 è la
- * revisione; fino al 27 settembre: file vecchio, nodo 171:17).
+ * La vetrina del Travel Designer.
  *
- * Fra 2-743 e 72-48 cambia solo la fascia hero: "E dopo l'incontro?" esce
- * dalla scheda della call e diventa un riquadro sotto la storia
- * (`components/dopo-la-call.tsx`), la riga del credito resta nella scheda sotto
- * il tasto, e la storia si stringe di poco. Dal titolo "Cosa vuol dire
- * viaggiare per me" in giù i due nodi sono lo stesso disegno.
+ * **Dal 3 ottobre 2026 il riferimento visivo è il tool vetrina v6**
+ * (`xpetis-vetrine-tool/riferimento/pagine_tool/vetrina.html`), non più il
+ * nodo Figma 72-48 (decisione D1): dal tool si prende la forma, comportamento
+ * e contenuto restano quelli del Flusso. Il codice è nostro: niente del tool è
+ * importato, e le regole di visualizzazione stanno in `lib/vetrina-vista.ts`.
  *
- * Tutto arriva da `public_td_showcase` in una sola query, più due numeri di
- * `public_config` per "Come funziona". Nessuna vista nuova, nessuna lettura
- * diretta di tabella.
+ * Tutto arriva da viste pubbliche: `public_td_showcase` (profilo, servizi,
+ * card), `public_td_reviews` (recensioni) e `public_config` (numeri di «Come
+ * funziona», testi di prezzo e dicitura delle recensioni).
  *
- * L'ordine delle sezioni è quello del disegno: hero con la scheda della call,
- * "Cosa vuol dire viaggiare per me" con i viaggi firma, "Come funziona",
- * itinerari pronti, viaggi di gruppo, recensioni, e la scheda finale. **Una
- * sezione senza contenuto non esiste**, titolo compreso: un designer senza
- * viaggi di gruppo — su venticinque, il caso più comune — non vede
- * "Viaggi di gruppo" sopra il nulla.
+ * L'ordine delle sezioni è quello del tool: hero con la scheda della call e
+ * «E dopo l'incontro?», «Cosa vuol dire viaggiare per me» con i viaggi firma,
+ * «Come funziona», itinerari pronti, viaggi di gruppo, recensioni, scheda
+ * finale. **Una sezione senza contenuto non esiste**, titolo compreso.
  *
- * Quello che il Figma disegna e questa pagina non mostra, con la sua ragione:
+ * Quello che il tool mostra e questa pagina no, con la ragione (elenco intero
+ * in `VETRINE_V6_FASE0.md`, § 5):
  *
- *  1. **Il voto "4.6" sulla foto** e la sezione recensioni: non esistono
- *     recensioni. Vedi `components/recensioni-vetrina.tsx`.
- *  2. **La riga "Membro XPETIS"** della scheda hero: vuole `joined_at`, che
- *     `public_td_showcase` non espone. Il Figma nuovo la ridisegna, ma
- *     ridisegnarla non decide di esporla. Vedi `lib/vetrina.ts`.
- *  3. **Il prezzo sul riquadro "Itinerario su misura"** e le icone dei
- *     quattro riquadri dopo la call. Vedi `components/dopo-la-call.tsx`.
- *
- * Dal 29 settembre le card dei viaggi di gruppo portano alla pagina del
- * viaggio (Figma 3-1121, migration 0051).
+ *  1. **Il voto «4.6» e «Membro XPETIS: 1 anno» fissi**: qui solo dati veri
+ *     (D2). Il voto esce se ci sono recensioni verificate sopra soglia, gli
+ *     anni da `joined_at` se sono almeno uno. Oggi, per tutti, nessuno dei due.
+ *  2. **«Il secondo Incontro, con un altro Travel Designer, è gratis»**: non è
+ *     una promessa decisa (D4). Non si costruisce, nemmeno spenta.
+ *  3. **I 30€ del credito**: il credito si promette e non si quantifica (R2).
+ *  4. **La variante «Dopo la sessione»** della linguetta Sessione (D-1), la
+ *     fascia di esperienza al posto del numero (D-5), il testo `competenze` al
+ *     posto dei paesi (D-6), i testi di «Come funziona» del tool (D-7) e i nomi
+ *     «Incontro» / «Sessione» (D-9): restano i nostri finché Simone non decide.
+ *  5. **Header e footer del tool**, «Iscriviti» compreso: i nostri (R4).
  */
 
 type Props = {
@@ -70,9 +70,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const vetrina = await leggiVetrina(slug)
   if (!vetrina) return { title: 'Travel Designer · XPETIS' }
+  // L'anteprima di WhatsApp e dei social, come `metadatiVetrina` del tool:
+  // nome, l'inizio della storia, la foto.
+  const descrizione = accorcia(vetrina.bio ?? vetrina.travel_philosophy ?? vetrina.hero_bio)
   return {
-    title: `${vetrina.display_name} · XPETIS`,
-    description: vetrina.hero_bio ?? vetrina.headline ?? undefined,
+    title: `${vetrina.display_name} · Travel Designer XPETIS`,
+    description: descrizione,
+    openGraph: {
+      title: `${vetrina.display_name} · Travel Designer XPETIS`,
+      description: descrizione,
+      images: vetrina.photo_url ? [{ url: vetrina.photo_url, alt: vetrina.display_name }] : undefined,
+    },
   }
 }
 
@@ -117,9 +125,25 @@ function Presentazione({ vetrina }: { vetrina: Vetrina }) {
       etichetta: 'Anni di esperienza',
       valore: vetrina.years_experience ? `${vetrina.years_experience} anni` : '',
     },
-    // Manca "Membro XPETIS": `joined_at` non è nella vista. Vedi lib/vetrina.ts.
+    // «Membro XPETIS»: gli anni compiuti da `joined_at`, che la vista dà già
+    // calcolati (0054) senza esporre la data. Zero anni, la riga non esce (D2).
+    {
+      etichetta: 'Membro XPETIS',
+      valore:
+        vetrina.member_years > 0
+          ? `${vetrina.member_years} ${vetrina.member_years === 1 ? 'anno' : 'anni'}`
+          : '',
+    },
     { etichetta: 'Lingue parlate', valore: vetrina.languages.join(', ') },
   ].filter((riga) => riga.valore.length > 0)
+
+  // Il voto: solo dalle recensioni verificate e sopra soglia, già deciso dalla
+  // vista. `null` = non esce, ed è il caso di tutti finché non arriva la
+  // milestone 8.
+  const voto =
+    vetrina.rating_avg !== null && vetrina.rating_avg !== undefined
+      ? Number(vetrina.rating_avg).toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      : null
 
   // Il testo sotto la tabella è **la storia** (`bio`, campo `storia` del form):
   // il testo d'esempio del Figma è la stessa storia del form, accorciata.
@@ -133,9 +157,13 @@ function Presentazione({ vetrina }: { vetrina: Vetrina }) {
           className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_12.981%,rgba(0,0,0,0.9)_100%)]"
           aria-hidden
         />
-        {/* Il Figma mette qui anche il voto medio con la stella rossa: fuori
-            finché non esistono recensioni. Resta il link a Instagram, che il
-            form raccoglie davvero. */}
+        {voto && (
+          <p className="absolute bottom-5 left-[18px] inline-flex items-center gap-2 rounded-[24px] bg-scuro px-[18px] py-2 text-[18px] font-semibold text-neutro">
+            <span className="text-primario" aria-hidden>★</span>
+            <span className="sr-only">Voto medio delle recensioni verificate: </span>
+            {voto}
+          </p>
+        )}
         {vetrina.instagram_handle && (
           <a
             href={`https://instagram.com/${vetrina.instagram_handle.replace(/^@/, '')}`}
@@ -293,10 +321,14 @@ function ComeFunziona({
 export default async function PaginaVetrina({ params, searchParams }: Props) {
   const [{ slug }, query] = await Promise.all([params, searchParams])
 
-  const [vetrina, oreRimborso, oreRiprogrammazione] = await Promise.all([
+  const [vetrina, oreRimborso, oreRiprogrammazione, testi, recensioni] = await Promise.all([
     leggiVetrina(slug),
     leggiNumeroConfig(CHIAVI.oreRimborsoPieno),
     leggiNumeroConfig(CHIAVI.oreMinimeRiprogrammazione),
+    leggiTestiConfig([CHIAVI.prezzoSuRichiesta, CHIAVI.notaRecensioniDichiarate]),
+    // La vista contiene solo i designer pubblicati: per uno slug sconosciuto è
+    // vuota, e la pagina va comunque in 404 qui sotto.
+    leggiRecensioni(slug),
   ])
   // La vista contiene solo i profili pubblicati: uno slug sconosciuto e un
   // designer in bozza sono lo stesso caso, ed è giusto che lo siano.
@@ -336,9 +368,17 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
   // progetti") chiusa da un aforisma (`manifesto`). Il form li raccoglie
   // separati e qui stanno uno dopo l'altro. Quale campo vada dove è una
   // domanda aperta per Chiara, in PIANO.md.
-  const credo = [vetrina.hero_bio, vetrina.manifesto].filter(
-    (t): t is string => Boolean(t && t.trim()),
-  )
+  //
+  // Dal tool vetrina v6 il testo ha un campo suo, `viaggiarePerMe`
+  // (`travel_philosophy`, 0052), e il tool `heroBio` e `manifesto` non li
+  // mostra: quando c'è, vince lui. I profili caricati prima ripiegano sui due
+  // campi di prima, come oggi.
+  const credo = (
+    vetrina.travel_philosophy?.trim()
+      ? paragrafi(vetrina.travel_philosophy)
+      : [vetrina.hero_bio, vetrina.manifesto]
+  ).filter((t): t is string => Boolean(t && t.trim()))
+  const nomeBreve = vetrina.short_name || nome
 
   return (
     <div className="bg-crema">
@@ -403,9 +443,10 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
                     // Le URL si risolvono qui, lato server: il componente della
                     // galleria è client e non deve importare `lib/vetrina`.
                     foto={viaggio.images.map((percorso) => urlMedia(percorso))}
-                    // Il form non raccoglie tag per viaggio: si mostrano i paesi
-                    // coperti dal designer. Vedi il commento nel componente.
-                    etichette={vetrina.countries.slice(0, 3)}
+                    // Il paese del viaggio (tool v6, 0052). I profili caricati
+                    // prima non ce l'hanno: niente etichetta, invece dei paesi
+                    // del designer, che non sono quelli del viaggio.
+                    etichette={viaggio.country ? [viaggio.country] : []}
                   />
                 ))}
               </div>
@@ -413,7 +454,7 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
 
             <div className="mt-12 text-center">
               <a href="#servizi" className={TASTO}>
-                Prenota una call con {nome}
+                Prenota una call con {nomeBreve}
               </a>
             </div>
           </div>
@@ -446,6 +487,7 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
                   key={itinerario.slug}
                   itinerario={itinerario}
                   href={percorsoItinerario(vetrina.slug, itinerario.slug)}
+                  prezzoMancante={testi[CHIAVI.prezzoSuRichiesta]}
                 />
               ))}
             </div>
@@ -466,9 +508,10 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3">
               {gruppi.map((viaggio) => (
                 <CardViaggioGruppo
-                  key={viaggio.slug ?? viaggio.title}
+                  key={viaggio.slug}
                   viaggio={viaggio}
-                  href={viaggio.slug ? percorsoViaggioDiGruppo(vetrina.slug, viaggio.slug) : null}
+                  href={percorsoViaggioDiGruppo(vetrina.slug, viaggio.slug)}
+                  prezzoMancante={testi[CHIAVI.prezzoSuRichiesta]}
                 />
               ))}
             </div>
@@ -476,7 +519,7 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
         </section>
       )}
 
-      <RecensioniVetrina />
+      <RecensioniVetrina recensioni={recensioni} notaDichiarate={testi[CHIAVI.notaRecensioniDichiarate]} />
 
       {/* ------------------------------ Ti sembra il Travel Designer giusto? */}
       <section className="px-4 py-16 lg:px-[93px] lg:pb-[143px] lg:pt-[123px]">
@@ -493,7 +536,7 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
               href="#servizi"
               className="w-full max-w-[277px] rounded-[30px] bg-primario px-5 py-[9px] text-corpo text-neutro transition hover:brightness-110"
             >
-              Prenota la call con {nome}
+              Prenota la call con {nomeBreve}
             </a>
             <TornaAiRisultati className="w-full max-w-[277px] rounded-[30px] bg-scuro px-5 py-[9px] text-corpo text-neutro transition hover:brightness-125" />
           </div>
@@ -501,7 +544,7 @@ export default async function PaginaVetrina({ params, searchParams }: Props) {
           {/* Il credito consulenza (Flusso §6): lo applica il designer nella
               proposta, qui lo si dice soltanto. */}
           <p className="mt-6 text-[12px] italic">
-            Se poi parti con {nome}, il costo della call viene scalato dal viaggio.
+            Se poi parti con {nomeBreve}, il costo della call viene scalato dal viaggio.
           </p>
         </div>
       </section>

@@ -420,9 +420,14 @@ await expectFail('tag su un paese non coperto dal TD', `
 //
 // Dalla 0048 lo slug non può più essere una stringa qualunque su un designer
 // pubblicato: le due prove usano gli slug ammessi, e restano quello che erano.
+// Dal seed 0006 (4 ottobre 2026) Marco ha già la sua approfondita, con questi
+// stessi valori: la prova la riscrive invece di crearla, e prova la stessa cosa.
 await expectOk('consulenza attiva senza Payment Link: ora si può', `
   insert into td_services (td_id, service_type, is_active, price_cents, duration_minutes, cal_event_type_slug)
-  values ('11111111-1111-1111-1111-111111111111','consultation_deep',true,9000,90,'consulenza-xpetis-90')`)
+  values ('11111111-1111-1111-1111-111111111111','consultation_deep',true,9000,90,'consulenza-xpetis-90')
+  on conflict (td_id, service_type) do update
+     set is_active = true, price_cents = 9000, duration_minutes = 90,
+         cal_event_type_slug = 'consulenza-xpetis-90', stripe_payment_link_url = null`)
 await expectFail('consulenza attiva senza prezzo', `
   insert into td_services (td_id, service_type, is_active, duration_minutes, cal_event_type_slug)
   values ('22222222-2222-2222-2222-222222222222','consultation_deep',true,60,'consulenza-xpetis-60')`, 'bookable_complete')
@@ -686,7 +691,8 @@ console.log('\n== I cinque servizi del form ==')
 await expectOk('il designer attiva viaggio di gruppo e accompagnamento privato', `
   insert into td_services (td_id, service_type, is_active, sort_order) values
     ('11111111-1111-1111-1111-111111111111','group_trip',true,20),
-    ('11111111-1111-1111-1111-111111111111','private_guiding',true,21)`)
+    ('11111111-1111-1111-1111-111111111111','private_guiding',true,21)
+  on conflict (td_id, service_type) do update set is_active = true`)
 await expectFail('ma nessun ordine può nascere su di loro', `
   insert into orders (traveler_id, td_id, service_type)
   values ('44444444-4444-4444-4444-444444444444','11111111-1111-1111-1111-111111111111','group_trip')`,
@@ -1066,14 +1072,21 @@ await expectFail('recensione esterna senza autore', `
     ? ok('non entra nelle medie interne: td_review_stats resta vuota')
     : fail('td_review_stats contaminato: ' + JSON.stringify(stats))
 
+  // Dalla 0054 (decisione D3 del 3 ottobre 2026) le recensioni dichiarate si
+  // mostrano, con una dicitura: **una sola** vista pubblica le legge, solo le
+  // pubblicate, e mai con gli anni del recensore.
   const pub = (await q(`
-    select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace
      where n.nspname='public' and c.relkind='v'
        and has_table_privilege('anon', c.oid, 'SELECT')
-       and pg_get_viewdef(c.oid) like '%td_showcase_reviews%'`)).rows[0]
-  Number(pub.count) === 0
-    ? ok('nessuna vista pubblica le espone')
-    : fail('una vista pubblica espone le recensioni esterne')
+       and pg_get_viewdef(c.oid) like '%td_showcase_reviews%'`)).rows.map(r => r.relname)
+  JSON.stringify(pub) === JSON.stringify(['public_td_reviews'])
+    ? ok('le recensioni dichiarate escono da una vista sola, public_td_reviews (D3)')
+    : fail('viste che leggono td_showcase_reviews: ' + JSON.stringify(pub))
+  const nonPubblicata = (await q(`select count(*) from public_td_reviews where author_name = 'Nico'`)).rows[0]
+  Number(nonPubblicata.count) === 0
+    ? ok('una recensione dichiarata non pubblicata non esce')
+    : fail('public_td_reviews mostra una recensione con is_published = false')
 }
 
 console.log('\n== Ciclo di vita della prenotazione ==')
@@ -1291,9 +1304,10 @@ console.log('\n== Superficie pubblica ==')
     ? ok('anon non legge nessuna tabella direttamente')
     : fail('tabelle leggibili da anon: ' + leaked.map(r => r.relname).join(', '))
   const views = rows.filter(r => r.relkind === 'v').map(r => r.relname)
-  const expected = ['geo_search','public_config','public_quiz_axes','public_reviews','public_tags','public_td_showcase']
+  const expected = ['geo_search','public_config','public_quiz_axes','public_reviews','public_tags',
+                    'public_td_group_trip','public_td_ready_itinerary','public_td_reviews','public_td_showcase']
   JSON.stringify(views.sort()) === JSON.stringify(expected)
-    ? ok('anon legge solo le 6 viste pubbliche')
+    ? ok('anon legge solo le 9 viste pubbliche')
     : fail('viste esposte: ' + JSON.stringify(views))
 
   // Nessuna vista pubblica deve nominare i valori degli assi o il livello dei paesi.
@@ -5329,14 +5343,19 @@ console.log('\n== I viaggi di gruppo (0048) ==')
 {
   const r = (await q(`select slug, group_trips from public_td_showcase
                        where slug in ('marco-rossi','giulia-neri') order by slug`)).rows
-  r.length === 2 && r.every(x => x.group_trips.length === 3)
-    ? ok('tre viaggi di gruppo per ciascuno dei due designer demo, nella vetrina pubblica')
-    : fail('group_trips: ' + JSON.stringify(r.map(x => [x.slug, x.group_trips.length])))
-  const g = r.find(x => x.slug === 'giulia-neri').group_trips[0]
-  // I sei campi del form, più lo slug dell'indirizzo dalla 0051.
-  const chiavi = ['slug', 'title', 'dates_label', 'duration_label', 'group_size_label', 'price_label', 'image_path']
+  // Dal seed 0006 Marco è il demo completo e Giulia quello minimo, senza viaggi
+  // di gruppo: la vetrina di Giulia deve reggere con l'elenco vuoto.
+  const quanti = Object.fromEntries(r.map(x => [x.slug, x.group_trips.length]))
+  quanti['marco-rossi'] === 3 && quanti['giulia-neri'] === 0
+    ? ok('tre viaggi di gruppo per Marco (demo completo), nessuno per Giulia (demo minimo)')
+    : fail('group_trips: ' + JSON.stringify(quanti))
+  const g = r.find(x => x.slug === 'marco-rossi').group_trips[0]
+  // I sei campi del form, lo slug dell'indirizzo dalla 0051, e dalla 0054 i
+  // campi della card del tool v6 (paesi, partecipanti, prossima partenza).
+  const chiavi = ['slug', 'title', 'dates_label', 'duration_label', 'group_size_label', 'price_label', 'image_path',
+                  'countries', 'participants_min', 'participants_max', 'next_departure']
   JSON.stringify(Object.keys(g).sort()) === JSON.stringify([...chiavi].sort())
-    ? ok('ogni viaggio porta i sei campi del form e lo slug, nient\'altro: ' + g.title + ' · ' + g.dates_label)
+    ? ok('ogni viaggio porta i campi della card e lo slug, nient\'altro: ' + g.title + ' · ' + g.dates_label)
     : fail('chiavi: ' + JSON.stringify(Object.keys(g)))
   const t = (await q(`select has_table_privilege('anon','td_group_trips','SELECT') as a,
                              has_table_privilege('authenticated','td_group_trips','SELECT') as u,
@@ -5363,9 +5382,10 @@ console.log('\n== Lo slug dei viaggi di gruppo (0051) ==')
   const slug = async (td, pos) =>
     (await q(`select slug from td_group_trips where td_id = $1 and position = $2`, [td, pos])).rows[0]?.slug
 
-  // Il seed: i sei viaggi sono nati dopo la migration, quindi dal trigger.
-  const s1 = await slug(G, 1)
-  s1 === 'peru-trekking-dell-huayhuash'
+  // Il seed: i viaggi sono nati dopo la migration, quindi dal trigger. Dal seed
+  // 0006 Giulia non ne ha più (demo minimo): l'accento lo prova il Nakasendō.
+  const s1 = await slug(M, 3)
+  s1 === 'giappone-in-autunno-lungo-il-nakasendo'
     ? ok('gli slug del seed nascono dal titolo, senza accenti né apostrofi: ' + s1)
     : fail('slug del seed: ' + s1)
 
@@ -5745,6 +5765,700 @@ console.log('\n== Il cruscotto del team (0050) ==')
                                has_function_privilege('authenticated', $1, 'EXECUTE') as u`, [f])).rows[0]
     !r.a && !r.u ? ok(`${f}: chiusa ad anon e authenticated`) : fail(`${f} aperta`)
   }
+}
+
+console.log('\n== I dieci paesi del tool vetrina v6 (3 ottobre 2026) ==')
+{
+  // La lista del tool (stati.ts, di Alessandro) ha dieci paesi che la v2 non
+  // aveva. Stessa forma dei paesi piccoli: una regione omonima, nessuna città.
+  const attesi = {
+    andorra: 'europa_sud', angola: 'africa_sub_sahariana', eritrea: 'africa_sub_sahariana',
+    gambia: 'africa_sub_sahariana', bangladesh: 'asia_centrale_e_subcontinente_indiano',
+    antigua_e_barbuda: 'centro_america_e_caraibi', barbados: 'centro_america_e_caraibi',
+    saint_lucia: 'centro_america_e_caraibi', saint_vincent_e_grenadine: 'centro_america_e_caraibi',
+    sint_maarten: 'centro_america_e_caraibi',
+  }
+  const r = (await q(`
+    select k.code, k.macro_area_code, k.is_selectable,
+           (select count(*) from geo_regions g where g.country_code = k.code)::int as regioni,
+           (select count(*) from geo_regions g where g.country_code = k.code and g.slug = k.code
+                                              and g.kind = 'foreign_region')::int as omonima,
+           (select count(*) from geo_cities c where c.country_code = k.code)::int as citta
+      from geo_countries k where k.code = any($1)`, [Object.keys(attesi)])).rows
+  const storti = Object.keys(attesi).filter(c => {
+    const x = r.find(y => y.code === c)
+    return !x || x.macro_area_code !== attesi[c] || !x.is_selectable || x.regioni !== 1 || x.omonima !== 1 || x.citta !== 0
+  })
+  storti.length === 0
+    ? ok('i dieci paesi nuovi ci sono, sotto la macro-area del tool, con una regione omonima e nessuna città')
+    : fail('paesi nuovi storti: ' + JSON.stringify(storti) + ' ' + JSON.stringify(r))
+}
+
+console.log('\n== Vetrina v6: il profilo (0052) ==')
+{
+  const M = MARCO
+  await expectFail('axis_sides deve essere un oggetto',
+    `update travel_designers set axis_sides = '["dynamic"]' where id = '${M}'`, 'axis_sides_object')
+  await expectFail('card_phrases deve essere un oggetto',
+    `update travel_designers set card_phrases = '"frase"' where id = '${M}'`, 'card_phrases_object')
+  await expectOk('i tre jsonb chiusi accettano un oggetto',
+    `update travel_designers set axis_sides = '{"ritmo":"dynamic"}', card_phrases = '{"chiusura":"x"}',
+            card_phrases_status = '{"chiusura":"bozza"}', legal_name = 'Marco Rossi Anagrafico'
+      where id = '${M}'`)
+
+  // Le destinazioni in evidenza: 1-3, una per posizione, e sempre di livello 1.
+  const paesi = (await q(`select country_code, level from td_countries where td_id = '${M}' order by country_code`)).rows
+  const forte = paesi.find(p => p.level === 1), base = paesi.find(p => p.level === 2)
+  await expectFail('highlight_position fuori da 1-3',
+    `update td_countries set highlight_position = 4 where td_id = '${M}' and country_code = '${forte.country_code}'`)
+  await expectOk('una destinazione di livello 1 in evidenza',
+    `update td_countries set highlight_position = 1 where td_id = '${M}' and country_code = '${forte.country_code}'`)
+  if (base) {
+    await expectFail('una destinazione in evidenza di livello 2 non esiste',
+      `update td_countries set highlight_position = 2 where td_id = '${M}' and country_code = '${base.country_code}'`,
+      'highlight_is_level_1')
+  } else fail('Marco senza paesi di livello 2: il test del vincolo non ha su cosa girare')
+  const altroForte = paesi.find(p => p.level === 1 && p.country_code !== forte.country_code)
+  if (altroForte) {
+    await expectFail('due destinazioni nella stessa posizione',
+      `update td_countries set highlight_position = 1 where td_id = '${M}' and country_code = '${altroForte.country_code}'`,
+      'highlight_position')
+  }
+  await q(`update td_countries set highlight_position = null where td_id = '${M}'`)
+
+  await expectFail('il prezzo «da» non sta su una consulenza',
+    `update td_services set price_from_cents = 7000 where td_id = '${M}' and service_type = 'consultation'`,
+    'price_from_after_call')
+  await expectFail('il prezzo «da» non è negativo',
+    `update td_services set price_from_cents = -1 where td_id = '${M}' and service_type = 'custom_itinerary'`)
+  await expectOk('il prezzo «da» sull\'itinerario su misura',
+    `update td_services set price_from_cents = 7000 where td_id = '${M}' and service_type = 'custom_itinerary'`)
+  await expectFail('anni del recensore fuori scala',
+    `update td_showcase_reviews set author_years = 101 where td_id = '${M}'`)
+  await expectFail('paese del viaggio firma che la tassonomia non ha',
+    `update td_signature_trips set country_code = 'atlantide' where td_id = '${M}'`)
+}
+
+console.log('\n== Vetrina v6: itinerari e gruppi nel dettaglio (0053) ==')
+{
+  const M = MARCO
+  // Righe di prova proprie: quelle del demo (seed 0006) hanno già foto, paesi
+  // e partenze, e le prove qui sotto non devono dipendere da loro.
+  const it = (await q(`insert into td_ready_itineraries (td_id, position, title) values ('${M}', 88, 'Prova 0053 itinerario') returning id`)).rows[0].id
+  const gt = (await q(`insert into td_group_trips (td_id, position, title) values ('${M}', 88, 'Prova 0053 gruppo') returning id`)).rows[0].id
+
+  await expectFail('punteggio «fa per me» sopra 5', `update td_ready_itineraries set fit_nature = 6 where id = '${it}'`)
+  await expectFail('notti negative', `update td_group_trips set nights = -1 where id = '${gt}'`)
+  await expectFail('partecipanti minimi sopra i massimi',
+    `update td_group_trips set participants_min = 10, participants_max = 6 where id = '${gt}'`, 'participants_order')
+  await expectFail('una foto con due padri',
+    `insert into td_trip_images (ready_itinerary_id, group_trip_id, position, storage_path)
+     values ('${it}', '${gt}', 1, 'td-media/x.jpg')`, 'one_parent')
+  await expectFail('una foto senza padre',
+    `insert into td_trip_images (position, storage_path) values (1, 'td-media/x.jpg')`, 'one_parent')
+  await expectOk('una foto per l\'itinerario e una per il gruppo, entrambe in posizione 1',
+    `insert into td_trip_images (ready_itinerary_id, position, storage_path) values ('${it}', 1, 'td-media/marco-rossi/itinerario/a-1.jpg');
+     insert into td_trip_images (group_trip_id, position, storage_path) values ('${gt}', 1, 'td-media/marco-rossi/gruppo/b-1.jpg')`)
+  await expectFail('due foto nella stessa posizione',
+    `insert into td_trip_images (ready_itinerary_id, position, storage_path) values ('${it}', 1, 'td-media/y.jpg')`)
+  await expectFail('lo stesso paese due volte sullo stesso viaggio',
+    `insert into td_trip_countries (ready_itinerary_id, position, country_code) values ('${it}', 1, 'giappone');
+     insert into td_trip_countries (ready_itinerary_id, position, country_code) values ('${it}', 2, 'giappone')`)
+  await expectFail('una tappa vuota',
+    `insert into td_trip_stops (ready_itinerary_id, position, days_label, title, description) values ('${it}', 1, '1', ' ', null)`,
+    'not_empty')
+  await expectFail('una partenza che finisce prima di cominciare',
+    `insert into td_group_trip_departures (group_trip_id, starts_on, ends_on) values ('${gt}', '2027-03-10', '2027-03-01')`,
+    'departures_order')
+  await expectFail('uno stato di partenza inventato',
+    `insert into td_group_trip_departures (group_trip_id, starts_on, status) values ('${gt}', '2027-03-10', 'soldOut')`)
+
+  for (const t of ['td_trip_images', 'td_trip_countries', 'td_trip_stops', 'td_group_trip_departures']) {
+    const r = (await q(`select has_table_privilege('anon', $1, 'SELECT') as a,
+                               has_table_privilege('authenticated', $1, 'SELECT') as u,
+                               (select relrowsecurity from pg_class where relname = $1) as rls`, [t])).rows[0]
+    !r.a && !r.u && r.rls ? ok(`${t}: RLS accesa e chiusa ad anon e authenticated`) : fail(`${t}: ${JSON.stringify(r)}`)
+  }
+  await q(`delete from td_ready_itineraries where id = '${it}'`)
+  await q(`delete from td_group_trips where id = '${gt}'`)
+}
+
+console.log('\n== Vetrina v6: la superficie pubblica (0054) ==')
+{
+  const M = MARCO
+  const VISTE = ['public_td_showcase', 'public_td_ready_itinerary', 'public_td_group_trip', 'public_td_reviews']
+
+  // Le colonne chiuse non sono colonne di nessuna vista leggibile da anon…
+  const CHIUSE_COLONNE = ['legal_name', 'axis_sides', 'card_phrases', 'card_phrases_status', 'highlight_position',
+    'level', 'legal_coverage', 'group_trips_readiness', 'group_trips_timing', 'xpetis_note', 'td_terms_text',
+    'author_years', 'joined_at', 'email', 'phone']
+  const colonne = (await q(`
+    select c.table_name, c.column_name from information_schema.columns c
+     where c.table_schema = 'public'
+       and c.table_name in (select relname from pg_class where relkind = 'v' and has_table_privilege('anon', oid, 'SELECT'))
+       and c.column_name = any($1)`, [CHIUSE_COLONNE])).rows
+    // geo_search.level è il livello della gerarchia geografica (città, regione,
+    // paese), non il livello di copertura di un designer: vedi più sopra.
+    .filter(c => !(c.table_name === 'geo_search' && c.column_name === 'level'))
+  colonne.length === 0
+    ? ok('nessuna vista leggibile da anon ha una colonna chiusa (nome anagrafico, assi, livelli, note, condizioni, anni…)')
+    : fail('colonne chiuse esposte: ' + JSON.stringify(colonne))
+  // …né le nomina dentro un jsonb. `joined_at` sì, ma solo per calcolarne gli
+  // anni; `legal_name` pure, ma solo per il nome corto della 0056 (lì sotto c'è
+  // la prova che il suo valore non esce).
+  const CHIUSE_TESTO = ['axis_sides', 'card_phrases', 'highlight_position', 'legal_coverage',
+    'group_trips_readiness', 'group_trips_timing', 'xpetis_note', 'td_terms_text', 'author_years']
+  const defs = (await q(`select relname, pg_get_viewdef(oid) as d from pg_class
+                          where relkind = 'v' and has_table_privilege('anon', oid, 'SELECT')`)).rows
+  const perdite = defs.flatMap(v => CHIUSE_TESTO.filter(c => v.d.includes(c)).map(c => v.relname + '.' + c))
+  perdite.length === 0
+    ? ok('nessuna vista pubblica nomina le colonne chiuse, nemmeno dentro un jsonb')
+    : fail('viste che nominano colonne chiuse: ' + JSON.stringify(perdite))
+  for (const v of VISTE) {
+    const r = (await q(`select has_table_privilege('anon', $1, 'SELECT') as a, has_table_privilege('authenticated', $1, 'SELECT') as u`, [v])).rows[0]
+    r.a && r.u ? ok(`${v}: leggibile da anon e authenticated`) : fail(`${v}: ${JSON.stringify(r)}`)
+  }
+
+  // Un itinerario e un gruppo completi su Marco, con una nota XPETIS che non
+  // deve uscire da nessuna parte.
+  const SEGRETO = 'NOTA-RISERVATA-XPETIS-42'
+  const it = (await q(`insert into td_ready_itineraries (td_id, position, title) values ('${M}', 89, 'Prova 0054 itinerario') returning id, slug`)).rows[0]
+  const gt = (await q(`insert into td_group_trips (td_id, position, title) values ('${M}', 89, 'Prova 0054 gruppo') returning id, slug`)).rows[0]
+  await q(`update td_ready_itineraries set intro = 'Racconto', nights = 11, price_note = 'volo incluso',
+             main_stops = '{Tokyo,Kyoto}', price_includes = '{Hotel}', price_excludes = '{Visto}',
+             packing_list = '{Scarpe}', health_visa_info = 'Nessun visto', fit_nature = 4,
+             xpetis_note = '${SEGRETO}', td_terms_text = '${SEGRETO}' where id = '${it.id}'`)
+  await q(`insert into td_trip_images (ready_itinerary_id, position, storage_path) values
+             ('${it.id}', 2, 'td-media/marco-rossi/itinerario/seconda.jpg'),
+             ('${it.id}', 1, 'td-media/marco-rossi/itinerario/copertina.jpg')`)
+  await q(`insert into td_trip_countries (ready_itinerary_id, position, country_code) values
+             ('${it.id}', 1, 'giappone'), ('${it.id}', 2, 'bangladesh')`)
+  await q(`insert into td_trip_stops (ready_itinerary_id, position, days_label, title, description) values
+             ('${it.id}', 2, '4-6', 'Kyoto', 'templi'), ('${it.id}', 1, '1-3', 'Tokyo', null)`)
+  await q(`update td_group_trips set participants_min = 6, participants_max = 12, age_range = '25-40 anni',
+             guide_name = 'Desiree', xpetis_note = '${SEGRETO}', td_terms_text = '${SEGRETO}' where id = '${gt.id}'`)
+  const oggi = (await q(`select (now() at time zone 'Europe/Rome')::date as d`)).rows[0].d
+  const giorni = async (n) => (await q(`select ((now() at time zone 'Europe/Rome')::date + $1::int)::text as d`, [n])).rows[0].d
+  const ieri = await giorni(-1), fra10 = await giorni(10), fra20 = await giorni(20), fra30 = await giorni(30)
+  await q(`insert into td_group_trip_departures (group_trip_id, starts_on, ends_on, status) values
+             ('${gt.id}', '${ieri}', '${fra10}', 'confirmed'),
+             ('${gt.id}', '${fra10}', '${fra20}', 'sold_out'),
+             ('${gt.id}', '${fra30}', null, 'last_seats')`)
+
+  const ri = (await q(`select * from public_td_ready_itinerary where td_slug = 'marco-rossi' and slug = $1`, [it.slug])).rows[0]
+  ri && ri.images[0] === 'td-media/marco-rossi/itinerario/copertina.jpg' && ri.images.length === 2
+    ? ok('dettaglio itinerario: le foto in ordine, la prima è la copertina')
+    : fail('foto: ' + JSON.stringify(ri?.images))
+  JSON.stringify(ri?.countries) === JSON.stringify(['Giappone', 'Bangladesh'])
+    ? ok('dettaglio itinerario: i paesi del viaggio per nome, in ordine (anche uno dei dieci nuovi)')
+    : fail('paesi: ' + JSON.stringify(ri?.countries))
+  ri?.stops.map(s => s.days_label).join('|') === '1-3|4-6' && ri.nights === 11 && ri.main_stops.length === 2
+    ? ok('dettaglio itinerario: tappe in ordine, notti, tappe principali')
+    : fail('tappe: ' + JSON.stringify(ri?.stops))
+  const rg = (await q(`select * from public_td_group_trip where td_slug = 'marco-rossi' and slug = $1`, [gt.slug])).rows[0]
+  rg?.departures.length === 2 && rg.departures.every(d => d.starts_on >= String(oggi).slice(0, 10) || d.starts_on > ieri)
+    && !rg.departures.some(d => d.starts_on === ieri)
+    ? ok('dettaglio gruppo: solo le partenze future, la passata non esce')
+    : fail('partenze: ' + JSON.stringify(rg?.departures))
+  rg?.next_departure?.starts_on === fra30 && rg.next_departure.status === 'last_seats'
+    ? ok('prossima partenza: la prima futura non sold out, anche se una sold out viene prima')
+    : fail('prossima: ' + JSON.stringify(rg?.next_departure))
+  rg?.participants_min === 6 && rg.participants_max === 12 && rg.age_range === '25-40 anni' && rg.guide_name === 'Desiree'
+    ? ok('dettaglio gruppo: partecipanti, fascia d\'età, accompagnatore')
+    : fail('gruppo: ' + JSON.stringify(rg))
+  const tutto = JSON.stringify([ri, rg, (await q(`select * from public_td_showcase where slug = 'marco-rossi'`)).rows[0]])
+  !tutto.includes(SEGRETO)
+    ? ok('la nota XPETIS e le condizioni del designer non escono da nessuna vista')
+    : fail('il testo chiuso è leggibile da una vista pubblica')
+
+  const card = (await q(`select group_trips, ready_itineraries from public_td_showcase where slug = 'marco-rossi'`)).rows[0]
+  const cg = card.group_trips.find(g => g.slug === gt.slug), ci = card.ready_itineraries.find(i => i.slug === it.slug)
+  ci?.image_path === 'td-media/marco-rossi/itinerario/copertina.jpg' && ci.countries[0] === 'Giappone'
+    ? ok('card itinerario: la copertina vera e i paesi del viaggio')
+    : fail('card itinerario: ' + JSON.stringify(ci))
+  cg?.next_departure?.starts_on === fra30 && cg.participants_max === 12
+    ? ok('card gruppo: prossima partenza e partecipanti')
+    : fail('card gruppo: ' + JSON.stringify(cg))
+
+  await q(`update td_group_trip_departures set status = 'sold_out' where group_trip_id = '${gt.id}'`)
+  const tuttiSoldOut = (await q(`select next_departure from public_td_group_trip where slug = $1 and td_slug = 'marco-rossi'`, [gt.slug])).rows[0]
+  tuttiSoldOut.next_departure?.starts_on === fra10
+    ? ok('tutte sold out: la prossima è la prima futura')
+    : fail('sold out: ' + JSON.stringify(tuttiSoldOut))
+  await q(`delete from td_group_trip_departures where group_trip_id = '${gt.id}' and starts_on >= '${fra10}'`)
+  const nessuna = (await q(`select next_departure, departures from public_td_group_trip where slug = $1 and td_slug = 'marco-rossi'`, [gt.slug])).rows[0]
+  nessuna.next_departure === null && nessuna.departures.length === 0
+    ? ok('nessuna partenza futura: niente prossima partenza, mai una passata')
+    : fail('nessuna futura: ' + JSON.stringify(nessuna))
+
+  // Anni di appartenenza: compiuti, mai la data, mai negativi.
+  const anni = async (sqlData) => {
+    await q(`update travel_designers set joined_at = ${sqlData} where id = '${M}'`)
+    return (await q(`select member_years from public_td_showcase where slug = 'marco-rossi'`)).rows[0].member_years
+  }
+  const originale = (await q(`select joined_at from travel_designers where id = '${M}'`)).rows[0].joined_at
+  const a2 = await anni(`(now() at time zone 'Europe/Rome')::date - interval '2 years' - interval '1 day'`)
+  const a1 = await anni(`(now() at time zone 'Europe/Rome')::date - interval '2 years' + interval '1 day'`)
+  const a0 = await anni(`(now() at time zone 'Europe/Rome')::date + 30`)
+  a2 === 2 && a1 === 1 && a0 === 0
+    ? ok('member_years: anni compiuti (2, poi 1 il giorno prima dell\'anniversario), mai negativi')
+    : fail(`member_years: ${a2} ${a1} ${a0}`)
+  await q(`update travel_designers set joined_at = $1 where id = '${M}'`, [originale])
+
+  // Il voto: solo verificate, solo sopra soglia, soglia letta da app_config.
+  const st = (await q(`select reviews_count, avg_overall from td_review_stats where td_id = '${M}'`)).rows[0]
+  const voto = async () => (await q(`select rating_avg from public_td_showcase where slug = 'marco-rossi'`)).rows[0].rating_avg
+  if (st && Number(st.reviews_count) >= 1) {
+    const v1 = await voto()
+    Number(v1) === Number(st.avg_overall) ? ok(`voto con ${st.reviews_count} recensione/i verificata/e e soglia 1: ${v1}`) : fail('voto: ' + v1)
+    await q(`update app_config set value = $1 where key = 'showcase_rating_min_reviews'`, [Number(st.reviews_count) + 1])
+    ;(await voto()) === null ? ok('sotto soglia il voto non esce') : fail('voto sotto soglia esposto')
+    await q(`delete from app_config where key = 'showcase_rating_min_reviews'`)
+    ;(await voto()) === null ? ok('senza la riga di soglia il voto non esce') : fail('voto senza soglia esposto')
+    await q(`insert into app_config (key, value, config_group, label_it) values ('showcase_rating_min_reviews', 1, 'showcase', 'x')`)
+  } else {
+    ;(await voto()) === null ? ok('nessuna recensione verificata: nessun voto') : fail('voto senza recensioni')
+  }
+  const giulia = (await q(`select rating_avg from public_td_showcase where slug = 'giulia-neri'`)).rows[0]
+  const stG = (await q(`select count(*) from td_review_stats where td_id = '${GIULIA}'`)).rows[0]
+  Number(stG.count) > 0 || giulia.rating_avg === null
+    ? ok('le recensioni dichiarate non fanno media: chi ha solo quelle non ha voto')
+    : fail('voto da recensioni dichiarate')
+
+  // Le recensioni della vetrina.
+  await q(`update td_showcase_reviews set is_published = true, author_years = 3 where td_id = '${M}' and position = 1`)
+  const rec = (await q(`select * from public_td_reviews where td_slug = 'marco-rossi' and source = 'td_declared'`)).rows
+  rec.length >= 1 && !('author_years' in rec[0]) && rec.every(r => r.stars >= 1)
+    ? ok('public_td_reviews: le dichiarate pubblicate escono, con source td_declared e senza gli anni')
+    : fail('recensioni: ' + JSON.stringify(rec))
+  await q(`update td_showcase_reviews set is_published = false, author_years = null where td_id = '${M}'`)
+
+  // Un designer in bozza non esce da nessuna delle viste nuove.
+  const B = '99999999-0000-0000-0000-000000000054'
+  await q(`insert into travel_designers (id, slug, display_name, email) values ('${B}', 'bozza-v6', 'Bozza', 'bozza@example.com')`)
+  await q(`insert into td_ready_itineraries (td_id, position, title) values ('${B}', 1, 'Segreto in bozza')`)
+  await q(`insert into td_group_trips (td_id, position, title) values ('${B}', 1, 'Gruppo in bozza')`)
+  await q(`insert into td_showcase_reviews (td_id, position, author_name, stars, body, is_published)
+           values ('${B}', 1, 'Qualcuno', 5, 'Bello', true)`)
+  const bozza = (await q(`select (select count(*) from public_td_ready_itinerary where td_slug = 'bozza-v6')
+                               + (select count(*) from public_td_group_trip where td_slug = 'bozza-v6')
+                               + (select count(*) from public_td_reviews where td_slug = 'bozza-v6') as n`)).rows[0]
+  Number(bozza.n) === 0 ? ok('un designer in bozza non esce da nessuna vista di dettaglio') : fail('bozza esposta: ' + bozza.n)
+
+  // td_publish_blockers: i due motivi nuovi.
+  await q(`insert into td_services (td_id, service_type, is_active, price_cents, duration_minutes, cal_event_type_slug)
+           values ('${B}', 'consultation', false, null, 30, 'consulenza-xpetis-30'),
+                  ('${B}', 'consultation_deep', true, 9000, 45, 'consulenza-xpetis-90')`)
+  const bl = (await q(`select td_publish_blockers('${B}') as b`)).rows[0].b
+  bl.some(b => b.startsWith('consulenza breve senza prezzo'))
+    ? ok('blocco: consulenza breve senza prezzo') : fail('blocchi: ' + JSON.stringify(bl))
+  bl.some(b => b.includes('durata di 45 minuti non ammessa (ammesse: 60, 90)'))
+    ? ok('blocco: Sessione approfondita con una durata fuori elenco') : fail('blocchi: ' + JSON.stringify(bl))
+  await q(`update td_services set duration_minutes = 90 where td_id = '${B}' and service_type = 'consultation_deep'`)
+  !(await q(`select td_publish_blockers('${B}') as b`)).rows[0].b.some(b => b.includes('minuti non ammessa'))
+    ? ok('Sessione da 90 minuti: nessun blocco sulla durata') : fail('90 minuti bloccati')
+  const salvaMin = (await q(`select * from app_config where key = 'calcom_minutes_consultation_deep'`)).rows[0]
+  await q(`delete from app_config where key = 'calcom_minutes_consultation_deep'`)
+  ;(await q(`select td_publish_blockers('${B}') as b`)).rows[0].b.some(b => b.includes('manca app_config.calcom_minutes_consultation_deep'))
+    ? ok('senza la riga delle durate la Sessione attiva è bloccata, e il motivo lo dice')
+    : fail('riga delle durate assente e nessun blocco')
+  await q(`insert into app_config (key, value, value_text, config_group, label_it) values ($1, null, $2, $3, $4)`,
+          [salvaMin.key, salvaMin.value_text, salvaMin.config_group, salvaMin.label_it])
+  const fn = (await q(`select has_function_privilege('anon', 'calcom_expected_minutes(service_type)', 'EXECUTE') as a`)).rows[0]
+  !fn.a ? ok('calcom_expected_minutes(): chiusa ad anon') : fail('calcom_expected_minutes aperta')
+  await q(`delete from travel_designers where id = '${B}'`)
+
+  // Le righe di app_config: i testi della vetrina passano da public_config, la
+  // soglia del voto pure; le condizioni dei gruppi nascono vuote.
+  const cfg = (await q(`select key, value, value_text from public_config
+                         where key in ('showcase_rating_min_reviews', 'showcase_declared_reviews_note',
+                                       'ready_itinerary_price_prefix', 'group_trip_price_prefix',
+                                       'group_trip_terms_text', 'showcase_price_on_request')`)).rows
+  cfg.length === 6 && cfg.find(c => c.key === 'group_trip_terms_text').value_text === ''
+    ? ok('le sei righe showcase della vetrina v6 sono in public_config; group_trip_terms_text nasce vuota')
+    : fail('righe showcase: ' + JSON.stringify(cfg))
+
+  // Pulizia: Marco torna com'era per chi viene dopo.
+  await q(`delete from td_ready_itineraries where id = '${it.id}'`)
+  await q(`delete from td_group_trips where id = '${gt.id}'`)
+  await q(`update td_services set price_from_cents = 9000 where td_id = '${M}' and service_type = 'custom_itinerary'`)
+  await q(`update travel_designers set axis_sides = null, card_phrases = null, card_phrases_status = null,
+             legal_name = null where id = '${M}'`)
+}
+
+console.log('\n== L\'importatore delle vetrine v6 (0055) ==')
+{
+  const imp = await import(path.join(root, 'scripts', 'importa_vetrina.mjs'))
+  const LUCA = path.join(root, '..', 'vetrina-luca-ferraina')
+  const URL_FINTO = (p) => 'https://progetto.supabase.co/storage/v1/object/public/' + p
+  const prepara = (cartella, slug, email = null) => {
+    const letto = imp.leggiPacchetto(cartella)
+    return imp.preparaImport(letto.json, { cartella, slug, email, urlPubblica: URL_FINTO })
+  }
+  const importa = async (payload, scrivi) =>
+    (await q('select td_import_showcase($1::jsonb, $2) as r', [JSON.stringify(payload), scrivi])).rows[0].r
+  const archivio = async () => Number((await q('select count(*) from td_import_runs')).rows[0].count)
+  const tdId = async (slug) => (await q('select id from travel_designers where slug = $1', [slug])).rows[0]?.id
+
+  // ------------------------------------------------ il formato vecchio
+  for (const [nome, cartella] of [['Dennis', path.join(root, '..', 'vetrina-dennis-milello')]]) {
+    const { payload } = prepara(cartella, 'dennis-milello', 'dennis@example.com')
+    payload.errors.some(e => e.startsWith('Formato vecchio'))
+      ? ok(`${nome}: formato vecchio riconosciuto dallo script («riesportalo dal tool v6»)`)
+      : fail(`${nome}: ${JSON.stringify(payload.errors)}`)
+    const r = await importa(payload, true)
+    const runs = (await q(`select outcome from td_import_runs where td_slug = 'dennis-milello'`)).rows
+    r.esito === 'rifiutato' && !(await tdId('dennis-milello')) && runs.length === 1 && runs[0].outcome === 'rifiutato'
+      ? ok(`${nome} con --scrivi: rifiutato, nessun designer creato, il rifiuto è in archivio`)
+      : fail(`${nome}: ${JSON.stringify(r)} ${JSON.stringify(runs)}`)
+  }
+  {
+    const vecchio = JSON.parse(readFileSync(path.join(root, '..', 'vetrina_nuova.json'), 'utf8'))
+    const { payload } = imp.preparaImport(vecchio, { cartella: path.join(root, '..'), slug: 'x' })
+    payload.errors.some(e => e.startsWith('Formato vecchio'))
+      ? ok('vetrina_nuova.json (form vecchio): rifiutato anche lui') : fail(JSON.stringify(payload.errors))
+  }
+
+  // ------------------------------------------------ Luca: prova a secco
+  const { payload: luca, foto } = prepara(LUCA, 'luca-ferraina', 'luca@example.com')
+  luca.errors.length === 0 ? ok('Luca: nessun errore lato script') : fail('Luca: ' + JSON.stringify(luca.errors))
+  foto.size === 22 && [...foto.keys()].every(p => /^td-media\/luca-ferraina\/(profilo|firma|itinerario|gruppo)\/[0-9a-f]{16}\.(jpg|png|webp)$/.test(p))
+    ? ok('foto: 22 percorsi nostri (td-media/<designer>/<tipo>/<impronta>.<ext>), niente del percorso originale')
+    : fail('foto: ' + JSON.stringify([...foto.keys()]))
+  const prima = await archivio()
+  const secco = await importa(luca, false)
+  secco.esito === 'ok' && secco.nuovo && secco.modifiche > 0 && !(await tdId('luca-ferraina')) && (await archivio()) === prima
+    ? ok(`prova a secco: ${secco.modifiche} modifiche previste, niente scritto, archivio intatto`)
+    : fail('prova a secco: ' + JSON.stringify(secco).slice(0, 300))
+  secco.gruppi?.length === 7 && secco.gruppi[0].slug === 'vietnam-ha-giang-loop-e-la-magia-del-nord'
+    ? ok('la prova a secco dice gli slug che le voci prenderanno') : fail('slug: ' + JSON.stringify(secco.gruppi))
+
+  const senzaEmail = await importa({ ...luca, email: null }, false)
+  senzaEmail.esito === 'rifiutato' && senzaEmail.errori.some(e => e.includes('serve --email'))
+    ? ok('designer nuovo senza --email: rifiutato') : fail(JSON.stringify(senzaEmail.errori))
+
+  // ------------------------------------------------ Luca: scrittura
+  const scritto = await importa(luca, true)
+  const L = await tdId('luca-ferraina')
+  scritto.esito === 'ok' && scritto.scritto && L ? ok('scrittura: Luca importato') : fail('scrittura: ' + JSON.stringify(scritto).slice(0, 400))
+  const td = (await q(`select * from travel_designers where id = $1`, [L])).rows[0]
+  td.status === 'draft' && td.display_name === 'Luca Ferraina' && td.legal_name === 'Luca Ferraina'
+    && td.instagram_handle === 'pianetaferra' && td.years_experience === 6 && td.languages.length === 4
+    && td.photo_url.startsWith('https://progetto.supabase.co/storage/v1/object/public/td-media/luca-ferraina/profilo/')
+    && td.axis_sides.ritmo === 'dynamic' && td.card_phrases.chiusura && td.legal_coverage.startsWith('Ho già')
+    ? ok('profilo: in bozza, nome, Instagram senza @, anni, lingue, foto, campi chiusi')
+    : fail('profilo: ' + JSON.stringify(td).slice(0, 500))
+
+  const paesi = (await q(`select country_code, level, highlight_position from td_countries where td_id = $1 order by country_code`, [L])).rows
+  const forti = paesi.filter(p => p.level === 1).map(p => `${p.country_code}:${p.highlight_position}`).join(' ')
+  paesi.length === 7 && forti === 'filippine:2 thailandia:3 vietnam:1'
+    ? ok('livelli: le tre in evidenza sono di livello 1, nell\'ordine del pacchetto; gli altri quattro (tutti «Base») di livello 2')
+    : fail('paesi: ' + JSON.stringify(paesi))
+  const tagVietnam = Number((await q(`select count(*) from td_destination_tags where td_id = $1 and country_code = 'vietnam'`, [L])).rows[0].count)
+  tagVietnam === 13 ? ok('tag del Vietnam: 7 temi e 6 contesti, tutti agganciati') : fail('tag Vietnam: ' + tagVietnam)
+
+  const assi = (await q(`select axis_code, array_agg(value order by value) as v from td_axis_values where td_id = $1 group by axis_code order by 1`, [L])).rows
+  const assiStr = assi.map(a => `${a.axis_code}=${a.v.join(',')}`).join(' ')
+  assiStr === 'comfort_wild=4 companions=1,2 curated_vs_real=1 pace=3 planning_involvement=2 social_orientation=3'
+    ? ok('assi: i cinque valori e «con chi viaggi» (solo, coppia), controprova passata')
+    : fail('assi: ' + assiStr)
+
+  const sv = (await q(`select service_type, is_active, price_cents, price_from_cents, duration_minutes, cal_event_type_slug,
+                              (select count(*) from td_service_bullets b where b.service_id = s.id)::int as punti
+                         from td_services s where td_id = $1 order by sort_order`, [L])).rows
+  const s = Object.fromEntries(sv.map(x => [x.service_type, x]))
+  s.consultation?.price_cents === 3000 && s.consultation.duration_minutes === 30 && s.consultation.cal_event_type_slug === 'consulenza-xpetis-30'
+    && s.consultation.is_active && s.consultation.punti === 4
+    ? ok('consulenza breve: 30€, 30 minuti, consulenza-xpetis-30, attiva, quattro punti') : fail('breve: ' + JSON.stringify(s.consultation))
+  s.consultation_deep?.price_cents === 9000 && s.consultation_deep.duration_minutes === 90
+    && s.consultation_deep.cal_event_type_slug === 'consulenza-xpetis-90' && s.consultation_deep.is_active
+    ? ok('Sessione approfondita: 90€, 90 minuti, consulenza-xpetis-90') : fail('approfondita: ' + JSON.stringify(s.consultation_deep))
+  s.custom_itinerary?.price_from_cents === 7000 && s.custom_itinerary.price_cents === null
+    && ['all_inclusive', 'group_trip', 'private_guiding'].every(t => s[t]?.is_active)
+    ? ok('servizi dopo la call: i quattro attivi; «da 70€» in price_from_cents, non in price_cents (D5)')
+    : fail('dopo la call: ' + JSON.stringify(sv))
+
+  const firma = (await q(`select title, country_code, (select count(*) from td_signature_trip_images i where i.trip_id = t.id)::int as foto
+                            from td_signature_trips t where td_id = $1 order by position`, [L])).rows
+  firma.length === 3 && firma.every(f => f.foto === 3) && firma.map(f => f.country_code).join(',') === 'vietnam,filippine,thailandia'
+    ? ok('viaggi firma: tre, ognuno col suo paese e tre foto') : fail('firma: ' + JSON.stringify(firma))
+
+  const g = (await q(`select g.title, g.position, g.participants_min, g.participants_max, g.age_range, g.xpetis_note, g.td_terms_text,
+                             (select string_agg(d.status, ',' order by d.starts_on) from td_group_trip_departures d where d.group_trip_id = g.id) as stati,
+                             (select count(*) from td_trip_images i where i.group_trip_id = g.id)::int as foto,
+                             (select count(*) from td_trip_stops t where t.group_trip_id = g.id)::int as tappe
+                        from td_group_trips g where td_id = $1 order by position`, [L])).rows
+  g.length === 7 && g[0].stati === 'sold_out,open,open' && g[0].participants_max === 15 && g[0].participants_min === null
+    && g[3].participants_min === 6 && g[5].age_range === '18-50 anni' && g[0].xpetis_note && g[0].td_terms_text
+    && g[0].tappe === 7 && g.every(x => x.foto === 1)
+    ? ok('viaggi di gruppo: sette, con partenze e stati, partecipanti, fascia d\'età, tappe, foto, e i due testi chiusi')
+    : fail('gruppi: ' + JSON.stringify(g).slice(0, 600))
+  const it = (await q(`select title, nights, fit_on_the_road, price_includes,
+                              (select string_agg(country_code, ',' order by position) from td_trip_countries c where c.ready_itinerary_id = r.id) as paesi
+                         from td_ready_itineraries r where td_id = $1 order by position`, [L])).rows
+  it.length === 2 && it[0].nights === 11 && it[0].fit_on_the_road === 5 && it[0].paesi === 'laos,thailandia' && it[0].price_includes.length === 3
+    ? ok('itinerari: due, con notti, punteggi, quota e i paesi del viaggio') : fail('itinerari: ' + JSON.stringify(it))
+  const rec = (await q(`select author_name, stars, is_published from td_showcase_reviews where td_id = $1 order by position`, [L])).rows
+  rec.length === 2 && rec.every(r => r.is_published && r.stars === 5)
+    ? ok('recensioni dichiarate: due, pubblicate all\'import (D3)') : fail('recensioni: ' + JSON.stringify(rec))
+  const run = (await q(`select outcome, raw ? 'frasiCard' as raw_ok, report->>'esito' as esito from td_import_runs where td_slug = 'luca-ferraina'`)).rows
+  run.length === 1 && run[0].outcome === 'scritto' && run[0].raw_ok
+    ? ok('archivio: una riga «scritto» col JSON grezzo intero') : fail('archivio: ' + JSON.stringify(run))
+
+  // ------------------------------------------------ secondo lancio: niente cambia
+  const fotografia = async () => (await q(`
+    select md5(string_agg(x, '|' order by x)) as h from (
+      select to_jsonb(t)::text as x from travel_designers t where id = $1
+      union all select to_jsonb(c)::text from td_countries c where td_id = $1
+      union all select to_jsonb(d)::text from td_destination_tags d where td_id = $1
+      union all select to_jsonb(a)::text from td_axis_values a where td_id = $1
+      union all select to_jsonb(s)::text from td_services s where td_id = $1
+      union all select to_jsonb(b)::text from td_service_bullets b join td_services s on s.id = b.service_id where s.td_id = $1
+      union all select to_jsonb(f)::text from td_signature_trips f where td_id = $1
+      union all select to_jsonb(i)::text from td_signature_trip_images i join td_signature_trips f on f.id = i.trip_id where f.td_id = $1
+      union all select to_jsonb(r)::text from td_ready_itineraries r where td_id = $1
+      union all select to_jsonb(g)::text from td_group_trips g where td_id = $1
+      union all select to_jsonb(i)::text from td_trip_images i
+                 where ready_itinerary_id in (select id from td_ready_itineraries where td_id = $1)
+                    or group_trip_id in (select id from td_group_trips where td_id = $1)
+      union all select to_jsonb(c)::text from td_trip_countries c
+                 where ready_itinerary_id in (select id from td_ready_itineraries where td_id = $1)
+                    or group_trip_id in (select id from td_group_trips where td_id = $1)
+      union all select to_jsonb(t)::text from td_trip_stops t
+                 where ready_itinerary_id in (select id from td_ready_itineraries where td_id = $1)
+                    or group_trip_id in (select id from td_group_trips where td_id = $1)
+      union all select to_jsonb(d)::text from td_group_trip_departures d
+                 where group_trip_id in (select id from td_group_trips where td_id = $1)
+      union all select to_jsonb(r)::text from td_showcase_reviews r where td_id = $1) z`, [L])).rows[0].h
+  const h1 = await fotografia()
+  const di_nuovo = await importa(luca, true)
+  const h2 = await fotografia()
+  di_nuovo.esito === 'ok' && di_nuovo.modifiche === 0 && h1 === h2
+    ? ok('secondo lancio sullo stesso pacchetto: zero modifiche, tutte le righe identiche (updated_at compresi)')
+    : fail(`secondo lancio: ${di_nuovo.modifiche} modifiche, righe ${h1 === h2 ? 'uguali' : 'diverse'}`)
+
+  // ------------------------------------------------ cosa non tocca mai
+  await q(`update travel_designers set phone = '+39 333', cal_username = 'luca-ferraina-xpetis',
+                  cal_webhook_ok_at = now(), joined_at = '2025-02-01', email = 'vera@example.com' where id = $1`, [L])
+  await importa({ ...luca, email: 'altra@example.com' }, true)
+  const intatto = (await q(`select status, phone, cal_username, joined_at::text, email, cal_webhook_ok_at is not null as wh
+                              from travel_designers where id = $1`, [L])).rows[0]
+  intatto.status === 'draft' && intatto.phone === '+39 333' && intatto.cal_username === 'luca-ferraina-xpetis'
+    && intatto.joined_at === '2025-02-01' && intatto.email === 'vera@example.com' && intatto.wh
+    ? ok('reimport: stato, telefono, Cal.com, joined_at ed email non si toccano') : fail('toccati: ' + JSON.stringify(intatto))
+
+  // ------------------------------------------------ un prezzo cambiato non si sovrascrive
+  {
+    const p = structuredClone(luca)
+    p.services.find(x => x.type === 'consultation').price_cents = 4000
+    const r = await importa(p, true)
+    const prezzo = (await q(`select price_cents from td_services where td_id = $1 and service_type = 'consultation'`, [L])).rows[0].price_cents
+    r.avvisi.some(a => a.includes('prezzo nel database 3000 centesimi, nel pacchetto 4000. Non sovrascritto')) && prezzo === 3000
+      ? ok('prezzo della breve cambiato nel pacchetto: report, e nel database resta 30€')
+      : fail('prezzo: ' + prezzo + ' ' + JSON.stringify(r.avvisi))
+  }
+
+  // ------------------------------------------------ voci rinominate, sparite, riordinate
+  {
+    const p = structuredClone(luca)
+    const slugPrima = (await q(`select title, slug from td_group_trips where td_id = $1 order by position`, [L])).rows
+    p.itineraries[0].title = 'Brasile: Rio e Ilha Grande'             // un titolo cambiato davvero
+    p.group_trips = [p.group_trips[2], p.group_trips[0], ...p.group_trips.slice(3)]  // via il secondo, primi due scambiati
+    const r = await importa(p, true)
+    const dopo = (await q(`select title, slug, position from td_group_trips where td_id = $1 order by position`, [L])).rows
+    const itin = (await q(`select slug from td_ready_itineraries where td_id = $1 order by position`, [L])).rows.map(x => x.slug)
+    const slugDi = (rows, t) => rows.find(x => x.title === t)?.slug
+    r.esito === 'ok' && dopo.length === 6 && dopo[0].title.startsWith('Filippine') && dopo[1].title.startsWith('Vietnam')
+      && slugDi(dopo, p.group_trips[0].title) === slugDi(slugPrima, p.group_trips[0].title)
+      && slugDi(dopo, p.group_trips[1].title) === slugDi(slugPrima, p.group_trips[1].title)
+      && !dopo.some(x => x.title === 'Avventura e relax in Thailandia del Sud')
+      ? ok('voci riordinate: lo slug segue il titolo, non la posizione; la voce sparita non c\'è più')
+      : fail('riordino: ' + JSON.stringify(dopo))
+    itin[0] === 'brasile-rio-e-ilha-grande'
+      ? ok('titolo cambiato: è una voce nuova con uno slug nuovo, il vecchio indirizzo non risponde più')
+      : fail('slug itinerario: ' + JSON.stringify(itin))
+    const vecchio = (await q(`select count(*) from td_ready_itineraries where td_id = $1 and slug = 'brasile-rio-de-janeiro'`, [L])).rows[0]
+    Number(vecchio.count) === 0 ? ok('nessuna riga risponde più allo slug vecchio') : fail('slug vecchio ancora presente')
+    await importa(luca, true) // torna come il pacchetto
+  }
+
+  // ------------------------------------------------ i rifiuti
+  {
+    const p = structuredClone(luca)
+    p.group_trips[0].countries = ['atlantide']
+    p.signature_trips[0].country_code = 'lemuria'
+    const h = await fotografia()
+    const r = await importa(p, true)
+    r.esito === 'rifiutato' && r.errori.some(e => e === 'Paesi che la tassonomia non ha: atlantide, lemuria') && (await fotografia()) === h
+      ? ok('paese sconosciuto: rifiutato con l\'elenco completo, niente toccato') : fail('paese: ' + JSON.stringify(r.errori))
+  }
+  {
+    const p = structuredClone(luca)
+    p.axes.find(a => a.axis === 'curated_vs_real').side = 'vita reale'   // valore 1, cioè «Estetica curata»
+    const r = await importa(p, false)
+    r.esito === 'rifiutato' && r.errori.some(e => e.startsWith('Asse curated_vs_real: il valore 1 sta dal lato «Estetica curata»'))
+      ? ok('asse in contraddizione con assiLato: l\'import si ferma con l\'asse e i due valori') : fail('asse: ' + JSON.stringify(r.errori))
+  }
+  {
+    const p = structuredClone(luca)
+    p.td.legal_coverage = 'Ho un\'agenzia'
+    const r = await importa(p, false)
+    r.esito === 'rifiutato' && r.errori[0].includes('legal_coverage')
+      ? ok('copertura legale con parole diverse dal form: rifiutato in modo visibile') : fail('copertura: ' + JSON.stringify(r.errori))
+  }
+  {
+    const p = structuredClone(luca)
+    p.services.find(x => x.type === 'consultation_deep').minutes = 45
+    p.services.find(x => x.type === 'consultation_deep').minutes_label = '45 minuti'
+    const r = await importa(p, false)
+    r.esito === 'ok' && r.avvisi.some(a => a.startsWith('Sessione approfondita: durata «45 minuti» non ammessa (ammesse: 60, 90)'))
+      ? ok('Sessione da 45 minuti: quel servizio si ferma con un messaggio, il resto passa') : fail('45: ' + JSON.stringify(r.avvisi))
+  }
+
+  // ------------------------------------------------ un designer nuovo col prezzo illeggibile
+  {
+    const j = structuredClone(JSON.parse(readFileSync(path.join(LUCA, 'vetrina.json'), 'utf8')))
+    j.callPrezzo = 'trenta'
+    j.nomeProfessionale = 'Pianeta Ferra'
+    j.fotoProfilo = 'https://xyz.supabase.co/storage/v1/object/public/vetrine-td/CODICE-SEGRETO/pacchetto/foto.jpg'
+    j.chiaveDelFuturo = 'qualcosa'
+    j.paesi.forEach(x => { x.livello = 'Base' })
+    j.topDestinazioniId = []
+    const { payload: p } = imp.preparaImport(j, { cartella: LUCA, slug: 'pianeta-ferra', email: 'p@example.com', urlPubblica: URL_FINTO })
+    p.warnings.some(a => a.startsWith('callPrezzo «trenta» non si legge'))
+      && p.warnings.some(a => a.includes('foto con URL assoluto (xyz.supabase.co…)') && !a.includes('CODICE-SEGRETO'))
+      && p.warnings.some(a => a.startsWith('Chiave sconosciuta «chiaveDelFuturo»'))
+      && p.warnings.some(a => a.startsWith('Nessun paese di livello 1'))
+      ? ok('report: prezzo illeggibile, URL assoluto (senza il codice segreto), chiave sconosciuta, nessun livello 1')
+      : fail('avvisi: ' + JSON.stringify(p.warnings))
+    const r = await importa(p, true)
+    const P = await tdId('pianeta-ferra')
+    const nuovo = (await q(`select display_name, legal_name, photo_url from travel_designers where id = $1`, [P])).rows[0]
+    const breve = (await q(`select is_active, price_cents from td_services where td_id = $1 and service_type = 'consultation'`, [P])).rows[0]
+    nuovo?.display_name === 'Pianeta Ferra' && nuovo.legal_name === 'Luca Ferraina' && nuovo.photo_url === null
+      ? ok('nome professionale in pagina, nome anagrafico chiuso, nessuna foto da un URL assoluto (D8)')
+      : fail('nuovo: ' + JSON.stringify(nuovo))
+    breve && !breve.is_active && breve.price_cents === null
+      && r.blocchi_pubblicazione.includes('consulenza breve senza prezzo: la cassa non si può aprire')
+      && r.blocchi_pubblicazione.includes('nessun paese di livello 1: il designer non prenderebbe mai il badge')
+      ? ok('breve senza prezzo: creata spenta, e i blocchi alla pubblicazione lo dicono')
+      : fail('breve: ' + JSON.stringify(breve) + ' ' + JSON.stringify(r.blocchi_pubblicazione))
+    await q(`delete from travel_designers where id = $1`, [P])
+  }
+
+  // ------------------------------------------------ chiusure
+  {
+    const f = (await q(`select has_function_privilege('anon', 'td_import_showcase(jsonb, boolean)', 'EXECUTE') as a,
+                               has_function_privilege('authenticated', 'td_import_showcase(jsonb, boolean)', 'EXECUTE') as u,
+                               has_function_privilege('service_role', 'td_import_showcase(jsonb, boolean)', 'EXECUTE') as s`)).rows[0]
+    !f.a && !f.u && f.s ? ok('td_import_showcase(): solo service_role') : fail('privilegi import: ' + JSON.stringify(f))
+    const t = (await q(`select has_table_privilege('anon', 'td_import_runs', 'SELECT') as a,
+                               has_table_privilege('authenticated', 'td_import_runs', 'SELECT') as u,
+                               (select relrowsecurity from pg_class where relname = 'td_import_runs') as rls`)).rows[0]
+    !t.a && !t.u && t.rls ? ok('td_import_runs: RLS accesa, chiusa ad anon e authenticated') : fail('archivio: ' + JSON.stringify(t))
+  }
+
+  await q(`delete from travel_designers where slug = 'luca-ferraina'`)
+  await q(`delete from td_import_runs`)
+}
+
+
+console.log('\n== Il nome corto delle frasi (0056) ==')
+{
+  const M = MARCO
+  const salva = (await q(`select display_name, legal_name from travel_designers where id = '${M}'`)).rows[0]
+  const corto = async () => (await q(`select * from public_td_showcase where slug = 'marco-rossi'`)).rows[0]
+  await q(`update travel_designers set display_name = 'Studio Viaggi Lenti', legal_name = 'Marco Anagrafico Rossi' where id = '${M}'`)
+  const a = await corto()
+  a.short_name === 'Studio Viaggi Lenti' && !JSON.stringify(a).includes('Anagrafico')
+    ? ok('nome professionale: le frasi lo usano intero, e il nome anagrafico non esce dalla vista (D8)')
+    : fail('professionale: ' + a.short_name)
+  await q(`update travel_designers set display_name = 'Marco Rossi', legal_name = 'Marco Rossi' where id = '${M}'`)
+  const b = await corto()
+  await q(`update travel_designers set legal_name = null where id = '${M}'`)
+  const c = await corto()
+  b.short_name === 'Marco' && c.short_name === 'Marco'
+    ? ok('nome anagrafico in pagina, o nessun nome anagrafico: la prima parola, come nel tool')
+    : fail(`nome corto: ${b.short_name} ${c.short_name}`)
+  await q(`update travel_designers set display_name = $1, legal_name = $2 where id = '${M}'`, [salva.display_name, salva.legal_name])
+}
+
+
+console.log('\n== I demo sulla struttura v6 (seed 0006) ==')
+{
+  const M = MARCO, G = GIULIA
+  const oggi = (await q(`select (now() at time zone 'Europe/Rome')::date::text as d`)).rows[0].d
+  // Lo stato dei due demo, senza gli id: le figlie si riscrivono a ogni giro e
+  // cambiano id, ma il contenuto deve restare identico.
+  const stato = async () => (await q(`
+    select md5(string_agg(x, '|' order by x)) as h from (
+      select (to_jsonb(t) - 'updated_at')::text as x from travel_designers t where id in ($1, $2)
+      union all select (to_jsonb(s) - 'id')::text from td_services s where td_id in ($1, $2)
+      union all select (to_jsonb(b) - 'id' - 'service_id')::text || s.service_type || s.td_id
+                  from td_service_bullets b join td_services s on s.id = b.service_id where s.td_id in ($1, $2)
+      union all select (to_jsonb(r) - 'id' - 'updated_at' - 'created_at')::text from td_ready_itineraries r where td_id in ($1, $2)
+      union all select (to_jsonb(g) - 'id' - 'updated_at' - 'created_at')::text from td_group_trips g where td_id in ($1, $2)
+      union all select (to_jsonb(i) - 'id' - 'ready_itinerary_id' - 'group_trip_id')::text || coalesce(r.slug, g.slug)
+                  from td_trip_images i left join td_ready_itineraries r on r.id = i.ready_itinerary_id
+                  left join td_group_trips g on g.id = i.group_trip_id
+                 where coalesce(r.td_id, g.td_id) in ($1, $2)
+      union all select (to_jsonb(d) - 'id' - 'group_trip_id')::text || g.slug
+                  from td_group_trip_departures d join td_group_trips g on g.id = d.group_trip_id where g.td_id in ($1, $2)
+      union all select (to_jsonb(v) - 'created_at')::text from td_showcase_reviews v where td_id in ($1, $2)) z`, [M, G])).rows[0].h
+  // Le prove di prima hanno toccato i demo: un giro di seed li riporta allo
+  // stato voluto, e il secondo giro non deve cambiare niente.
+  await db.exec(readFileSync(path.join(root, 'seed', '0006_demo_v6.sql'), 'utf8'))
+  const prima = await stato()
+  await db.exec(readFileSync(path.join(root, 'seed', '0006_demo_v6.sql'), 'utf8'))
+  prima === await stato()
+    ? ok('seed 0006 rilanciato: stesso stato dei due demo (convergente)')
+    : fail('seed 0006 non convergente')
+
+  const vm = (await q(`select * from public_td_showcase where slug = 'marco-rossi'`)).rows[0]
+  const tipi = vm.services.map(x => x.service_type).sort().join(',')
+  tipi === 'all_inclusive,consultation,consultation_deep,custom_itinerary,group_trip,private_guiding'
+    && vm.services.find(x => x.service_type === 'custom_itinerary').price_from_cents === 9000
+    && vm.travel_philosophy && vm.expertise_areas && vm.signature_trips.slice(0, 3).every(t => t.country)
+    ? ok('Marco: Sessione, i quattro servizi dopo la call con «da 90€», testo di «viaggiare per me», viaggi firma col paese')
+    : fail('Marco: ' + JSON.stringify({ tipi, f: vm.signature_trips.map(t => t.country) }))
+  // Le tre del seed (posizioni 1-3); le prove di prima ne aggiungono altre.
+  const rm = (await q(`select count(*)::int as n from public_td_reviews
+                        where td_slug = 'marco-rossi' and source = 'td_declared' and position <= 3`)).rows[0].n
+  rm === 3 ? ok('Marco: tre recensioni dichiarate in vetrina') : fail('recensioni di Marco: ' + rm)
+
+  const it1 = (await q(`select * from public_td_ready_itinerary where td_slug = 'marco-rossi' order by position limit 1`)).rows[0]
+  it1.images.length === 4 && it1.stops.length === 5 && it1.price_includes.length > 0 && it1.fit_nature > 0
+    && it1.countries[0] === 'Vietnam' && it1.health_visa_info
+    ? ok('Marco: un itinerario completo in ogni campo (4 foto, 5 tappe, quota, fa per me, paese, visti)')
+    : fail('itinerario completo: ' + JSON.stringify(it1).slice(0, 300))
+  const it3 = (await q(`select * from public_td_ready_itinerary where td_slug = 'marco-rossi' order by position offset 2 limit 1`)).rows[0]
+  it3.images.length === 0 && it3.price_label === null
+    ? ok('Marco: un itinerario senza foto né prezzo («Prezzo su richiesta»)') : fail('itinerario vuoto: ' + JSON.stringify(it3).slice(0, 200))
+
+  const gr = (await q(`select slug, departures, next_departure, participants_min, participants_max
+                         from public_td_group_trip where td_slug = 'marco-rossi' order by position`)).rows
+  const attese = [['2026-03-07', 'confirmed'], ['2026-11-14', 'sold_out'], ['2027-03-06', 'last_seats'], ['2027-10-09', 'open']]
+    .filter(([d]) => d >= oggi)
+  JSON.stringify(gr[0].departures.map(d => [d.starts_on, d.status])) === JSON.stringify(attese)
+    ? ok(`Marco, primo gruppo: delle quattro partenze escono solo le ${attese.length} future (la passata no)`)
+    : fail('partenze: ' + JSON.stringify(gr[0].departures))
+  const prossimaAttesa = attese.find(([, st]) => st !== 'sold_out')?.[0] ?? attese[0]?.[0] ?? null
+  ;(gr[0].next_departure?.starts_on ?? null) === prossimaAttesa
+    ? ok('Marco, primo gruppo: la prossima partenza salta la sold out: ' + prossimaAttesa)
+    : fail('prossima: ' + JSON.stringify(gr[0].next_departure))
+  gr[1].participants_min === null && gr[1].participants_max === 10
+    && gr[2].departures.length === 0 && gr[2].next_departure === null
+    ? ok('Marco: un gruppo col solo massimo dei partecipanti, uno con le sole partenze passate (nessuna in pagina)')
+    : fail('gruppi: ' + JSON.stringify(gr.slice(1)))
+
+  const vg = (await q(`select * from public_td_showcase where slug = 'giulia-neri'`)).rows[0]
+  const rg = (await q(`select count(*)::int as n from public_td_reviews where td_slug = 'giulia-neri'`)).rows[0].n
+  vg.ready_itineraries.length === 0 && vg.group_trips.length === 0 && rg === 0
+    && !vg.services.some(x => x.service_type === 'consultation_deep')
+    ? ok('Giulia: demo minimo, senza Sessione, itinerari, gruppi e recensioni')
+    : fail('Giulia: ' + JSON.stringify({ it: vg.ready_itineraries.length, gr: vg.group_trips.length, rg, s: vg.services.map(x => x.service_type) }))
+  const bl = (await q(`select td_publish_blockers($1) as b`, [G])).rows[0].b
+  bl.length === 0 ? ok('Giulia minima resta pubblicabile: nessun blocco') : fail('blocchi di Giulia: ' + JSON.stringify(bl))
 }
 
 console.log(failures === 0 ? '\nTutto verde.\n' : `\n${failures} asserzioni fallite.\n`)

@@ -1073,6 +1073,245 @@ ferma se trova una riga che non si aspetta. Il file è **una transazione sola**
 | 112 | Nel suggeritore scrivi `Siena`, poi `Cusco` | Siena: niente. Cusco: la città, che porta al Perù | La prima è la potatura, la seconda una delle 188 |
 | 113 | `select td.slug, string_agg(tc.country_code, ', ' order by tc.country_code) from td_countries tc join travel_designers td on td.id = tc.td_id group by td.slug;` | giulia-neri: **bolivia, peru** · marco-rossi: **giappone, thailandia, vietnam** | I demo non perdono paesi: la potatura tocca solo le città |
 | 114 | Rilancia il comando del punto 2 una seconda volta | Nessun errore, conteggi invariati | Il seed è idempotente |
+
+**🔴 Le prove dei dieci paesi nuovi e dello schema vetrina v6 (3 ottobre 2026)**
+
+La tassonomia passa da 129 a **139 stati** e da 244 a **254 regioni**: i dieci
+paesi della lista del tool vetrina v6 che non avevamo (andorra, angola,
+eritrea, gambia, bangladesh, antigua_e_barbuda, barbados, saint_lucia,
+saint_vincent_e_grenadine, sint_maarten), ciascuno con una regione omonima e
+**nessuna città**. Le città restano 188. Gli altri 129 coincidono con il tool
+in id, nome e macro-area: nessuna differenza da correggere. Sui paesi che
+c'erano già il seed cambia solo `sort_order`, perché dentro ogni macro-area
+l'ordine è alfabetico e i nuovi ci si inseriscono in mezzo.
+
+**Come si applica, in quest'ordine, dalla radice del progetto.** Le query le ho
+provate su PGlite con `node supabase/tests/prova_query.mjs "<query>"`, non sul
+database vero: **niente di questo l'ho eseguito io**.
+
+1. `supabase db push` — le `0052_vetrina_v6_profilo.sql`,
+   `0053_vetrina_v6_viaggi.sql`, `0054_vetrina_v6_viste.sql`.
+2. Il seed della configurazione, che porta le sette righe nuove (sei
+   `showcase` e `calcom_minutes_consultation_deep`). Ogni riga è `on conflict
+   do nothing`: quelle che hai cambiato da Studio restano come sono.
+   ```bash
+   supabase db query --linked -f supabase/seed/0001_config.sql
+   ```
+   ⚠️ Senza `calcom_minutes_consultation_deep`, un designer con la consulenza
+   approfondita attiva **non si può pubblicare** (è voluto: il motivo lo dice).
+3. Il seed geografico, come per le prove 109-114. Stessa transazione unica,
+   stesse guardie:
+   ```bash
+   supabase db query --linked -f supabase/seed/0002_geo.sql
+   ```
+4. **Non** il seed 0003: riscrive le foto (trappola n. 1 del runbook).
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 147 | Dopo il punto 3: `select (select count(*) from geo_continents) as continenti, (select count(*) from geo_macro_areas) as macro_aree, (select count(*) from geo_countries) as stati, (select count(*) from geo_regions) as regioni, (select count(*) from geo_cities) as citta;` | **6 · 14 · 139 · 254 · 188** | Se gli stati sono ancora 129, il seed non è arrivato in fondo |
+| 148 | `select k.code, k.name_it, m.name_it as macro_area, (select count(*) from geo_regions r where r.country_code = k.code) as regioni, (select count(*) from geo_cities c where c.country_code = k.code) as citta from geo_countries k join geo_macro_areas m on m.code = k.macro_area_code where k.code in ('andorra','angola','eritrea','gambia','bangladesh','antigua_e_barbuda','barbados','saint_lucia','saint_vincent_e_grenadine','sint_maarten') order by m.name_it, k.code;` | **Dieci righe**: Angola, Eritrea, Gambia in Africa Sub-Sahariana; Bangladesh in Asia Centrale e Subcontinente Indiano; Antigua e Barbuda, Barbados, Saint Lucia, Saint Vincent e Grenadine, Sint Maarten in Centro America e Caraibi; Andorra in Europa Sud. Tutte con `regioni = 1` e `citta = 0` | |
+| 149 | Nel suggeritore del sito scrivi `barbados` | Compare **Barbados** e porta al paese | I locativi delle cinque isole («alle Barbados», «ad Antigua e Barbuda»…) sono proposte mie in `lib/frase.ts`: **da rivedere a Gaia** |
+| 150 | Rilancia il comando del punto 3 | Nessun errore, conteggi invariati | Idempotente |
+| 151 | `select key, value, value_text from app_config where key in ('showcase_rating_min_reviews','showcase_declared_reviews_note','ready_itinerary_price_prefix','group_trip_price_prefix','group_trip_terms_text','showcase_price_on_request','calcom_minutes_consultation_deep') order by key;` | **Sette righe**; `showcase_rating_min_reviews` = 1, `calcom_minutes_consultation_deep` = `60, 90`, `group_trip_terms_text` **vuota** | La vuota è voluta: le condizioni dei gruppi non escono finché non le confermi |
+| 152 | `select slug, status, td_publish_blockers(id) from travel_designers;` | Per i designer che oggi si pubblicano, nessun motivo nuovo. Se uno ha l'approfondita attiva con una durata che non è 60 né 90, compare `consultation_deep: durata di N minuti non ammessa` | È il controllo nuovo della 0054 |
+| 153 | `select slug, member_years, rating_avg from public_td_showcase order by slug;` | `member_years` è un numero intero (0 per chi è entrato da meno di un anno), `rating_avg` **vuoto** per tutti | Nessuno ha recensioni verificate: il voto non esce (decisione D2) |
+
+**🔴 Le prove dell'importatore delle vetrine (3 ottobre 2026)**
+
+Prima di queste: le prove 147-153 (servono la `0052`-`0054` e le righe nuove
+del seed 0001). Poi:
+
+1. `supabase db push` — la `0055_import_vetrine.sql`.
+2. **Di nuovo il seed 0001**: porta `calcom_minutes_consultation` (30), da cui
+   l'importatore prende la durata della breve. Senza, rifiuta ogni designer
+   nuovo e lo dice.
+   ```bash
+   supabase db query --linked -f supabase/seed/0001_config.sql
+   ```
+
+Il comando si lancia **dalla radice del progetto**, e legge
+`NEXT_PUBLIC_SUPABASE_URL` e `SUPABASE_SECRET_KEY` da `.env.local` (ci sono
+già entrambe). Senza `--scrivi` non scrive niente: né database, né foto, né
+archivio. Le query sono provate su PGlite con Luca importato, non sul
+database vero. Nelle query, `<L>` sta per
+`(select id from travel_designers where slug = 'luca-ferraina')`.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 154 | `node --env-file=.env.local supabase/scripts/importa_vetrina.mjs vetrina-luca-ferraina --slug luca-ferraina --email <email di Luca>` | Report «PROVA A SECCO»: esito *pronto*, designer **NUOVO (nasce in bozza)**, 146 modifiche; un avviso («Tutti i paesi dichiarati Base: il livello 1 viene solo dalle 3 destinazioni in evidenza»); 2 itinerari e 7 gruppi con i loro indirizzi; blocco «account Cal.com non collegato»; «22 foto, 22 da caricare, 0 da togliere» | Mandami il report intero se è diverso |
+| 155 | `select count(*) from travel_designers where slug = 'luca-ferraina';` e `select count(*) from td_import_runs;` | **0** e **0** | La prova a secco non lascia niente |
+| 156 | Lo stesso comando della 154 con `--scrivi` in fondo | Report «SCRITTURA», esito *scritto*, stesse voci | |
+| 157 | `select slug, status, display_name, td_publish_blockers(id) from travel_designers where slug = 'luca-ferraina';` | `draft` · `Luca Ferraina` · `{"account Cal.com non collegato"}` | L'importatore non pubblica mai |
+| 158 | `select country_code, level, highlight_position from td_countries where td_id = <L> order by level, highlight_position nulls last, country_code;` | vietnam 1·1, filippine 1·2, thailandia 1·3; indonesia, laos, maldive, sri_lanka 2·vuoto | La regola del 3 ottobre: le tre in evidenza sono di livello 1 |
+| 159 | `select a.axis_code, a.value, q.label_min, q.label_max from td_axis_values a join quiz_axes q on q.code = a.axis_code where a.td_id = <L> order by q.sort_order, a.value;` | controllo 2 (Poco controllo), ritmo 3 (Dynamic), comfort_wild 4 (Wild), curated_vs_real 1 (Estetica curata), social 3 (Socialità), companions 1 e 2 | **Il controllo del verso (milestone 1)**: ogni valore sta dal lato che Luca ha scelto a parole in `assiLato`. L'importatore si ferma da solo se uno non torna |
+| 160 | `select service_type, is_active, price_cents, price_from_cents, duration_minutes, cal_event_type_slug from td_services where td_id = <L> order by sort_order;` | breve 3000 · 30 · `consulenza-xpetis-30`; approfondita 9000 · 90 · `consulenza-xpetis-90`; su misura con `price_from_cents` 7000 e `price_cents` vuoto; All Inclusive, gruppo e privato attivi | Il «da 70€» non è un prezzo che si incassa (D5) |
+| 161 | Su Studio, Storage, bucket `td-media`, cartella `luca-ferraina` | Quattro cartelle: `profilo` (2), `firma` (9), `itinerario` (4), `gruppo` (7). Nomi come `3f9a…c2.jpg`, niente del percorso originale | La `cardSfondo` è una foto di un viaggio: ha la sua copia in `profilo` |
+| 162 | Rilancia la 156 identica | Esito *scritto*, **0 modifiche**, «0 da caricare, 0 da togliere» | Idempotente. In `td_import_runs` due righe `scritto` |
+| 163 | Copia la cartella (`cp -R vetrina-luca-ferraina vetrina-luca-prova`), in `vetrina-luca-prova/vetrina.json` metti `"callPrezzo": "40"`, e lancia `--scrivi` su quella cartella con `--slug luca-ferraina` | Avviso «consultation: prezzo nel database 3000 centesimi, nel pacchetto 4000. Non sovrascritto»; la query della 160 dice ancora **3000** | Un prezzo che cambia lo applica il team a mano |
+| 164 | Nella stessa copia rimetti `"callPrezzo": "30"` e nel primo viaggio di gruppo scrivi `"paesi": ["atlantide"]`; lancia `--scrivi` | **RIFIUTATO**: «Paesi che la tassonomia non ha: atlantide». Niente cambia; in `td_import_runs` una riga `rifiutato` | Poi `rm -R vetrina-luca-prova` |
+| 165 | `node --env-file=.env.local supabase/scripts/importa_vetrina.mjs vetrina-dennis-milello --slug dennis-milello --email prova@example.com` | **RIFIUTATO**: «Formato vecchio (manca «formato»): riesportalo dal tool v6» | Il form vecchio non ha un secondo parser, per scelta |
+| 166 | `select outcome, report->>'modifiche' as modifiche, created_at from td_import_runs where td_slug = 'luca-ferraina' order by created_at desc;` | Le righe delle prove 156, 162, 163 (`scritto`) e 164 (`rifiutato`), dalla più recente | È la coda di correzione del team: il report intero è nella colonna `report`, il JSON del pacchetto in `raw` |
+
+**🔴 Le prove delle tre pagine (4 ottobre 2026)**
+
+Prima di queste, **tutte** le prove 147-166 e la `0056_nome_corto.sql`
+(`supabase db push` la porta insieme alle altre). ⚠️ **Il codice nuovo delle
+pagine legge viste che esistono solo dopo la `0054`**: se il sito gira prima
+delle migration, vetrina e dettagli rispondono con un errore. Prima il
+database, poi il codice.
+
+Per vedere Luca il profilo va **pubblicato**, e per pubblicarlo serve il suo
+account Cal.com (è un blocco alla pubblicazione):
+
+```sql
+update travel_designers set cal_username = '<username Cal.com di Luca>' where slug = 'luca-ferraina';
+update travel_designers set status = 'published' where slug = 'luca-ferraina';
+```
+
+Se il secondo comando si rifiuta, il messaggio dice cosa manca
+(`select td_publish_blockers(id) from travel_designers where slug = 'luca-ferraina';`).
+Finite le prove, se Luca non deve restare online:
+`update travel_designers set status = 'draft' where slug = 'luca-ferraina';`.
+
+Le pagine le ho viste girare io in locale, con il sito vero (`next dev`)
+puntato a un finto Supabase che rispondeva da PGlite con Luca importato e
+pubblicato: 1512 e 375 px, foto comprese. **Non** sul tuo database: le prove
+qui sotto sono quelle.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 167 | `npm run dev`, apri `localhost:3000/designer/luca-ferraina` dal computer | Nell'ordine: foto (con Instagram), nome, aree di competenza, anni di esperienza, lingue, storia; scheda della call con «Consulenza breve» e «Consulenza approfondita», 30€; **«E dopo l'incontro?» con quattro riquadri, le icone e «da 70€»** sul su misura; «Cosa vuol dire viaggiare per me» col testo di Luca e tre viaggi firma, ognuno col suo paese; «Come funziona»; due itinerari con la pillola «Personalizzabile» e i paesi; sette viaggi di gruppo; «Cosa dice chi ha viaggiato con me» con la dicitura sopra e due recensioni; la scheda finale | **Niente voto** sulla foto e **niente «Membro XPETIS»**: Luca non ha recensioni verificate ed è entrato oggi (D2). Niente «secondo Incontro gratis» (D4) |
+| 168 | Nella scheda della call, guarda la riga col simbolo del credito | «Quello che paghi per l'incontro verrà scalato dal costo del servizio che eventualmente sceglierai», **senza cifra** | Decisione del 3 ottobre |
+| 169 | Clicca «Consulenza approfondita» | 90€, 90 minuti, i punti della Sessione | `?servizio=consultation_deep` nell'indirizzo, come prima |
+| 170 | Nella card «Vietnam: Ha Giang Loop…» | «Prossima partenza 23 dic 2026 – 4 gen 2027», **non** il 24 ottobre (sold out); «13 giorni», «fino a 15 persone», «A partire da 1.579€». La card «Avventura e relax in Thailandia del Sud» dice «Prezzo su richiesta» e nessuna partenza | «fino a 15» è una mia proposta (D-18), testo per Gaia |
+| 171 | Clicca «Ottieni maggiori informazioni» sul primo itinerario | `/designer/luca-ferraina/itinerario/brasile-rio-de-janeiro`: briciole, titolo, «Luca Ferraina · 10 giorni · Laos e Thailandia», una foto grande e una piccola, «Mostra tutte le foto (2)» che apre le due foto e si chiude con Esc; racconto firmato; due tappe; «Questo viaggio fa per me?» coi sei punteggi; «Vuoi cambiare qualcosa?»; riquadro con «A partire da 1380€», «a persona, calcolato su 2 persone · Volo incluso», «Durata 10 gg · 11 notti»; «Informazioni utili» con tre voci che si aprono una alla volta; fascia scura; «Altri itinerari di Luca» | La riga del credito dice «Si parte dalla call, 30 minuti e 30€: se poi parti con Luca, il costo della call viene scalato dal viaggio» |
+| 172 | Torna e apri il primo viaggio di gruppo | «Progettato da Luca Ferraina · 13 giorni · Vietnam»; nel riquadro **Partenze**: 24 ott – 5 nov 2026 **barrata** con «Sold out», poi 23 dic e 22 mar; «13 giorni · 12 notti»; «fino a 15 partecipanti»; tasto «Parlane con Luca»; nella fascia scura «Prossima partenza 23 dic 2026 – 4 gen 2027» | **Niente «Accompagnato da»** (Luca non l'ha scritto) e **niente «Acconto, saldo e cancellazione»** (la riga di `app_config` è vuota). Il 25 ottobre il 24 ottobre sparisce da solo |
+| 173 | In «Informazioni utili» del gruppo | Tre voci: valigia, «La quota comprende» (con le spunte e sotto «La quota non comprende»), info sanitarie | Se scrivi un testo in `group_trip_terms_text` da Studio, ricaricando compare la quarta voce; svuotala e sparisce |
+| 174 | Le stesse tre pagine **dal telefono** (o dal browser stretto a 375 px) | Una colonna, niente che esca a destra; sulle pagine di viaggio il riquadro del prezzo viene subito dopo le foto | Il disegno mobile vero arriverà: i blocchi sono componibili |
+| 175 | Apri `/designer/luca-ferraina/itinerario/1` e `/designer/luca-ferraina/viaggio-di-gruppo/3` | **404** tutte e due | Gli indirizzi del tool (R3): mai un altro viaggio |
+| 176 | Copia la cartella (`cp -R vetrina-luca-ferraina vetrina-luca-prova`), in `vetrina-luca-prova/vetrina.json` cambia il titolo del primo viaggio di gruppo in `"Vietnam del Nord in moto"`, lancia l'import con `--scrivi` su quella cartella (`--slug luca-ferraina`) e apri il vecchio indirizzo del viaggio | Il vecchio indirizzo dà **404**; la vetrina linka `/viaggio-di-gruppo/vietnam-del-nord-in-moto` | Lo slug segue il titolo (0051). Poi rilancia l'import dalla cartella originale e `rm -R vetrina-luca-prova` |
+| 177 | Condividi `localhost:3000/designer/luca-ferraina` in un'anteprima (o guarda il sorgente: `og:title`, `og:image`) | Titolo «Luca Ferraina · Travel Designer XPETIS», l'inizio della storia, la sua foto | In locale WhatsApp non vede `localhost`: la prova vera è sul sito pubblicato |
+| 178 | Il primo comando del blocco «Le colonne chiuse» qui sotto | **Nessuna riga** | La chiave publishable è quella del browser: è ciò che chiunque legge con gli strumenti di sviluppo aperti |
+| 179 | Il secondo e il terzo comando dello stesso blocco | **Nessuna riga** anche lì | Nel gruppo del Vietnam ci sono sia la nota XPETIS sia le condizioni di Luca: non devono uscire |
+| 180 | Il quarto comando del blocco | Un errore di permesso, **nessun dato** | Le tabelle restano chiuse: il browser legge solo viste |
+
+**Le colonne chiuse** (prove 178-180), dalla radice del progetto. Il primo
+`source` carica le chiavi da `.env.local` nella shell senza stamparle:
+
+```bash
+set -a; source .env.local; set +a
+CHIUSE='legal_name|axis_sides|card_phrases|legal_coverage|group_trips_readiness|xpetis_note|td_terms_text|joined_at|highlight_position|author_years'
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/public_td_showcase?select=*&slug=eq.luca-ferraina" -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | grep -o -E "$CHIUSE" | sort -u
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/public_td_group_trip?select=*&td_slug=eq.luca-ferraina" -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | grep -o -E "$CHIUSE" | sort -u
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/public_td_reviews?select=*&td_slug=eq.luca-ferraina" -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | grep -o -E "$CHIUSE" | sort -u
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/travel_designers?select=legal_name" -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+```
+
+**🔴 Le prove dei demo sulla struttura v6 (4 ottobre 2026)**
+
+Il seed nuovo è `supabase/seed/0006_demo_v6.sql`. **Marco Rossi diventa il
+demo completo, Giulia Neri quello minimo** (niente Sessione, itinerari,
+gruppi, recensioni: come saranno molti dei 25). È convergente: rilanciato
+porta sempre allo stesso stato. Non tocca `photo_url`, `joined_at`,
+`cal_username`, `status`, né prezzi e durate delle consulenze già esistenti.
+
+**Una sola cosa da lanciare**, dalla radice del progetto:
+
+```bash
+supabase db query --linked -f supabase/seed/0006_demo_v6.sql
+```
+
+- **Non** rigirare il `0003`: riscrive le foto profilo con un host morto.
+- **Non** serve il `0004`: il seed nuovo non tocca le foto profilo.
+- Le foto di itinerari e gruppi riusano i file di `seed-immagini/` già nel
+  bucket (il 4 ottobre ho controllato: rispondono tutti). Se un giorno
+  mancassero: `bash scripts/carica-immagini-finte.sh`.
+- ⚠️ Cancella i tre itinerari e i tre viaggi di gruppo di Giulia: i loro
+  indirizzi daranno 404. Sono dati finti, ed è la prova 191.
+
+Le query le ho provate su PGlite, non sul database vero.
+
+| # | Cosa fai | Cosa deve succedere | Note |
+|---|---|---|---|
+| 181 | Il comando qui sopra | Nessun errore (`BEGIN` … `COMMIT`) | Una transazione sola: se qualcosa si ferma, non cambia niente |
+| 182 | Rilancialo | Nessun errore, niente di diverso | Convergente |
+| 183 | `select s.service_type, s.is_active, s.price_cents, s.price_from_cents, s.duration_minutes, s.cal_event_type_slug from td_services s join travel_designers t on t.id = s.td_id where t.slug = 'marco-rossi' order by s.sort_order;` | Sei righe, tutte attive: breve (col prezzo che ha oggi), **approfondita 9000 · 90 · `consulenza-xpetis-90`**, su misura con **`price_from_cents` 9000**, All Inclusive, viaggio di gruppo, accompagnamento privato | Sul database di prova Marco 30 minuti / 60€ |
+| 184 | `select t.slug, (select count(*) from td_ready_itineraries r where r.td_id = t.id) as itinerari, (select count(*) from td_group_trips g where g.td_id = t.id) as gruppi, (select count(*) from td_showcase_reviews v where v.td_id = t.id and v.is_published) as recensioni, (select count(*) from td_services s where s.td_id = t.id and s.service_type = 'consultation_deep' and s.is_active) as sessione from travel_designers t where t.slug in ('marco-rossi', 'giulia-neri') order by t.slug;` | giulia-neri **0 · 0 · 0 · 0**; marco-rossi **3 · 3 · 3 · 1** | |
+| 185 | Apri `/designer/marco-rossi` | Due pillole nella scheda della call; «E dopo l'incontro?» con quattro riquadri e **«da 90€»**; «Cosa vuol dire viaggiare per me» col testo nuovo (non più `hero_bio`); viaggi firma con Vietnam, Giappone, Thailandia; tre itinerari (il terzo senza foto e con «Prezzo su richiesta»); tre gruppi; tre recensioni con la dicitura sopra | |
+| 186 | Apri il primo itinerario («Vietnam del Nord…») | Quattro foto («Mostra tutte le foto (4)»), racconto, cinque tappe, «fa per me», riquadro con «a persona, calcolato su 2 persone · volo non incluso • IVA inclusa» (la nota di ripiego: questo itinerario non ne ha una sua), «Durata 12 gg · 11 notti», tappe principali, tre voci di «Informazioni utili» | La nota XPETIS del seed **non** deve comparire da nessuna parte |
+| 187 | Apri il secondo («Giappone fuori stagione…») | Due foto, il racconto, **niente** tappe, **niente** «fa per me», **niente** «Informazioni utili» | Un blocco senza dati non esce |
+| 188 | Apri il primo viaggio di gruppo («Vietnam: il Nord in moto…») | «Accompagnato da Marco Rossi»; **Partenze**: 14 – 25 nov 2026 barrata «Sold out», 6 – 17 mar 2027 «Ultimi posti disponibili», 9 – 20 ott 2027 senza etichetta, e **non** il 7 marzo 2026; «6-10 partecipanti»; «25-50 anni»; nella fascia scura «Prossima partenza 6 – 17 mar 2027» | Le condizioni scritte dal designer nel seed **non** escono |
+| 189 | Apri il secondo («Thailandia: Isan e Mekong…») | «fino a 10 partecipanti»; una partenza «Confermato»; sotto il prezzo solo «a persona», **senza** «volo non incluso» | Sui gruppi non c'è ripiego |
+| 190 | Apri il terzo («Giappone in autunno…») | La pagina c'è, con «Prezzo su richiesta», **senza** «Partenze» e **senza** «Prossima partenza». Sulla vetrina la sua card non ha la riga della prossima partenza | Ha solo una partenza del 2025 |
+| 191 | Apri `/designer/giulia-neri`, poi `/designer/giulia-neri/itinerario/cordillera-blanca-santa-cruz-e-laguna-69` | La vetrina ha **solo** foto e dati, la scheda della call con **una** pillola, «E dopo l'incontro?» col solo All Inclusive, «Cosa vuol dire viaggiare per me» coi viaggi firma, «Come funziona» e la scheda finale: **nessuna sezione vuota**, nessun titolo sopra il nulla. Il vecchio itinerario dà **404** | È il «demo minimo» del prompt |
+
+**Vetrine v6 (3 ottobre 2026).** Il tool vetrina v6 di Andrea e Alessandro
+(`xpetis-vetrine-tool/`, esempio completo in `vetrina-luca-ferraina/`) sostituisce
+il form vecchio come sorgente dei profili. Prompt per Claude Code in
+`PROMPT_VETRINE_V6.md` (struttura dati, importatore, tre pagine). Decisioni di
+Simone del 3 ottobre:
+
+- **Ricostruiamo noi**: dal tool si prende solo l'aspetto grafico delle tre
+  pagine; prenotazione, Cal.com, cassa e login restano i nostri. Per vetrina,
+  itinerario e viaggio di gruppo il riferimento visivo diventa il tool, non più
+  i nodi Figma `72-48`, `3-1386`, `3-1121`.
+- **Stelline e «Membro XPETIS»: solo dati veri.** Voto solo dalle recensioni
+  verificate (milestone 8), anzianità da `joined_at`; senza dati il blocco non
+  esce. I valori fissi del tool (4.6, 1 anno) non si usano.
+- **Le recensioni scritte dal TD si mostrano con una dicitura** che dice che le
+  ha raccolte il designer; non entrano nel voto.
+- **«Il secondo Incontro con un altro TD è gratis» si toglie**: non è una
+  promessa decisa.
+
+Seconda tornata, sempre il 3 ottobre (prompt riscritto, versione 2):
+
+- **`suMisuraPrezzo` è il prezzo di partenza dell'Itinerario su misura**: esce
+  come «da X€» in «E dopo l'incontro?». Non è l'importo incassato, che resta
+  quello della proposta del TD.
+- **I 10 paesi del tool che non avevamo si aggiungono** alla tassonomia
+  (andorra, angola, antigua_e_barbuda, bangladesh, barbados, eritrea, gambia,
+  saint_lucia, saint_vincent_e_grenadine, sint_maarten): 129 → 139 stati,
+  senza città nuove. Ci si allinea alla lista del tool, che è di Alessandro.
+- **`frasiCard` solo per noi**: nel sito nessun posto le usa. Si conservano
+  chiuse. Hanno la forma di mattoncini personali della frase della card: se un
+  giorno servono, ci sono.
+- **`nomeProfessionale`, se c'è, sostituisce il nome in pagina.**
+- **Il voto esce con almeno 1 recensione verificata** (`app_config`).
+
+⚠️ Corretto nel prompt v2 un mio errore della v1: `callPrezzo` **imposta** il
+prezzo della breve (per designer, come già col form); la deviazione 10 fissa
+solo la durata.
+
+Decisioni sulla fase 0 (`VETRINE_V6_FASE0.md`), 3 ottobre:
+
+- **Livello dei paesi: 1 se il paese è fra le tre destinazioni in evidenza
+  oppure è dichiarato «Esperto», altrimenti 2**; l'ordine delle tre resta in
+  `td_countries.highlight_position` (0052).
+- **La pillola «Personalizzabile» sulle card degli itinerari sì**: i
+  viaggiatori devono sapere che sono esempi, e che tutto è personalizzabile.
+  Il ♥ è la sua icona, non un comando.
+- **La riga del credito della scheda della call perde la cifra**, come le
+  altre (R2). Si rimette quando si vuole.
+- **Le quattro icone di «E dopo l'incontro?» si prendono dal tool.**
+
+- [x] **[C]** Fase 1: dieci paesi in tassonomia (139 · 254 · 188), migration
+      `0052`-`0054`, righe di `app_config`, harness (1064 asserzioni) →
+      prove 147-153
+- [x] **[C]** Fase 2: l'importatore → `supabase/scripts/importa_vetrina.mjs`,
+      migration `0055`, harness (1101 asserzioni) → prove 154-166
+- [x] **[C]** Fase 3: le tre pagine → vetrina, itinerario e gruppo sul
+      riferimento del tool v6, migration `0056` (nome corto), prove 167-180
+- [x] **[C]** Fase 4: dati demo → `seed/0006_demo_v6.sql` (Marco completo,
+      Giulia minima), harness 1115 → prove 181-191
+- [ ] **[C]** Fase 5: verifica
+- [ ] **[C]** Fase 6: documenti
+
+❓ Aperte: il prezzo della proposta di un su misura può stare sotto il «da»
+della vetrina? E le differenze fra tool e Flusso che Claude Code elencherà in
+fase 0 (variante «Dopo la sessione», testo acconto/saldo sui gruppi, «calcolato
+su 2 persone», cuore sulle card, fascia di esperienza, «Aree di competenza»,
+testi).
+
 - [ ] **[C]** Importatore fedele dei profili TD, idempotente e rilanciabile: non
       normalizza, ma **segnala** ogni voce che non ha saputo agganciare.
       Dal 27 settembre il form ha una chiave in più, `gruppo` → `td_group_trips`
@@ -1817,7 +2056,22 @@ niente cliccato, nessun embed aperto, niente da collegato.
       c'è scritto cosa diventa leggibile con gli strumenti di sviluppo aperti
 - [~] **[C]** Pagina form + pagamento nei tre stati (in attesa, confermata,
       scaduta): cellulare, domanda di contesto, flag servizi. **Gli stati ci
-      sono** (`app/prenotazione/[id]/page.tsx`), il form no: cellulare, domanda
+      sono** (`app/prenotazione/[id]/page.tsx`), il form no.
+      ⚠️ **DOVE si chiede il telefono: deciso da Simone il 21 settembre 2026 —
+      nel form di prenotazione**, cioè la strada del Flusso, non sulla pagina
+      `/servizio/<token>`. Conseguenza: lo si chiede al **100%** dei
+      viaggiatori, e un istante **prima del pagamento**, che è il momento
+      peggiore per aggiungere attrito. La strada scartata — chiederlo solo a chi
+      preme «sì, mandagli la richiesta», dove lo scopo è scritto nella stessa
+      schermata — era più difendibile sul consenso (`phone_consent_at`) ma
+      lascia il team senza numero prima della call.
+      ⚠️ **Finché non è costruito il giro è rotto:** l'ordine nasce, l'alert
+      dice «apri il gruppo WhatsApp», e **il numero non esiste in tutto il
+      database**. Le colonne `travelers.phone` e `phone_consent_at` ci sono
+      dalla `0005`; nel codice la parola `phone` non compare da nessuna parte.
+      Il consenso si lega a **S-14** (privacy): raccogliere un numero «per
+      eventuali comunicazioni» al momento del pagamento è la formula che il
+      legale fa riscrivere.
       di contesto e flag servizi restano da fare
 - [x] **[C]** **Il passaggio dall'embed alla cassa**, che non era in questo
       elenco e andava progettato: il viaggiatore finisce di prenotare **prima**

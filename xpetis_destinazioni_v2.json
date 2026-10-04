@@ -981,6 +981,21 @@
               ]
             },
             {
+              "id": "andorra",
+              "name": "Andorra",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "andorra",
+                  "name": "Andorra",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
               "id": "bosnia_ed_erzegovina",
               "name": "Bosnia ed Erzegovina",
               "type": "state",
@@ -1790,6 +1805,21 @@
           "selectable": true,
           "states": [
             {
+              "id": "angola",
+              "name": "Angola",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "angola",
+                  "name": "Angola",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
               "id": "botswana",
               "name": "Botswana",
               "type": "state",
@@ -1856,6 +1886,21 @@
               ]
             },
             {
+              "id": "eritrea",
+              "name": "Eritrea",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "eritrea",
+                  "name": "Eritrea",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
               "id": "etiopia",
               "name": "Etiopia",
               "type": "state",
@@ -1874,6 +1919,21 @@
                       "selectable": false
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "id": "gambia",
+              "name": "Gambia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "gambia",
+                  "name": "Gambia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
                 }
               ]
             },
@@ -2430,6 +2490,21 @@
           "type": "macro_area",
           "selectable": true,
           "states": [
+            {
+              "id": "bangladesh",
+              "name": "Bangladesh",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "bangladesh",
+                  "name": "Bangladesh",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
             {
               "id": "bhutan",
               "name": "Bhutan",
@@ -3304,6 +3379,36 @@
           "selectable": true,
           "states": [
             {
+              "id": "antigua_e_barbuda",
+              "name": "Antigua e Barbuda",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "antigua_e_barbuda",
+                  "name": "Antigua e Barbuda",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "barbados",
+              "name": "Barbados",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "barbados",
+                  "name": "Barbados",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
               "id": "belize",
               "name": "Belize",
               "type": "state",
@@ -3541,6 +3646,51 @@
                       "selectable": false
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "id": "saint_lucia",
+              "name": "Saint Lucia",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "saint_lucia",
+                  "name": "Saint Lucia",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "saint_vincent_e_grenadine",
+              "name": "Saint Vincent e Grenadine",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "saint_vincent_e_grenadine",
+                  "name": "Saint Vincent e Grenadine",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
+                }
+              ]
+            },
+            {
+              "id": "sint_maarten",
+              "name": "Sint Maarten",
+              "type": "state",
+              "selectable": true,
+              "regions": [
+                {
+                  "id": "sint_maarten",
+                  "name": "Sint Maarten",
+                  "type": "foreign_region",
+                  "selectable": false,
+                  "cities": []
                 }
               ]
             }
@@ -4214,8 +4364,8 @@
   "statistics": {
     "continents": 6,
     "macro_areas": 14,
-    "states": 129,
-    "regions": 244,
+    "states": 139,
+    "regions": 254,
     "cities": 188
   }
 }

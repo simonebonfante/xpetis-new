@@ -22,7 +22,7 @@
  * da un crawler non sono la stessa cosa, anche quando il valore è identico.
  */
 import 'server-only'
-import { createClient } from '@/lib/supabase/server'
+import { clientPubblico } from '@/lib/supabase/pubblico'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
@@ -51,7 +51,41 @@ export const CHIAVI = {
    */
   oreRimborsoPieno: 'cancel_full_refund_hours',
   oreMinimeRiprogrammazione: 'reschedule_min_hours',
+  /**
+   * Le righe della vetrina v6 (seed 0001, 3 ottobre 2026), gruppo `showcase`.
+   * Una riga vuota spegne la frase: è il modo di toglierla da Studio.
+   */
+  /** «a persona, calcolato su 2 persone», davanti alla nota di prezzo degli itinerari. */
+  prefissoPrezzoItinerario: 'ready_itinerary_price_prefix',
+  /** «a persona», davanti alla nota di prezzo dei viaggi di gruppo (senza ripiego). */
+  prefissoPrezzoGruppo: 'group_trip_price_prefix',
+  /** Acconto, saldo e cancellazione dei gruppi: vuota finché Simone non conferma. */
+  condizioniGruppo: 'group_trip_terms_text',
+  /** «Prezzo su richiesta», al posto di «A partire da» quando il prezzo manca. */
+  prezzoSuRichiesta: 'showcase_price_on_request',
+  /** La dicitura sopra le recensioni scritte dal designer (D3, da riscrivere a Gaia). */
+  notaRecensioniDichiarate: 'showcase_declared_reviews_note',
 } as const
+
+/**
+ * Più testi pubblici in una query sola: le pagine della vetrina ne usano
+ * quattro o cinque. Stessa regola di `leggiTestoConfig()`: vuoto e assente sono
+ * lo stesso caso, e danno `null`.
+ */
+export async function leggiTestiConfig<K extends string>(chiavi: readonly K[]): Promise<Record<K, string | null>> {
+  const supabase = clientPubblico()
+  const { data, error } = await supabase
+    .from('public_config')
+    .select('key, value_text')
+    .in('key', chiavi as readonly string[])
+
+  if (error) throw new Error(`public_config: ${error.message}`)
+
+  const righe = (data ?? []) as { key: string; value_text: string | null }[]
+  return Object.fromEntries(
+    chiavi.map((k) => [k, ripulisci(righe.find((r) => r.key === k) ?? null)]),
+  ) as Record<K, string | null>
+}
 
 /**
  * Il valore di testo di un parametro **pubblico**, o `null` se la riga non c'è
@@ -62,7 +96,7 @@ export const CHIAVI = {
  * qualcuno cancelli la riga (che poi nessuno saprebbe ricreare).
  */
 export async function leggiTestoConfig(chiave: string): Promise<string | null> {
-  const supabase = await createClient()
+  const supabase = clientPubblico()
   const { data, error } = await supabase
     .from('public_config')
     .select('value_text')
@@ -81,7 +115,7 @@ export async function leggiTestoConfig(chiave: string): Promise<string | null> {
  * che conteneva il numero, invece di stamparne uno scritto nel codice.
  */
 export async function leggiNumeroConfig(chiave: string): Promise<number | null> {
-  const supabase = await createClient()
+  const supabase = clientPubblico()
   const { data, error } = await supabase
     .from('public_config')
     .select('value')

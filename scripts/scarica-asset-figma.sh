@@ -72,10 +72,13 @@ scarica img/icona-chevron.svg  "https://www.figma.com/api/mcp/asset/ffa6ae26-fa3
 # "Filtri avanzati", che non esiste finché match_designers non filtra i servizi.
 
 echo "Vetrina del designer (FILE NUOVO Q9Kry…) — nodo 2-743 il 28 settembre, 72-48 dal 29"
-# **Quattro asset di 72-48 mancano, e la pagina ne fa a meno**: i segni delle
-# icone di "E dopo l'incontro?" (nodi 72:515, 72:535, 72:540, 72:545, livelli
-# separati dal tondo rosso al 20%, che è 72:523 e gemelli). Il 29 settembre il
-# connettore Figma ha esaurito le chiamate prima di arrivarci. Anche il "$" del
+# **I quattro segni delle icone di "E dopo l'incontro?"** (nodi 72:515, 72:535,
+# 72:540, 72:545) il 29 settembre non si erano potuti scaricare: il connettore
+# Figma aveva esaurito le chiamate. Dal 4 ottobre 2026 non vengono da qui ma dal
+# tool vetrina v6 (xpetis-vetrine-tool/…/markup/VetrinaMarkup.tsx), dove sono
+# SVG in linea: copiati una volta in public/img/dopo-*.svg, insieme alle due
+# stelle di "Questo viaggio fa per me?" (stella-fa-per-me-*.svg). Non sono URL
+# Figma: questo script non li riscarica e non li deve sovrascrivere. Anche il "$" del
 # credito (72:434) in 72-48 è più grande, 12×18: resta credito-simbolo.svg
 # qui sotto, 7,8×12,4, finché non si riscarica. Quando si riscaricano:
 # get_design_context su quei nodi, righe qui, e components/dopo-la-call.tsx.

@@ -448,3 +448,48 @@ insert into app_config (key, value, value_text, config_group, label_it, notes) v
    'Ora del digest giornaliero degli alert (0-23, ora di Roma; negativa = spento)',
    'Stima, da confermare con chi lo legge. Il digest parte al primo giro dell''orologio dopo quest''ora, una volta al giorno (team_digests è unica per data), agli indirizzi di team_notify_recipients. Se non ci sono alert aperti non parte niente.')
 on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- La vetrina del tool v6 (migration 0052-0054, 3 ottobre 2026)
+-- ---------------------------------------------------------------------------
+-- Gruppo `showcase`: li serve `public_config`, sono testi e soglie che la pagina
+-- usa comunque. Come le righe della 0048, sul progetto vero si inseriscono
+-- rilanciando questo file (ogni riga è `on conflict do nothing`: quelle già
+-- presenti, magari cambiate da Studio, non si toccano).
+--
+-- Una riga di testo vuota vuol dire «non esce»: è il modo di spegnere una
+-- frase da Studio senza cancellare la riga.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('showcase_rating_min_reviews', 1, null, 'showcase',
+   'Recensioni verificate necessarie perché il voto medio compaia in vetrina',
+   'Deciso da Simone il 3 ottobre 2026 (D2). Contano solo le recensioni verificate (reviews), mai quelle dichiarate dal designer. Sotto soglia la vista non dà il voto.'),
+  ('showcase_declared_reviews_note', null, 'Recensioni raccolte dal Travel Designer fuori da XPETIS.', 'showcase',
+   'Dicitura sopra le recensioni scritte dal designer',
+   'Prima stesura tecnica, DA RISCRIVERE A GAIA (D3, 3 ottobre 2026). Senza genere di proposito. Vuota = la dicitura non esce, ma le recensioni dichiarate sì.'),
+  ('ready_itinerary_price_prefix', null, 'a persona, calcolato su 2 persone', 'showcase',
+   'Riga davanti alla nota di prezzo degli itinerari pronti',
+   'Dal tool vetrina v6, DA CONFERMARE. Segue la nota del designer o, se manca, ready_itinerary_price_note.'),
+  ('group_trip_price_prefix', null, 'a persona', 'showcase',
+   'Riga davanti alla nota di prezzo dei viaggi di gruppo',
+   'Dal tool vetrina v6, DA CONFERMARE. Segue la nota del designer; sui gruppi non c''è ripiego (un gruppo coi voli inclusi si troverebbe scritto «volo non incluso»).'),
+  ('group_trip_terms_text', null, '', 'showcase',
+   'Acconto, saldo e cancellazione: testo XPETIS su tutti i viaggi di gruppo',
+   'VUOTO finché Simone non conferma: è una promessa commerciale. Vuoto = la voce non esce da «Informazioni utili». Il testo del tool (acconto 30%, penali, rimborso sotto il minimo) è in VETRINE_V6_FASE0.md. Il testo scritto dal designer sta in td_terms_text e non si mostra mai.'),
+  ('showcase_price_on_request', null, 'Prezzo su richiesta', 'showcase',
+   'Al posto di «A partire da» quando un itinerario o un viaggio di gruppo non ha prezzo',
+   'Dal tool vetrina v6 (TESTI_SITO), DA CONFERMARE. Vuoto = al posto del prezzo non esce niente.')
+on conflict (key) do nothing;
+
+-- Le durate delle consulenze (deviazione 10), gemelle delle righe
+-- calcom_slugs_*. La breve: la legge l'importatore per creare il servizio di un
+-- designer nuovo. L'approfondita: una Sessione attiva con un'altra durata
+-- blocca la pubblicazione (td_publish_blockers, 0054), e senza la riga la
+-- blocca sempre, e il motivo lo dice.
+insert into app_config (key, value, value_text, config_group, label_it, notes) values
+  ('calcom_minutes_consultation', null, '30', 'integrations',
+   'Durata in minuti della consulenza breve',
+   'Deviazione 10: sempre 30. La legge l''importatore delle vetrine (0055) per creare la breve di un designer nuovo, insieme a calcom_slugs_consultation.'),
+  ('calcom_minutes_consultation_deep', null, '60, 90', 'integrations',
+   'Durate in minuti ammesse per la consulenza approfondita',
+   'Deviazione 10, 27 settembre 2026. Separate da virgola. Il tool vetrina v6 propone solo 90: l''importatore legge comunque la durata dal pacchetto e la confronta con questo elenco.')
+on conflict (key) do nothing;

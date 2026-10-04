@@ -9,6 +9,197 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**4 ottobre 2026 — vetrine v6: fase 4, i demo**
+
+Nuovo `seed/0006_demo_v6.sql`, convergente, in una transazione. **Marco
+completo, Giulia minima**, e la scelta non è estetica: l'harness applica tutti
+i seed prima delle asserzioni, e contava i dati di Marco in decine di prove e
+quelli di Giulia in poche e superficiali. Svuotare Marco avrebbe voluto dire
+riscrivere mezzo harness.
+
+Marco ha ora tutti i casi che le pagine devono saper mostrare: un itinerario
+completo in ogni campo, uno parziale (i blocchi senza dati non escono), uno
+senza foto né prezzo; un gruppo con una partenza passata, una sold out, una
+«ultimi posti» e una aperta, uno col solo massimo dei partecipanti, uno con
+le sole partenze passate; «da 90€» sul su misura; la Sessione. Giulia perde
+Sessione (spenta, non cancellata: può avere prenotazioni di prova attaccate),
+itinerari, gruppi, e le recensioni restano in tabella ma spente.
+
+Il seed **non tocca** `photo_url` (quindi il 0004 non va rigirato), né
+`joined_at` (le prove del match ci contano), né prezzi e durate delle
+consulenze. Le foto riusano i file di `seed-immagini/` già nel bucket:
+controllato in sola lettura sul progetto di sviluppo, rispondono tutti 200. I
+valori dei servizi nuovi di Marco sono gli stessi che l'harness usava nelle sue
+prove (approfondita 9000 · 90 · `-90`), così due prove che li *inserivano* ora
+li *riscrivono* (`on conflict … do update`) e provano la stessa cosa.
+
+Le mie prove v6 lavoravano sul primo itinerario e sul primo gruppo di Marco,
+che ora hanno foto e partenze del seed: lavorano su righe di prova proprie.
+Tre asserzioni vecchie riscritte sulla regola nuova (tre gruppi per Marco e
+zero per Giulia; lo slug senza accenti provato sul Nakasendō di Marco invece
+che sull'Huayhuash di Giulia). La convergenza si prova lanciando il seed due
+volte di fila e confrontando lo stato dei due demo senza gli id, che le figlie
+riscritte cambiano. Harness a 1115. Niente lanciato sul database vero.
+
+---
+
+**4 ottobre 2026 — vetrine v6: fase 3, le tre pagine**
+
+Vetrina, itinerario e viaggio di gruppo ricostruiti sul riferimento del tool
+vetrina v6, col nostro codice: regole di visualizzazione in
+`lib/vetrina-vista.ts` (riscritte da `vista.ts` e `normalizza.ts`, non
+importate), blocchi comuni alle due pagine di viaggio in
+`components/blocchi-voce.tsx`, galleria e «Carica altre recensioni» come soli
+componenti client. «Informazioni utili» è un `<details name>`: la fisarmonica
+esclusiva la fa il browser, senza JavaScript. Le quattro icone di «E dopo
+l'incontro?» e le stelle di «fa per me» vengono dagli SVG in linea del tool,
+copiati in `public/img/`. Tolto `components/scheda-designer.tsx`, che non usava
+più nessuno. Migration `0056`: `short_name` nella vetrina pubblica, perché la
+regola D8 (nome professionale intero nelle frasi, altrimenti il primo nome)
+chiede di sapere se `display_name` è il nome anagrafico, che è chiuso.
+Harness a 1104, build verde.
+
+**Ho visto le pagine prima di dire che vanno**, senza toccare il database di
+Simone: un finto Supabase in Node (HTTPS con certificato locale) risponde al
+sottoinsieme di PostgREST che il sito usa leggendo da PGlite, **col ruolo
+`anon`** — quindi verifica anche i permessi delle viste —, con Luca importato
+dall'importatore vero e pubblicato, più un designer minimo. `next dev` puntato
+lì, screenshot con Chrome headless. Tre cose trovate così e non dal
+compilatore: il titolo delle card degli itinerari era bianco su bianco (la
+sezione scura passava `text-neutro` alla card); con due foto la piccola
+occupava mezza altezza; e Next 16 rifiuta di ottimizzare immagini da un host
+privato (`dangerouslyAllowLocalIP`), che ho acceso **solo per il giro di
+screenshot** e rimesso come prima — col vero Supabase non serve. A 375 px
+Chrome headless allarga la finestra a un minimo suo e taglia lo screenshot,
+facendo sembrare rotta una pagina che non lo è: la prova vera si fa con la
+pagina dentro un iframe largo 375.
+
+Scelte di default prese senza risposta, tutte segnate: «fino a 15 persone»
+con il solo massimo (D-18); nessun «Accompagnato da» se manca (D-17); la nota
+di prezzo sotto il prezzo soltanto; gli stati delle partenze coi tre token che
+abbiamo, perché i colori del tool non hanno corrispondente (D-31); testi e
+nomi nostri dove ne avevamo («Prenota la call», «Personalizza con una call»),
+del tool dove non ne avevamo («Parlane con…», «Questo viaggio fa per me?»).
+
+**Dopo, sul database vero di Simone: «JWT issued at future».** Simone,
+collegato col suo account su `localhost:3000`, ha avuto la vetrina di Luca in
+errore 500 su `public_td_showcase`. L'orologio del Mac era giusto (scarto di
+4 centesimi), e la stessa vista interrogata con la sola chiave publishable
+rispondeva: il token rifiutato era quello della sua sessione, che `proxy.ts`
+fa verificare al servizio di autenticazione (che lo accetta) e poi le letture
+mandavano a PostgREST (che lo giudicava emesso nel futuro: i due servizi di
+Supabase non concordavano di qualche secondo, tipico subito dopo un login).
+
+Il guasto vero era nostro: **le letture delle viste pubbliche viaggiavano col
+token del visitatore**, perché usavano il client coi cookie. Nuovo
+`lib/supabase/pubblico.ts` — chiave publishable, nessun cookie, nessuna
+sessione — usato da `lib/vetrina.ts`, `lib/config.ts` (tranne `leggiContatto`,
+che resta sulla chiave secret), `lib/quiz.ts` e `lib/match.ts`. Nessuna di
+quelle viste o funzioni guarda `auth.uid()` (controllato), quindi il risultato
+non cambia; cambia che un token storto non può più far cadere una pagina
+pubblica. La sessione resta all'header e alle pagine del viaggiatore. Provato
+sul server di Simone: le tre pagine di Luca, la vetrina di Marco, `/ricerca` e
+la home rispondono 200, l'indirizzo vecchio 404.
+
+---
+
+**3 ottobre 2026 — vetrine v6: fase 0 (lettura e piano) e fase 1 (tassonomia e schema)**
+
+Prompt `PROMPT_VETRINE_V6.md`, versione 2. Fase 0 in `VETRINE_V6_FASE0.md`:
+mappatura di ogni chiave del `vetrina.json` di Luca, migration, blocchi delle
+tre pagine, 33 differenze fra tool e Flusso, campi ❓. Fase 1: dieci paesi in
+tassonomia, `0052`-`0054`, sette righe di `app_config`, harness da 1002 a 1064
+prove ok, tutto verde.
+
+**La scoperta che ha cambiato il piano è stata il livello dei paesi.** Il
+prompt voleva `livello` (Base/Esperto) → `td_countries.level`; la mappatura del
+6 agosto e una nota di Simone in `PUNTI_APERTI.md` dicevano invece
+«`topDestinazioni` → livello 1, il campo `livello` è morto». Luca, che ha
+compilato ogni campo, ha sette paesi tutti «Base»: il tool non fa scegliere il
+livello. Con la regola del prompt nessuno dei 25 si sarebbe pubblicato senza
+correzione a mano. Simone ha deciso: **livello 1 se fra le tre in evidenza
+oppure «Esperto»**, e l'ordine delle tre in `highlight_position`. Un vincolo
+(`highlight_is_level_1`) tiene la metà della regola che il database può
+verificare.
+
+Due assunzioni del prompt non reggevano alla lettura del codice del tool: il
+♥ sulle card non è un comando ma l'icona della pillola «Personalizzabile»
+(che Simone tiene), e le quattro icone che mancano dal 29 settembre in «E dopo
+l'incontro?» stanno nel tool come SVG. E una nostra: la scheda della call
+quantifica già il credito («I {prezzo} dell'incontro verranno scalati…»),
+che R2 vieta — perde la cifra in fase 3.
+
+**Il confronto della tassonomia l'ho fatto contando, non leggendo**: i 129
+paesi comuni coincidono con `stati.ts` in id, nome e macro-area, zero
+differenze; mancano esattamente i dieci. Inseriti con uno script che rifà il
+JSON con `JSON.stringify(…, null, 2)` (il file fa il giro identico), ordine
+alfabetico dentro la macro-area come gli altri, `statistics` ricontate: 139 ·
+254 · 188. Effetto collaterale innocuo: il seed rigenerato sposta il
+`sort_order` dei paesi che seguono i nuovi.
+
+**Le scelte di schema**, scritte anche nelle migration:
+
+- `price_from_cents` a sé e non `price_cents` per il «da 70€» del su misura: su
+  una consulenza `price_cents` è l'importo che la cassa incassa, e lo stesso
+  nome con un altro senso è un errore in attesa;
+- foto, paesi e tappe in **tabelle condivise** fra itinerari e gruppi, con due
+  chiavi esterne e `num_nonnulls(...) = 1` come `reviews`; partenze in una
+  tabella dei soli gruppi, **con date vere** — è la scadenza che la 0048 non
+  sapeva rappresentare;
+- le liste di stringhe come `text[]`, i sei punteggi come sei colonne con il
+  loro `check`;
+- le colonne superate (`image_path`, `dates_label`, `group_size_label`) **non
+  tolte**: le scrive il seed 0003, che l'harness rigira. Le card della vetrina
+  continuano a servirle finché le pagine non sono rifatte, e `image_path`
+  diventa già la copertina vera di `td_trip_images`;
+- `rating_avg` legge la soglia da **`public_config`**, non da `app_config`:
+  l'harness vieta alle viste pubbliche di toccare `app_config`, ed è giusto —
+  una vista pubblica deve leggere solo parametri già pubblici;
+- `public_td_reviews` unisce **già adesso** le verificate di `reviews` (zero
+  righe, e comunque già pubbliche in `public_reviews`) e le dichiarate: la
+  milestone 8 non dovrà cambiare la vista.
+
+Tre asserzioni vecchie sono diventate rosse per la ragione giusta — codificavano
+decisioni che il 3 ottobre ha cambiato (nessuna vista sulle recensioni
+dichiarate, sei viste pubbliche, le chiavi delle card dei gruppi) — e le ho
+riscritte sulla regola nuova, non allentate. Una nuova era rossa per un falso
+positivo già noto: `geo_search.level` è il livello geografico, non quello del
+designer.
+
+Nuovo `supabase/tests/prova_query.mjs`: ricostruisce il database come
+l'harness e stampa il risultato delle query passate. Le query delle prove
+147-153 sono passate di lì prima di finire in `PIANO.md`. **Niente è stato
+applicato al database vero.**
+
+**Fase 2, l'importatore** (`supabase/scripts/importa_vetrina.mjs`, migration
+`0055`, harness a 1101, build verde; `tsconfig.json` esclude ora
+`xpetis-vetrine-tool/esempio`, che rompeva il build importando moduli che da
+noi non esistono). Lo script legge e valida in JavaScript, in una funzione pura
+che l'harness usa su PGlite; **le scritture le fa tutte il database**, in
+`td_import_showcase`, così un designer entra tutto o niente. La prova a secco
+è la stessa funzione che scrive e poi solleva un'eccezione propria dentro un
+blocco `begin … exception`: Postgres disfa le scritture, le variabili — il
+report — restano. Non simula: fa e disfa, e per questo sa dire anche gli slug
+che le voci prenderanno.
+
+Le foto stanno a `td-media/<designer>/<tipo>/<impronta>.<ext>`, con l'impronta
+SHA-256 del contenuto, invece del `<slug-voce>-<n>` suggerito dal prompt: così
+il percorso non dipende dallo slug (che nasce nel database, dopo), rilanciare
+non ricarica niente e una foto cambiata cambia indirizzo.
+
+Su Luca: 146 modifiche al primo lancio, **zero al secondo**, con un'impronta
+md5 di tutte le righe del designer identica prima e dopo (`updated_at`
+compresi). Il segreto è un `is distinct from` su ogni UPDATE e la
+riconciliazione delle voci per titolo, come chiedeva la 0051.
+
+Due errori miei, presi dall'harness e non dalla lettura. Il primo: in
+PL/pgSQL `array || 'testo'` con un letterale nudo prova a leggere il letterale
+come un array («malformed array literal»), e lo faceva solo il ramo che avvisa
+di un'email diversa — tutti gli import dopo quel test risultavano rifiutati.
+Ora sono tutti `array_append(…, '…'::text)`. Il secondo era un'asserzione
+sbagliata: un titolo corretto solo in una maiuscola dà lo stesso slug, ed è
+giusto così. La prova vera è un titolo cambiato davvero.
+
 **29 settembre 2026 — le ultime pagine sul Figma nuovo**
 
 Quattro nodi verificati da Simone: home `1-14`, quiz `2-2`, viaggio di gruppo

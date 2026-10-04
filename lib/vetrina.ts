@@ -7,14 +7,17 @@
  * itinerari pronti. Qui non si aggiunge niente: se serve una lettura nuova si
  * aggiunge una vista, non si apre una tabella.
  *
- * **Un campo del Figma non c'è, ed è voluto segnalarlo invece di procurarselo.**
- * La riga "Membro XPETIS" della scheda hero vuole `travel_designers.joined_at`,
- * che `public_td_showcase` non espone. Leggerlo con la chiave secret sarebbe
- * lecito ma scavalcherebbe la regola "la superficie pubblica è la vista": la
- * riga resta fuori finché Simone non decide se aggiungere la colonna alla vista.
- * Vedi PIANO.md, milestone 3.
+ * Dalla 0054 (vetrine v6, 3 ottobre 2026) le letture sono quattro, tutte da
+ * viste: la vetrina (`public_td_showcase`), il dettaglio di un itinerario
+ * (`public_td_ready_itinerary`), quello di un viaggio di gruppo
+ * (`public_td_group_trip`) e le recensioni (`public_td_reviews`). Le colonne
+ * chiuse — nome anagrafico, livelli, assi, note XPETIS, condizioni scritte dal
+ * designer — non sono in nessuna: l'harness lo verifica colonna per colonna.
+ *
+ * «Membro XPETIS» non legge più `joined_at`: la vista dà gli anni compiuti
+ * (`member_years`), mai la data.
  */
-import { createClient } from '@/lib/supabase/server'
+import { clientPubblico } from '@/lib/supabase/pubblico'
 
 /** I cinque servizi del form, più la consulenza approfondita. */
 export type TipoServizio =
@@ -69,11 +72,20 @@ export type Servizio = {
    * entrambi i casi l'embed non si apre, e il tasto non compare.
    */
   cal_event_type_slug: string | null
+  /**
+   * Il prezzo «da» mostrato in vetrina (0052, D5): oggi solo sull'Itinerario su
+   * misura («da 70€»). **Non** è un importo che si incassa: quello del su misura
+   * lo scrive il designer nella proposta. Per le consulenze l'importo vero è
+   * `price_cents`.
+   */
+  price_from_cents: number | null
 }
 
 export type ViaggioFirma = {
   title: string
   description: string | null
+  /** Il nome del paese del viaggio (0052). `null` sui profili caricati prima del tool v6. */
+  country: string | null
   /** Percorsi nel bucket `td-media`, già in ordine di `position`. */
   images: string[]
 }
@@ -90,7 +102,20 @@ export type ItinerarioPronto = {
   duration_label: string | null
   /** Idem per il prezzo ("1.380€"). È vetrina, non una cassa: vedi 0026. */
   price_label: string | null
+  /** La copertina: la prima foto della voce (0054), o la colonna superata. */
   image_path: string | null
+  /** I paesi del viaggio per nome, in ordine (0054). */
+  countries: string[]
+}
+
+/** Lo stato di una partenza (0053). `open` non ha etichetta. */
+export type StatoPartenza = 'open' | 'confirmed' | 'last_seats' | 'sold_out'
+
+/** Una partenza di un viaggio di gruppo: date vere, AAAA-MM-GG. */
+export type Partenza = {
+  starts_on: string
+  ends_on: string | null
+  status: StatoPartenza
 }
 
 /**
@@ -109,11 +134,80 @@ export type ItinerarioPronto = {
 export type ViaggioDiGruppo = {
   slug: string
   title: string
+  /** Superata dalla 0053 (partenze vere): la vista la serve ancora, le pagine non la leggono più. */
   dates_label: string | null
   duration_label: string | null
+  /** Superata dalla 0053 (participants_min / participants_max). */
   group_size_label: string | null
   price_label: string | null
   image_path: string | null
+  countries: string[]
+  participants_min: number | null
+  participants_max: number | null
+  /**
+   * La prima partenza **futura** non sold out, o la prima futura se lo sono
+   * tutte (0054, calcolata nel database all'ora di Roma). Mai una passata.
+   */
+  next_departure: Partenza | null
+}
+
+/** Una tappa del viaggio, come la scrive il designer. */
+export type Tappa = {
+  days_label: string | null
+  title: string | null
+  description: string | null
+}
+
+/**
+ * Il dettaglio di un itinerario pronto o di un viaggio di gruppo, dalle viste
+ * `public_td_ready_itinerary` e `public_td_group_trip` (0054). Stessa forma
+ * nel tool, stessa forma qui; i campi dei soli gruppi sono in fondo.
+ */
+export type DettaglioVoce = {
+  td_slug: string
+  slug: string
+  title: string
+  duration_label: string | null
+  price_label: string | null
+  nights: number | null
+  intro: string | null
+  price_note: string | null
+  main_stops: string[]
+  price_includes: string[]
+  price_excludes: string[]
+  packing_list: string[]
+  health_visa_info: string | null
+  fit_nature: number
+  fit_trekking: number
+  fit_on_the_road: number
+  fit_city: number
+  fit_culture: number
+  fit_chill: number
+  images: string[]
+  countries: string[]
+  stops: Tappa[]
+}
+
+export type DettaglioGruppo = DettaglioVoce & {
+  participants_min: number | null
+  participants_max: number | null
+  age_range: string | null
+  guide_name: string | null
+  /** Solo le partenze future, in ordine di data (0054). */
+  departures: Partenza[]
+  next_departure: Partenza | null
+}
+
+/** Una recensione da mostrare in vetrina (0054, `public_td_reviews`). */
+export type Recensione = {
+  /** `td_declared`: raccolta dal designer fuori da XPETIS (D3). `xpetis_verified`: dalla milestone 8. */
+  source: 'td_declared' | 'xpetis_verified'
+  title: string | null
+  author_name: string | null
+  stars: number
+  date_label: string | null
+  reviewed_on: string | null
+  body: string | null
 }
 
 /**
@@ -191,11 +285,28 @@ export type Vetrina = {
   cal_username: string | null
   /** Dalla 0048, in coda alla vista. Vuoto per chi non ne organizza. */
   group_trips: ViaggioDiGruppo[]
+  /** Dalla 0054: aree di competenza come le scrive il designer (campo `competenze` del tool). */
+  expertise_areas: string | null
+  /** Dalla 0054: «Cosa vuol dire viaggiare per me» (campo `viaggiarePerMe`). */
+  travel_philosophy: string | null
+  /** Dalla 0054: anni compiuti da quando è entrato in XPETIS. Mai la data. */
+  member_years: number
+  /**
+   * Dalla 0054: media delle sole recensioni **verificate**, e solo sopra la
+   * soglia di `app_config.showcase_rating_min_reviews`. Altrimenti `null`, e il
+   * voto non esce (D2). Le recensioni dichiarate dal designer non contano mai.
+   */
+  rating_avg: number | string | null
+  /**
+   * Dalla 0056: il nome delle frasi («Prenota la call con Luca»). La prima
+   * parola del nome, oppure il nome professionale intero (D8).
+   */
+  short_name: string
 }
 
 /** La vetrina di un designer pubblicato, o `null` se lo slug non esiste. */
 export async function leggiVetrina(slug: string): Promise<Vetrina | null> {
-  const supabase = await createClient()
+  const supabase = clientPubblico()
   const { data, error } = await supabase
     .from('public_td_showcase')
     .select('*')
@@ -204,6 +315,61 @@ export async function leggiVetrina(slug: string): Promise<Vetrina | null> {
 
   if (error) throw new Error(`public_td_showcase: ${error.message}`)
   return (data as Vetrina | null) ?? null
+}
+
+/**
+ * Il dettaglio di un itinerario pronto, o `null` se lo slug non esiste o il
+ * designer non è pubblicato: la vista contiene solo i pubblicati.
+ */
+export async function leggiDettaglioItinerario(
+  slugDesigner: string,
+  slugItinerario: string,
+): Promise<DettaglioVoce | null> {
+  const supabase = clientPubblico()
+  const { data, error } = await supabase
+    .from('public_td_ready_itinerary')
+    .select('*')
+    .eq('td_slug', slugDesigner)
+    .eq('slug', slugItinerario)
+    .maybeSingle()
+
+  if (error) throw new Error(`public_td_ready_itinerary: ${error.message}`)
+  return (data as DettaglioVoce | null) ?? null
+}
+
+/** Il gemello per i viaggi di gruppo. */
+export async function leggiDettaglioViaggioDiGruppo(
+  slugDesigner: string,
+  slugViaggio: string,
+): Promise<DettaglioGruppo | null> {
+  const supabase = clientPubblico()
+  const { data, error } = await supabase
+    .from('public_td_group_trip')
+    .select('*')
+    .eq('td_slug', slugDesigner)
+    .eq('slug', slugViaggio)
+    .maybeSingle()
+
+  if (error) throw new Error(`public_td_group_trip: ${error.message}`)
+  return (data as DettaglioGruppo | null) ?? null
+}
+
+/**
+ * Le recensioni della vetrina, nell'ordine della vista: prima le verificate
+ * (dalla più recente), poi le dichiarate (nella posizione data dal designer).
+ */
+export async function leggiRecensioni(slugDesigner: string): Promise<Recensione[]> {
+  const supabase = clientPubblico()
+  const { data, error } = await supabase
+    .from('public_td_reviews')
+    .select('source, title, author_name, stars, date_label, reviewed_on, body')
+    .eq('td_slug', slugDesigner)
+    .order('source_order', { ascending: true })
+    .order('reviewed_on', { ascending: false, nullsFirst: false })
+    .order('position', { ascending: true })
+
+  if (error) throw new Error(`public_td_reviews: ${error.message}`)
+  return (data ?? []) as Recensione[]
 }
 
 /**

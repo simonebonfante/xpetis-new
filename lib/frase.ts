@@ -40,7 +40,7 @@ type Frammento = readonly [string, string, string]
  * "in Vietnam", "negli Stati Uniti", "a Malta".
  *
  * La tassonomia non dichiara l'articolo, quindi il default è "in" — che va bene
- * per la grande maggioranza dei 129 stati — e le eccezioni stanno qui, per
+ * per la grande maggioranza dei 139 stati — e le eccezioni stanno qui, per
  * identificatore. Isole e città-stato vogliono "a", i nomi plurali "nei/negli/
  * nelle". Se la tassonomia cresce, una destinazione nuova cade sul default e
  * l'errore è leggibile, non silenzioso.
@@ -70,6 +70,14 @@ const LOCATIVO_IRREGOLARE: Record<string, string> = {
   singapore: 'a Singapore',
   tonga: 'a Tonga',
   samoa: 'a Samoa',
+  // I cinque paesi dei Caraibi entrati il 3 ottobre 2026 con la lista del tool
+  // vetrina v6. DA RIVEDERE CON GAIA: proposte mie. Andorra, Angola, Eritrea,
+  // Gambia e Bangladesh, entrati lo stesso giorno, stanno bene sul default "in".
+  antigua_e_barbuda: 'ad Antigua e Barbuda',
+  barbados: 'alle Barbados',
+  saint_lucia: 'a Saint Lucia',
+  saint_vincent_e_grenadine: 'a Saint Vincent e Grenadine',
+  sint_maarten: 'a Sint Maarten',
   // Macro-aree
   isole_delloceano_indiano: "nelle Isole dell'Oceano Indiano",
 }

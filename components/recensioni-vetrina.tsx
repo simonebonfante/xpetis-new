@@ -1,29 +1,56 @@
+import { ElencoRecensioni } from '@/components/elenco-recensioni'
+import type { Recensione } from '@/lib/vetrina'
+
 /**
- * "Cosa dice chi ha viaggiato con me" (Figma 171:68).
+ * «Cosa dice chi ha viaggiato con me». Forma dal tool vetrina v6.
  *
- * **La sezione oggi non esiste, e non è una dimenticanza.** Le recensioni di un
- * designer possono venire da due posti, e nessuno dei due può alimentarla ora:
+ * Fino al 3 ottobre 2026 questa sezione non esisteva: le recensioni scritte dal
+ * designer stavano chiuse in attesa della milestone 8. **Decisione D3 di
+ * Simone**: si mostrano, con una dicitura sopra che dice che le ha raccolte il
+ * designer (`app_config.showcase_declared_reviews_note`, prima stesura tecnica,
+ * da riscrivere a Gaia). Le stelle della singola recensione si vedono; **la
+ * media no** — il voto sulla foto conta solo le verificate (D2).
  *
- *  · `public_reviews` è la vista delle recensioni XPETIS, ed è **vuota**. Su
- *    `reviews` ogni riga pretende un ordine vero dietro — è quel vincolo a
- *    rendere impossibili le recensioni finte — e finché nessuno ha comprato una
- *    consulenza non c'è niente da mostrare. Si riempirà con la milestone 8.
+ * Il tool scrive sotto ogni recensione «Viaggiatore XPETIS da N anni», e se
+ * `anni` manca mette 1. **Qui non esce**: chi ha lasciato una recensione al
+ * designer fuori da XPETIS non è un viaggiatore XPETIS.
  *
- *  · `td_showcase_reviews` sono le recensioni che il designer porta da fuori
- *    (il seed ne contiene, per i due designer di prova). **Nessuna vista le
- *    espone e `is_published` nasce a falso**, per una decisione del 6 agosto:
- *    se mostrarle, come distinguerle da quelle vere e se contarle nelle medie si
- *    decide alla milestone 8. Esporle da qui vorrebbe dire prendere quella
- *    decisione di nascosto, aggiungendo una vista pubblica di mia iniziativa.
- *
- * Quindi: niente sezione. Non dati inventati, non una fascia vuota con un
- * titolo che promette qualcosa. Quando la milestone 8 decide, questo file
- * diventa la sezione del Figma — fascia marrone, card con la frase-titolo rossa,
- * stelle, corpo, data e "Carica altre recensioni".
- *
- * Lo stesso ragionamento ha già tolto il bollo "4.9 valutazione media" da
- * `/ricerca` e il "4.6" dalla scheda hero di questa pagina.
+ * Le verificate (`reviews`, milestone 8) arrivano dalla stessa vista
+ * (`public_td_reviews`) senza cambiare questa pagina; la dicitura compare solo
+ * se fra quelle mostrate ce n'è almeno una dichiarata.
  */
-export function RecensioniVetrina() {
-  return null
+export function RecensioniVetrina({
+  recensioni,
+  notaDichiarate,
+}: {
+  recensioni: Recensione[]
+  notaDichiarate: string | null
+}) {
+  const valide = recensioni.filter((r) => r.body?.trim() || r.title?.trim())
+  if (!valide.length) return null
+  const ciSonoDichiarate = valide.some((r) => r.source === 'td_declared')
+
+  return (
+    <section aria-labelledby="titolo-recensioni" className="bg-[#9e6f54] px-4 py-16 lg:px-[100px] lg:py-[72px]">
+      <div className="mx-auto max-w-[1312px]">
+        <h2 id="titolo-recensioni" className="font-titoli text-[36px] font-bold leading-[1.12] text-neutro lg:text-[44px]">
+          Cosa dice chi
+          <br />
+          ha viaggiato con me
+        </h2>
+        {ciSonoDichiarate && notaDichiarate && (
+          <p className="mt-4 max-w-[720px] text-corpo text-neutro/90">{notaDichiarate}</p>
+        )}
+        <ElencoRecensioni
+          recensioni={valide.map((r) => ({
+            titolo: r.title?.trim() || null,
+            nome: r.author_name?.trim() || null,
+            stelle: Math.max(0, Math.min(5, Number(r.stars) || 0)),
+            data: r.date_label?.trim() || null,
+            testo: r.body?.trim() || null,
+          }))}
+        />
+      </div>
+    </section>
+  )
 }

@@ -2,238 +2,234 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 
+import { CHIAVI, leggiTestiConfig } from '@/lib/config'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { CardViaggioGruppo } from '@/components/card-viaggio-gruppo'
-import { FotoVetrina } from '@/components/foto-vetrina'
-import { SchedaDesigner } from '@/components/scheda-designer'
+import { GalleriaVoce } from '@/components/galleria-voce'
+import { StatoPartenzaChip } from '@/components/stato-partenza'
 import {
+  FaPerMe,
+  FasciaFinale,
+  InformazioniUtili,
+  RaccontoFirmato,
+  SchedaPrezzo,
+  TappeViaggio,
+  type RigaScheda,
+  type VoceInformazioni,
+} from '@/components/blocchi-voce'
+import {
+  accorcia,
+  durataGruppo,
+  elencoPaesi,
+  etichettaGiorni,
+  intervalloDate,
+  persone,
+  prezzoVetrina,
+  prossimaPartenza,
+  rigaCredito,
+  rigaPrezzo,
+} from '@/lib/vetrina-vista'
+import {
+  formattaPrezzo,
+  leggiDettaglioViaggioDiGruppo,
   leggiVetrina,
   percorsoViaggioDiGruppo,
-  trovaViaggioDiGruppo,
   urlMedia,
-  type Vetrina,
-  type ViaggioDiGruppo,
 } from '@/lib/vetrina'
 
 /**
- * Un viaggio di gruppo — Figma nuovo `Q9Krydv6xD8mFJCtU9NHzr`, nodo 3-1121.
+ * «Viaggio di gruppo», una pagina per viaggio.
  *
- * La destinazione di "Ottieni maggiori informazioni" sulle card della vetrina.
- * **L'indirizzo porta lo slug del viaggio** (`/designer/<designer>/
- * viaggio-di-gruppo/<slug>`, migration 0051), mai la sua posizione: con un
- * ordinale, riordinare i viaggi farebbe rispondere 200 ai link vecchi con un
- * viaggio diverso. È la storia della 0033, e la pagina è la gemella di quella
- * dell'itinerario pronto.
+ * **Dal 3 ottobre 2026 il riferimento visivo è il tool vetrina v6**
+ * (`xpetis-vetrine-tool/riferimento/pagine_tool/gruppo.html`), non più il nodo
+ * Figma 3-1121 (D1). Indirizzo invariato: `/designer/<designer>/viaggio-di-gruppo/<slug>`
+ * (0051); un link del tool (`/gruppi/3`) o uno slug sparito danno 404 (R3).
  *
- * ## La regola di questa pagina: i campi sono sei
+ * ## Le partenze
  *
- * Il form Vetrina TD dà per ogni viaggio **titolo, date, giorni, persone,
- * prezzo, immagine**, e nient'altro (`vetrina_nuova.json`, chiave `gruppo`).
- * Istruzione di Simone, 29 settembre: *se non abbiamo i dati per quella parte,
- * non la facciamo* — né con un segnaposto, né con un «da compilare». Quindi il
- * disegno si costruisce solo dove ha una sorgente, e il resto è in `PIANO.md`
- * come domanda per Alessandro:
+ * Sono date vere dalla 0053, e la vista (0054) dà **solo quelle future**, a
+ * Roma. Il tool le mostra tutte, passate comprese, barrando le sold out; e
+ * come «prossima partenza», se non ce ne sono di future, mostra l'ultima già
+ * andata. Qui una partenza passata non esiste: **senza partenze future la
+ * pagina resta, e i blocchi «Partenze» e «Prossima partenza» non escono**.
  *
- *  · **"Questo viaggio fa per me?"** — sei temi con un voto a stelle
- *    (Natura, Trekking, On the Road, City, Cultura, Chill). Nessun campo del
- *    viaggio li dice; i temi del *designer* sono un'altra cosa.
- *  · **"Le tappe del viaggio"** — sei tappe con giorni, titolo e descrizione.
- *  · **"Informazioni utili"** — valigia, cosa comprende la quota, sanità e
- *    visti. Il secondo sarebbe anche una promessa commerciale.
- *  · **"Fascia d'età"** nella scheda del prezzo.
- *  · **"volo non incluso • IVA inclusa"** sotto il prezzo. Per gli itinerari
- *    pronti è una riga di `app_config`; per i viaggi di gruppo nessuno ha
- *    detto cosa comprende il prezzo, e riusare quella riga lo direbbe per loro.
- *  · **Il paese** nella riga "Progettato da … • 12 giorni • Argentina e Cile":
- *    il viaggio non dichiara la sua destinazione.
- *  · **La descrizione lunga** accanto alla foto del designer, e **la galleria a
- *    tre** con "Mostra tutte le foto": `image_path` è una foto sola, che qui
- *    riempie la larghezza della galleria (come nell'itinerario pronto).
+ * ## Le scelte che divergono dal tool
  *
- * ## Cosa non si fa qui: comprare
- *
- * **"Acquista il posto" non c'è.** Il Flusso non prevede di comprare un viaggio
- * di gruppo dal sito: sono solo vetrina (0048: nessuna cassa, nessun ordine,
- * `orders.service_type` non ammette `group_trip`). È Figma che aggiunge un
- * comportamento, e si segnala invece di costruirlo.
- *
- * **"Contatta il Travel Designer" diventa "Prenota una call con …"**, e porta
- * alla scheda della call in vetrina. Il designer non ha un contatto pubblico
- * (principio 1): la sola porta verso di lui è la consulenza, che si paga. Un
- * tasto che dice «contatta» e apre una prenotazione a pagamento prometterebbe
- * una cosa e ne farebbe un'altra. Anche questo è in `PIANO.md`.
+ *  · niente «Acquista il posto» (R4): l'unica azione è la call (`#servizi`);
+ *  · «Accompagnato da» solo se il designer l'ha scritto: il tool ci mette il
+ *    suo nome quando manca (D-17);
+ *  · con il solo massimo dei partecipanti, «fino a 15» (D-18);
+ *  · la nota di prezzo **senza ripiego**: un gruppo coi voli inclusi si
+ *    troverebbe scritto «volo non incluso»;
+ *  · «Acconto, saldo e cancellazione»: il tool mette un testo XPETIS fisso su
+ *    tutti i gruppi. È una promessa commerciale: qui esce solo se
+ *    `app_config.group_trip_terms_text` non è vuota (D-2), e oggi lo è. Il
+ *    testo scritto dal designer (`td_terms_text`) non esce mai;
+ *  · le «tappe principali» il tool non le mostra sulla pagina del gruppo, e
+ *    nemmeno qui (D-22);
+ *  · niente «secondo Incontro gratis» (D4), credito senza cifre (R2).
  */
 
 type Props = {
   params: Promise<{ slug: string; viaggio: string }>
 }
 
-/**
- * Vetrina e viaggio che l'URL nomina. Uno slug che quel designer non ha è un
- * 404, non un ripiego sul primo viaggio: è un link inventato, o il viaggio di
- * un altro designer.
- */
-async function leggiViaggio(
-  slugDesigner: string,
-  slugViaggio: string,
-): Promise<{ vetrina: Vetrina; viaggio: ViaggioDiGruppo } | null> {
-  const vetrina = await leggiVetrina(slugDesigner)
-  if (!vetrina) return null
-
-  const viaggio = trovaViaggioDiGruppo(vetrina.group_trips ?? [], slugViaggio)
-  if (!viaggio) return null
-
-  return { vetrina, viaggio }
+async function leggi(slug: string, slugViaggio: string) {
+  const [vetrina, voce] = await Promise.all([leggiVetrina(slug), leggiDettaglioViaggioDiGruppo(slug, slugViaggio)])
+  return vetrina && voce ? { vetrina, voce } : null
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, viaggio } = await params
-  const trovato = await leggiViaggio(slug, viaggio)
+  const trovato = await leggi(slug, viaggio)
   if (!trovato) return { title: 'Viaggio di gruppo · XPETIS' }
+  const { vetrina, voce } = trovato
+  const titolo = `${voce.title} · ${vetrina.display_name} · XPETIS`
+  const copertina = urlMedia(voce.images[0])
   return {
-    title: `${trovato.viaggio.title} · ${trovato.vetrina.display_name} · XPETIS`,
-    description: trovato.vetrina.headline ?? undefined,
+    title: titolo,
+    description: accorcia(voce.intro),
+    openGraph: {
+      title: titolo,
+      description: accorcia(voce.intro),
+      images: copertina ? [{ url: copertina, alt: voce.title }] : undefined,
+    },
   }
-}
-
-/** Le righe della scheda: solo quelle che il designer ha scritto. */
-function righe(viaggio: ViaggioDiGruppo): { etichetta: string; valore: string }[] {
-  return [
-    { etichetta: 'Date', valore: viaggio.dates_label },
-    { etichetta: 'Durata', valore: viaggio.duration_label },
-    { etichetta: 'Persone previste', valore: viaggio.group_size_label },
-    // "Fascia d'età" è nel disegno, non nel form.
-  ].filter((r): r is { etichetta: string; valore: string } => Boolean(r.valore && r.valore.trim()))
-}
-
-/**
- * La scheda bianca a destra della foto. Prezzo, date, durata e persone sono le
- * stringhe del designer, mostrate come le ha scritte: "1.380€" non si
- * riformatta, perché non sappiamo se vuol dire 1.380,00 o "da 1.380".
- */
-function SchedaViaggio({ viaggio, vetrina }: { viaggio: ViaggioDiGruppo; vetrina: Vetrina }) {
-  const dettagli = righe(viaggio)
-
-  return (
-    <div className="flex flex-col rounded-[15px] bg-neutro p-6 lg:px-[34px] lg:py-5">
-      {viaggio.price_label && (
-        <div className="flex flex-wrap items-baseline gap-3">
-          <p className="text-[24px] leading-[2] tracking-[-0.264px]">A partire da</p>
-          <p className="font-titoli text-[36px] font-bold leading-[34px] text-primario">
-            {viaggio.price_label}
-          </p>
-        </div>
-      )}
-
-      {dettagli.length > 0 && (
-        <dl className={viaggio.price_label ? 'mt-6 lg:mt-[37px]' : ''}>
-          {dettagli.map((riga, i) => (
-            <div
-              key={riga.etichetta}
-              className={`grid gap-1 py-[13px] sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4 ${
-                i === 0 ? 'border-t border-dashed border-scuro' : ''
-              } border-b border-dashed border-scuro`}
-            >
-              <dt className="text-[18px] font-bold leading-[1.5] tracking-[-0.198px]">
-                {riga.etichetta}
-              </dt>
-              <dd className="text-[18px] leading-[1.5] tracking-[-0.198px]">{riga.valore}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-
-      {/* Il disegno ha qui due tasti rossi: "Acquista il posto" (non esiste,
-          vedi in testa) e "Contatta il Travel Designer", che porta alla
-          scheda della call — è là che si prenota, col login prima se serve. */}
-      <Link
-        href={`/designer/${vetrina.slug}#servizi`}
-        className="mt-auto block rounded-[30px] bg-primario px-5 py-2 text-center text-corpo text-neutro transition hover:brightness-110 lg:mt-10"
-      >
-        Prenota una call con {vetrina.display_name}
-      </Link>
-    </div>
-  )
 }
 
 export default async function PaginaViaggioDiGruppo({ params }: Props) {
   const { slug, viaggio: slugViaggio } = await params
 
-  const trovato = await leggiViaggio(slug, slugViaggio)
+  const [trovato, testi] = await Promise.all([
+    leggi(slug, slugViaggio),
+    leggiTestiConfig([CHIAVI.prefissoPrezzoGruppo, CHIAVI.prezzoSuRichiesta, CHIAVI.condizioniGruppo]),
+  ])
   if (!trovato) notFound()
+  const { vetrina, voce } = trovato
 
-  const { vetrina, viaggio } = trovato
-  const altri = (vetrina.group_trips ?? []).filter((riga) => riga.slug !== viaggio.slug)
+  const nome = vetrina.display_name
+  const nomeBreve = vetrina.short_name || nome
+  const breve = vetrina.services.find((s) => s.service_type === 'consultation')
+  const credito = rigaCredito(breve?.duration_minutes ?? null, formattaPrezzo(breve?.price_cents ?? null), nomeBreve)
+  const prenota = `/designer/${vetrina.slug}#servizi`
+  const cta = { href: prenota, testo: `Parlane con ${nomeBreve}` }
+
+  const prezzo = prezzoVetrina(voce.price_label)
+  const riga = rigaPrezzo(testi[CHIAVI.prefissoPrezzoGruppo], voce.price_note)
+  const prossima = prossimaPartenza(voce.next_departure)
+
+  const durata = durataGruppo(voce.duration_label, voce.nights)
+  const quanti = persone(voce.participants_min, voce.participants_max, 'partecipanti')
+  const righe: RigaScheda[] = []
+  if (voce.departures.length) {
+    righe.push({
+      etichetta: 'Partenze',
+      contenuto: (
+        <ul className="space-y-2">
+          {voce.departures.map((d) => (
+            <li key={d.starts_on} className="flex flex-wrap items-center gap-2">
+              <span className={d.status === 'sold_out' ? 'text-scuro/60 line-through' : ''}>
+                {intervalloDate(d.starts_on, d.ends_on)}
+              </span>
+              <StatoPartenzaChip stato={d.status} />
+            </li>
+          ))}
+        </ul>
+      ),
+    })
+  }
+  if (durata) righe.push({ etichetta: 'Durata', contenuto: durata })
+  if (quanti) righe.push({ etichetta: 'Persone previste', contenuto: quanti })
+  if (voce.age_range) righe.push({ etichetta: 'Fascia d’età', contenuto: voce.age_range })
+
+  const informazioni: VoceInformazioni[] = [
+    { titolo: 'Cosa portare in valigia', righe: voce.packing_list },
+    voce.price_includes.length
+      ? { titolo: 'La quota comprende', spunte: voce.price_includes, sottotitolo: 'La quota non comprende', righe2: voce.price_excludes }
+      : { titolo: 'La quota non comprende', righe: voce.price_excludes },
+    { titolo: 'Info sanitarie e visti', testo: voce.health_visa_info },
+    // Il testo XPETIS, non quello del designer, e solo se la riga non è vuota.
+    { titolo: 'Acconto, saldo e cancellazione', testo: testi[CHIAVI.condizioniGruppo] },
+  ]
+
+  const paesi = elencoPaesi(voce.countries)
+  const altri = vetrina.group_trips.filter((g) => g.slug !== voce.slug).slice(0, 3)
 
   return (
     <div className="bg-crema">
       <Header />
 
-      <section className="px-4 pb-16 pt-[120px] lg:px-0 lg:pb-[89px] lg:pt-[172px]">
+      <section className="px-4 pb-16 pt-[110px] lg:px-[100px] lg:pb-[89px] lg:pt-[150px]">
         <div className="mx-auto max-w-[1312px]">
-          {/* Il filo del Figma è "Viaggi di gruppo > Argentina: …": un indice
-              dei viaggi di gruppo non esiste, quindi la prima voce porta alla
-              sezione della vetrina che li elenca. */}
-          <nav aria-label="Dove sei" className="text-corpo">
-            <Link href={`/designer/${vetrina.slug}`} className="hover:text-primario">
-              {vetrina.display_name}
-            </Link>
-            <span aria-hidden> &gt; </span>
-            <Link href={`/designer/${vetrina.slug}#viaggi-di-gruppo`} className="hover:text-primario">
-              Viaggi di gruppo
-            </Link>
+          <nav aria-label="Dove sei" className="text-[14px]">
+            <Link href={`/designer/${vetrina.slug}`} className="hover:text-primario">{nome}</Link>
+            <span aria-hidden> › </span>
+            <Link href={`/designer/${vetrina.slug}#viaggi-di-gruppo`} className="hover:text-primario">Viaggi di gruppo</Link>
+            <span aria-hidden> › </span>
+            <span aria-current="page">{voce.title}</span>
           </nav>
 
-          <h1 className="mt-6 font-titoli text-[40px] font-bold leading-tight">{viaggio.title}</h1>
-
-          {/* "Progettato da … • 12 giorni". Il terzo pezzo del disegno è il
-              paese, che il viaggio non dichiara. */}
-          <p className="mt-6 text-corpo">
-            Progettato da {vetrina.display_name}
-            {viaggio.duration_label && ` • ${viaggio.duration_label}`}
+          <h1 className="mt-4 font-titoli text-[32px] font-bold leading-tight lg:text-[40px]">{voce.title}</h1>
+          <p className="mt-2 text-[14px]">
+            Progettato da{' '}
+            <Link href={`/designer/${vetrina.slug}`} className="text-primario underline">{nome}</Link>
+            {[etichettaGiorni(voce.duration_label), paesi].filter(Boolean).map((p) => ` · ${p}`)}
           </p>
+          {voce.guide_name && <p className="text-[14px] text-scuro/80">Accompagnato da {voce.guide_name}</p>}
 
-          <div className="mt-8 grid gap-6 lg:mt-[37px] lg:grid-cols-[minmax(0,1fr)_424px]">
-            {/* Una foto, non tre: occupa la larghezza di tutta la galleria del
-                disegno, così il vuoto non si vede. */}
-            <div className="relative h-[300px] overflow-hidden rounded-[15px] lg:h-[452px]">
-              <FotoVetrina
-                src={urlMedia(viaggio.image_path)}
-                alt={viaggio.title}
-                sizes="(min-width: 1024px) 868px, 100vw"
+          <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_424px] lg:gap-8">
+            <div className="flex min-w-0 flex-col gap-8 lg:gap-12">
+              <GalleriaVoce
+                foto={voce.images.map((p) => urlMedia(p)).filter((u): u is string => Boolean(u))}
+                titolo={voce.title}
               />
+              <div className="lg:hidden">
+                <SchedaPrezzo prezzo={prezzo} prezzoMancante={testi[CHIAVI.prezzoSuRichiesta]} riga={riga} righe={righe}
+                  cta={cta} credito={credito} />
+              </div>
+              <RaccontoFirmato testo={voce.intro} nome={nome} foto={vetrina.photo_url} />
+              <TappeViaggio tappe={voce.stops} />
+              <FaPerMe voce={voce} />
             </div>
 
-            <SchedaViaggio viaggio={viaggio} vetrina={vetrina} />
+            <aside className="hidden lg:sticky lg:top-6 lg:block">
+              <SchedaPrezzo prezzo={prezzo} prezzoMancante={testi[CHIAVI.prezzoSuRichiesta]} riga={riga} righe={righe}
+                cta={cta} credito={credito} />
+            </aside>
           </div>
-
-          <div className="mt-6 lg:max-w-[868px]">
-            <SchedaDesigner vetrina={vetrina} />
-          </div>
-
-          {/* Qui il disegno mette "Questo viaggio fa per me?", poi "Le tappe
-              del viaggio" e "Informazioni utili". Nessuna delle tre ha una
-              sorgente: vedi in testa. */}
         </div>
       </section>
 
-      {/* ----------------------------------------------- Altri viaggi di gruppo
-          Gli altri **di questo designer**: sono i soli che la vetrina conosce. */}
-      {altri.length > 0 && (
-        <section className="bg-crema px-4 pb-16 lg:px-0 lg:pb-[120px]">
-          <div className="mx-auto max-w-[1312px]">
-            <h2 className="font-titoli text-[40px] font-bold leading-tight lg:text-h2 lg:leading-[70px]">
-              Altri viaggi di gruppo
-            </h2>
+      <InformazioniUtili voci={informazioni} />
 
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:mt-[86px] lg:grid-cols-3">
-              {altri.map((riga) => (
-                <CardViaggioGruppo
-                  key={riga.slug}
-                  viaggio={riga}
-                  href={percorsoViaggioDiGruppo(vetrina.slug, riga.slug)}
-                />
+      <FasciaFinale
+        prezzo={prezzo}
+        prezzoMancante={testi[CHIAVI.prezzoSuRichiesta]}
+        riga={riga}
+        prossima={
+          prossima && (
+            <div>
+              <p className="text-[13px] text-neutro/80">Prossima partenza</p>
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-[16px]">
+                {prossima.date}
+                <StatoPartenzaChip stato={prossima.stato} />
+              </p>
+            </div>
+          )
+        }
+        cta={cta}
+        credito={credito}
+      />
+
+      {altri.length > 0 && (
+        <section className="px-4 py-16 lg:px-[100px] lg:py-[90px]">
+          <div className="mx-auto max-w-[1312px]">
+            <h2 className="font-titoli text-[36px] font-bold leading-tight lg:text-[48px]">Altri viaggi di gruppo di {nomeBreve}</h2>
+            <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              {altri.map((g) => (
+                <CardViaggioGruppo key={g.slug} viaggio={g} href={percorsoViaggioDiGruppo(vetrina.slug, g.slug)}
+                  prezzoMancante={testi[CHIAVI.prezzoSuRichiesta]} etichetta="Viaggio di gruppo" />
               ))}
             </div>
           </div>

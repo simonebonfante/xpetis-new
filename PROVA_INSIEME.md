@@ -16,15 +16,19 @@ Durata: **due ore circa**, senza fretta.
 
 ---
 
+
+
 ## Come si legge questa guida
 
-| Simbolo | Significato |
-|---|---|
-| 👤 | lo fa **Andrea**, nei panni del viaggiatore |
-| 🎨 | lo fa **Alessandro**, nei panni del Travel Designer o del team |
-| 💻 | lo fa **Simone**: query, configurazione, n8n |
-| 🔴 | **punto di controllo**: qui un guasto sarebbe silenzioso |
-| ⚠️ | trappola nota, leggere prima di procedere |
+
+| Simbolo | Significato                                                    |
+| ------- | -------------------------------------------------------------- |
+| 👤      | lo fa **Andrea**, nei panni del viaggiatore                    |
+| 🎨      | lo fa **Alessandro**, nei panni del Travel Designer o del team |
+| 💻      | lo fa **Simone**: query, configurazione, n8n                   |
+| 🔴      | **punto di controllo**: qui un guasto sarebbe silenzioso       |
+| ⚠️      | trappola nota, leggere prima di procedere                      |
+
 
 **Regola per le query:** una alla volta, e guardare **il conteggio righe** in
 fondo all'editor. `UPDATE 0` non è un errore ma non ha fatto niente — ci è già
@@ -34,6 +38,8 @@ costato mezz'ora tre volte.
 proseguire. Sapere *dove* si è fermato vale più di qualunque messaggio.
 
 ---
+
+
 
 # Parte 0 · Preparazione 💻
 
@@ -53,10 +59,10 @@ applica.
 
 Il seed ha `on conflict do nothing` e il database è già seminato: le righe
 nuove vanno inserite a mano. Apri `supabase/seed/0001_config.sql` e
-`supabase/seed/0005_testi_mail.sql` e incolla nel SQL Editor **i blocchi
-`insert` che non sono ancora nel database**.
+`supabase/seed/0005_testi_mail.sql` e incolla nel SQL Editor **i blocchi**
+`insert` **che non sono ancora nel database**.
 
-⚠️ **Non rieseguire `0003_demo.sql`**: contiene un `update` che rimette i
+⚠️ **Non rieseguire** `0003_demo.sql`: contiene un `update` che rimette i
 segnaposto `example.com` sulle foto dei designer e le fa sparire dal sito.
 Se succede, si rimedia rieseguendo `0004_foto_finte.sql`.
 
@@ -73,14 +79,16 @@ select
 
 Attesi per questa prova:
 
-| | |
-|---|---|
-| `posta_accesa` | **0** — le mail si compongono e restano in coda, non partono |
-| `indirizzo_sito` | **`http://localhost:3000`** |
-| `ora_digest` | un numero (serve nella parte 4) |
-| `destinatari_team` | i tre indirizzi |
 
-⚠️ **`indirizzo_sito` è la riga più pericolosa del database.** Se punta a
+|                    |                                                              |
+| ------------------ | ------------------------------------------------------------ |
+| `posta_accesa`     | **0** — le mail si compongono e restano in coda, non partono |
+| `indirizzo_sito`   | `http://localhost:3000`                                      |
+| `ora_digest`       | un numero (serve nella parte 4)                              |
+| `destinatari_team` | i tre indirizzi                                              |
+
+
+⚠️ `indirizzo_sito` **è la riga più pericolosa del database.** Se punta a
 `xpetis.it`, i link dentro le mail portano alla landing page e tutta la parte 3
 non funziona — senza nessun errore.
 
@@ -89,7 +97,9 @@ non funziona — senza nessun errore.
 - `npm run dev` acceso
 - Su **n8n**, tutti e tre i workflow **Active**: Cal.com, Stripe, Orologio
 - Il sito raggiungibile anche dal telefono: nel terminale di `npm run dev` c'è
-  una riga `Network: http://192.168.x.x:3000` — serve nella parte 2
+una riga `Network: http://192.168.x.x:3000` — serve nella parte 2
+
+
 
 ### 0.5 · I dati
 
@@ -105,6 +115,8 @@ Attesi **Marco Rossi** e **Giulia Neri**, entrambi `published`, colonna
 manca.
 
 ---
+
+
 
 # Parte 1 · Il viaggiatore trova un designer 👤
 
@@ -138,7 +150,7 @@ Tre prove:
 1. **«Vietnam»** → deve trovare Marco
 2. **«peru»**, senza accento → deve trovare Perù e Giulia
 3. **«Siena»** → **non deve trovare niente**: è fra le 1.032 città tolte dalla
-   tassonomia v2, ed è una scelta di prodotto, non un difetto
+  tassonomia v2, ed è una scelta di prodotto, non un difetto
 
 ⚠️ Su «peru» comparirà anche **Perugia**: è corretto — è una città italiana e la
 ricerca ignora gli accenti. Annotare **in che ordine** compaiono: se Perugia sta
@@ -148,11 +160,13 @@ sopra Perù è un problema di ordinamento, non di dati.
 
 Apri **Marco Rossi**. Poi apri anche **Giulia Neri**.
 
-| Cosa guardare | Atteso |
-|---|---|
+
+| Cosa guardare          | Atteso                                                                |
+| ---------------------- | --------------------------------------------------------------------- |
 | Le pillole dei servizi | **Marco: solo la consulenza breve.** Giulia: breve **e** approfondita |
-| Viaggi di gruppo | una sezione in coda, con tre schede per designer, foto e date |
-| «E dopo l'incontro?» | **solo i servizi che quel designer offre davvero** |
+| Viaggi di gruppo       | una sezione in coda, con tre schede per designer, foto e date         |
+| «E dopo l'incontro?»   | **solo i servizi che quel designer offre davvero**                    |
+
 
 🎨 *Alessandro:* è la pagina che venderai ai 25. Dì cosa manca o cosa è di
 troppo — è il momento giusto, dopo sarà più caro.
@@ -167,7 +181,11 @@ Flusso non prevede di acquistarli dal sito. Se c'è, annotatelo.
 
 ---
 
+
+
 # Parte 2 · Prenotare e pagare 👤
+
+
 
 ### F · Il cancello del login
 
@@ -180,7 +198,7 @@ sulla home.
 ⚠️ Sulla pagina `/accedi` il bottone «Entra con Google» deve essere **una
 pillola rossa leggibile**. Era bianco su crema fino al 28 settembre.
 
-### G · L'embed Cal.com
+### G · L'embed [Cal.com](http://Cal.com)
 
 Premi di nuovo **Prenota la call**. Il calendario compare **dentro la pagina**.
 
@@ -201,6 +219,8 @@ Paga con:
 4242 4242 4242 4242 · scadenza futura qualsiasi · CVC qualsiasi
 ```
 
+
+
 ### 🔴 Controllo 1 — dopo il primo pagamento 💻
 
 ```sql
@@ -209,7 +229,7 @@ select b.status, b.confirmed_at, p.kind, p.status as pagamento, p.amount_cents
  order by b.created_at desc limit 2;
 ```
 
-Atteso: `confirmed`, pagamento `consultation` **`paid`**, importo giusto.
+Atteso: `confirmed`, pagamento `consultation` `paid`, importo giusto.
 
 ```sql
 select kind, severity, message from team_alerts
@@ -222,7 +242,11 @@ pagamento si è agganciato alla prenotazione giusta.
 
 ---
 
+
+
 # Parte 3 · Dopo la call 💻👤🎨
+
+
 
 ### I · Far finire la call
 
@@ -237,7 +261,7 @@ update bookings
  where id = '<id della prenotazione>';
 ```
 
-Controlla che dica **`UPDATE 1`**.
+Controlla che dica `UPDATE 1`.
 
 Poi su **n8n**, workflow *Orologio*, premi **Execute workflow**.
 
@@ -249,10 +273,10 @@ select message_kind, recipient, status, queued_at, subject
  order by queued_at desc limit 3;
 ```
 
-⚠️ **Ordinare per `queued_at`, mai per `id`**: gli id sono UUID casuali, quindi
+⚠️ **Ordinare per** `queued_at`**, mai per** `id`: gli id sono UUID casuali, quindi
 `order by id` restituisce righe a caso e sembra che la mail non ci sia.
 
-Atteso: una riga **`postcall_traveler`**, `status` in coda, **`sent_at` nullo**.
+Atteso: una riga `postcall_traveler`, `status` in coda, `sent_at` **nullo**.
 
 Poi leggi il corpo:
 
@@ -272,7 +296,7 @@ si capisce cosa gli stiamo proponendo?
 Apri quel link. La pagina dice cosa stai chiedendo e **che non stai comprando
 niente**. Premi il bottone.
 
-Deve rispondere «L'abbiamo ricevuta» con un riferimento tipo **`XP-00007`**.
+Deve rispondere «L'abbiamo ricevuta» con un riferimento tipo `XP-00007`.
 
 💻 Verifica:
 
@@ -284,12 +308,16 @@ select from_status, to_status, actor from order_status_history
  order by created_at desc limit 2;
 ```
 
-Atteso: ordine `requested`, e **`actor = traveler`** — è l'unica prova di chi ha
+Atteso: ordine `requested`, e `actor = traveler` — è l'unica prova di chi ha
 cliccato.
 
 ---
 
+
+
 # Parte 4 · Il designer lavora 🎨
+
+
 
 ### K · La pagina del designer
 
@@ -311,7 +339,7 @@ Cosa guardare:
 - si vede **solo il nome** del viaggiatore, non cognome né mail
 - c'è scritto quanto ha già pagato per la consulenza
 - **sotto il prezzo c'è una frase tipo «se scali la consulenza, toglila tu da
-  qui: il sistema non toglie niente da solo»**
+qui: il sistema non toglie niente da solo»**
 
 ⚠️ Quella frase è la cosa più importante della pagina. Il sistema **non calcola**
 lo sconto di proposito: se il designer non legge quella riga, scrive il prezzo
@@ -359,7 +387,7 @@ Cosa guardare:
 - si vede la proposta, il prezzo **1.350,00 €**, i giorni
 - **non si vede nessun dato del viaggiatore**: quel link gira in un gruppo
 - il prezzo è quello **finale**: non deve comparire nessuna sottrazione né il
-  numero 60
+numero 60
 
 Paga con la carta di prova.
 
@@ -373,7 +401,7 @@ select o.human_ref, o.status, p.kind, p.status as pagamento, p.amount_cents,
  order by o.created_at desc limit 2;
 ```
 
-Atteso: ordine **`in_progress`**, pagamento `full` **`paid`** da **135000**
+Atteso: ordine `in_progress`, pagamento `full` `paid` da **135000**
 centesimi, `non_legato_a_prenotazione` e `legato_a_ordine` entrambi **true**.
 
 ```sql
@@ -396,6 +424,8 @@ secondi e riapritelo — deve dare errore.
 
 ---
 
+
+
 # Parte 5 · Il cruscotto del team 🎨
 
 **Questa è la parte che solo Alessandro può provare, e va fatta così:
@@ -407,6 +437,7 @@ devi chiedere cosa significa una riga, quella riga è sbagliata.
 ```sql
 select * from team_ordini_aperti;
 ```
+
 Deve dire **chi deve muoversi e da quanto** — «Aspetta l'agenzia da 9 giorni» —
 non uno stato tecnico.
 
@@ -417,18 +448,20 @@ select * from team_prenotazioni_in_corso;
 ```sql
 select * from team_coda_alert;
 ```
+
 In ordine di quanto costa ignorarli, con scritto **cosa si fa**.
 
 ```sql
 select * from team_checklist_pubblicazione;
 ```
+
 Chi è pronto per la vetrina e a chi manca cosa. 🎨 **È lo strumento con cui
 seguirai i 25 designer**: dì se ti basta.
 
 ### O · Chiudere un alert
 
-💻 In Studio apri **`team_alerts` come tabella** (non la vista: le viste sono in
-sola lettura), trova un alert di collaudo e **spunta la colonna `risolto`**.
+💻 In Studio apri `team_alerts` **come tabella** (non la vista: le viste sono in
+sola lettura), trova un alert di collaudo e **spunta la colonna** `risolto`.
 
 ```sql
 select kind, risolto, resolved_at, resolved_by
@@ -464,6 +497,8 @@ vecchi raggruppati. **Nessun codice lungo in chiaro.**
 
 ---
 
+
+
 # Cosa annotare
 
 Un foglio solo, tre colonne: **lettera**, **cosa è successo**, **chi l'ha
@@ -473,25 +508,27 @@ Le tre domande a cui questa sessione deve rispondere:
 
 1. 👤 **Andrea:** c'è un punto in cui non hai capito cosa dovevi fare?
 2. 🎨 **Alessandro:** il cruscotto ti basta per seguire venticinque designer, o
-   ti serve qualcosa che non c'è?
+  ti serve qualcosa che non c'è?
 3. 🎨 **Alessandro:** la pagina del designer sul telefono è usabile da una
-   persona che non l'ha mai vista?
+  persona che non l'ha mai vista?
 
 ---
+
+
 
 # Cosa questa prova NON copre
 
 Da dire ad alta voce all'inizio, così nessuno pensa che sia tutto verificato:
 
 - **Nessuna mail parte davvero.** `email_enabled = 0`: si leggono dalla coda.
-  Verso destinatari veri non è mai stato provato
+Verso destinatari veri non è mai stato provato
 - **I pagamenti sono in sandbox**, sul conto di prova. Il conto dell'agenzia non
-  esiste ancora
+esiste ancora
 - **L'All Inclusive non si prova**: serve un'agenzia vera e il suo Stripe
 - **Le recensioni non esistono** (milestone 8, non iniziata)
 - **I 25 profili veri non sono importati**: in prova ci sono due designer finti
 - **Il dominio non punta all'app**, quindi i link nelle mail funzionano solo in
-  locale
+locale
 
 ---
 

@@ -64,3 +64,6 @@ next-env.d.ts
 
 # generated — run `npm run gen:types` to regenerate
 src/types/api.gen.ts
+
+xpetis-vetrine-tool/
+vetrina-luca-ferraina/

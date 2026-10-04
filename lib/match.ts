@@ -6,7 +6,7 @@
  * livello di paese, mai il valore di un asse. Qui non si ricalcola niente — il
  * browser non vede questo modulo e non deve.
  */
-import { createClient } from '@/lib/supabase/server'
+import { clientPubblico } from '@/lib/supabase/pubblico'
 import type { Quiz } from '@/lib/quiz-risposte'
 
 /** I due soli livelli che filtrano. Città e continenti vivono nel suggeritore. */
@@ -75,7 +75,7 @@ export async function cercaDesigner({
   limite = 20,
   offset = 0,
 }: Parametri): Promise<{ risultati: RisultatoMatch[]; totale: number }> {
-  const supabase = await createClient()
+  const supabase = clientPubblico()
 
   const { data, error } = await supabase.rpc('match_designers', {
     p_destination_level: destinazione?.livello ?? null,
@@ -107,7 +107,7 @@ export async function leggiDestinazione(
   if (!livello || !ref) return null
   if (!(LIVELLI_FILTRABILI as readonly string[]).includes(livello)) return null
 
-  const supabase = await createClient()
+  const supabase = clientPubblico()
   const { data } = await supabase
     .from('geo_search')
     .select('name_it, is_filterable')
@@ -124,7 +124,7 @@ export async function leggiDestinazione(
  * con "+100 Designer": un numero di comodo, che qui diventa quello vero.
  */
 export async function contaDesignerPubblicati(): Promise<number> {
-  const supabase = await createClient()
+  const supabase = clientPubblico()
   const { count } = await supabase
     .from('public_td_showcase')
     .select('id', { count: 'exact', head: true })
@@ -146,7 +146,7 @@ export async function contaDesignerPubblicati(): Promise<number> {
 export async function leggiTagDisponibili(
   destinazione: Destinazione | null,
 ): Promise<string[]> {
-  const supabase = await createClient()
+  const supabase = clientPubblico()
   const { data, error } = await supabase.rpc('tags_for_destination', {
     p_destination_level: destinazione?.livello ?? null,
     p_destination_ref: destinazione?.ref ?? null,
@@ -162,7 +162,7 @@ export async function leggiTag(): Promise<{
   contesti: { code: string; label_it: string }[]
   etichette: Record<string, string>
 }> {
-  const supabase = await createClient()
+  const supabase = clientPubblico()
   const { data } = await supabase
     .from('public_tags')
     .select('code, kind, label_it, sort_order')

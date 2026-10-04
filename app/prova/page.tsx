@@ -41,7 +41,7 @@ export default async function Prova() {
       <section className="rounded-xl border border-neutral-200 p-6">
         <h2 className="mb-3 font-semibold">Lettura pubblica (chiave publishable)</h2>
         <ul className="space-y-1 text-sm">
-          <li>Paesi nella tassonomia: <strong>{paesi ?? '—'}</strong> (attesi 129)</li>
+          <li>Paesi nella tassonomia: <strong>{paesi ?? '—'}</strong> (attesi 139)</li>
           <li>
             Designer pubblicati:{' '}
             <strong>{designer?.map((d) => d.display_name).join(', ') || '—'}</strong>

@@ -1,4 +1,5 @@
-import type { Servizio, TipoServizio } from '@/lib/vetrina'
+import Image from 'next/image'
+import { formattaPrezzo, type Servizio, type TipoServizio } from '@/lib/vetrina'
 
 /**
  * "E dopo l'incontro? Decidete insieme se continuare." — il riquadro crema
@@ -14,18 +15,18 @@ import type { Servizio, TipoServizio } from '@/lib/vetrina'
  * questi servizi si compra da qui (Flusso §3). Nascono dopo la consulenza, dai
  * bottoni della mail post-call.
  *
- * Due cose del disegno che qui non ci sono, di proposito:
+ * **Dal 4 ottobre 2026** (vetrine v6) i riquadri hanno le loro icone, prese
+ * dal tool vetrina v6 dove sono SVG in linea (`public/img/dopo-*.svg`): il
+ * connettore Figma il 29 settembre aveva finito le chiamate prima di
+ * scaricarle. E il riquadro «Itinerario su misura» porta il prezzo di partenza
+ * («da 70€») quando il designer l'ha scritto nel tool (`suMisuraPrezzo` →
+ * `td_services.price_from_cents`, decisione D5 del 3 ottobre). **Non è il
+ * prezzo che si incassa**: quello lo scrive il designer nella proposta, già al
+ * netto del credito (Flusso §6). È un «a partire da» di vetrina.
  *
- *  · **Il prezzo sul riquadro "Itinerario su misura"** ("50€" nel Figma). Il
- *    form Vetrina TD dà un prezzo solo per la call: il su misura lo prezza il
- *    designer nella proposta, già al netto del credito (Flusso §6). Un numero
- *    qui non avrebbe sorgente, e sarebbe una promessa che la proposta può
- *    smentire. Domanda aperta in `PIANO.md`.
- *  · **Le icone nei tondi rossi.** Il connettore Figma ha esaurito le chiamate
- *    il 29 settembre prima che i quattro segni si potessero scaricare (sono
- *    livelli separati dal tondo, nodi 72:515, 72:535, 72:540, 72:545). Si
- *    aggiungono quando lo script degli asset li avrà. Un tondo vuoto, o un
- *    segno ridisegnato a mano, sarebbe peggio di niente.
+ * La variante del tool «Dopo la sessione, hai già un itinerario completo!»
+ * (linguetta Sessione) non c'è: è una differenza fra tool e Flusso aperta in
+ * `VETRINE_V6_FASE0.md` (D-1), e fino a una decisione il riquadro è uno solo.
  */
 
 /**
@@ -39,11 +40,20 @@ import type { Servizio, TipoServizio } from '@/lib/vetrina'
  * post-call non offrirà mai, perché i suoi bottoni nascono da quegli stessi
  * servizi attivi.
  */
-const DOPO_LA_CALL: { tipo: TipoServizio; titolo: string; riga: string }[] = [
-  { tipo: 'custom_itinerary', titolo: 'Itinerario su misura', riga: 'Ti scrivo il viaggio giorno per giorno' },
-  { tipo: 'all_inclusive', titolo: 'All inclusive', riga: 'Progetto e prenoto il viaggio' },
-  { tipo: 'group_trip', titolo: 'Viaggio di gruppo', riga: 'Piccoli gruppi su date fisse' },
-  { tipo: 'private_guiding', titolo: 'Viaggio privato con me', riga: 'Vengo con te sul posto' },
+const DOPO_LA_CALL: {
+  tipo: TipoServizio
+  titolo: string
+  riga: string
+  icona: { src: string; larghezza: number; altezza: number }
+}[] = [
+  { tipo: 'custom_itinerary', titolo: 'Itinerario su misura', riga: 'Ti scrivo il viaggio giorno per giorno',
+    icona: { src: '/img/dopo-su-misura.svg', larghezza: 20, altezza: 18 } },
+  { tipo: 'all_inclusive', titolo: 'All inclusive', riga: 'Progetto e prenoto il viaggio',
+    icona: { src: '/img/dopo-all-inclusive.svg', larghezza: 13, altezza: 19 } },
+  { tipo: 'group_trip', titolo: 'Viaggio di gruppo', riga: 'Piccoli gruppi su date fisse',
+    icona: { src: '/img/dopo-gruppo.svg', larghezza: 22, altezza: 16 } },
+  { tipo: 'private_guiding', titolo: 'Viaggio privato con me', riga: 'Vengo con te sul posto',
+    icona: { src: '/img/dopo-privato.svg', larghezza: 22, altezza: 19 } },
 ]
 
 /**
@@ -72,12 +82,28 @@ export function DopoLaCall({ servizi }: { servizi: Servizio[] }) {
       </p>
 
       <ul className="mt-6 grid gap-[17px] sm:grid-cols-2 sm:gap-x-5 lg:max-w-[648px]">
-        {riquadri.map((d) => (
-          <li key={d.tipo} className="rounded-[10px] bg-neutro px-[21px] py-6">
-            <p className="font-titoli text-[22px] font-bold leading-tight">{d.titolo}</p>
-            <p className="mt-4 text-[14px] leading-[1.25]">{d.riga}</p>
-          </li>
-        ))}
+        {riquadri.map((d) => {
+          const da = formattaPrezzo(servizi.find((s) => s.service_type === d.tipo)?.price_from_cents ?? null)
+          return (
+            <li key={d.tipo} className="rounded-[10px] bg-neutro px-5 pb-[22px] pt-[17px]">
+              <div className="mb-[17px] flex items-center justify-between gap-[10px]">
+                {/* Il tondo rosso al 20%: `bg-primario/20`, il token col suo alfa. */}
+                <span className="grid size-[34px] shrink-0 place-items-center rounded-full bg-primario/20" aria-hidden>
+                  <Image
+                    src={d.icona.src}
+                    alt=""
+                    width={d.icona.larghezza}
+                    height={d.icona.altezza}
+                    style={{ width: d.icona.larghezza, height: d.icona.altezza }}
+                  />
+                </span>
+                {da && <span className="font-titoli text-[20px] font-bold text-primario">da {da}</span>}
+              </div>
+              <p className="font-titoli text-[22px] font-bold leading-tight">{d.titolo}</p>
+              <p className="mt-4 text-[14px] leading-[1.25]">{d.riga}</p>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

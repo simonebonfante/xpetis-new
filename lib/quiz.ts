@@ -12,7 +12,7 @@
  * **non** dà, dalla migration 0018: il peso dell'asse. Il match si calcola solo
  * lato server, quindi il quiz non ne ha bisogno.
  */
-import { createClient } from '@/lib/supabase/server'
+import { clientPubblico } from '@/lib/supabase/pubblico'
 import type { AsseQuiz, OpzioneQuiz } from '@/lib/quiz-risposte'
 
 type Riga = {
@@ -40,7 +40,7 @@ type Riga = {
  * Un buco si vede; una scelta che manca no.
  */
 export async function leggiAssiQuiz(): Promise<AsseQuiz[]> {
-  const supabase = await createClient()
+  const supabase = clientPubblico()
   const { data, error } = await supabase
     .from('public_quiz_axes')
     .select('code, kind, label_it, question_it, scale_min, scale_max, sort_order, options')

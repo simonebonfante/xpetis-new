@@ -247,12 +247,18 @@ export function BoxServizio({
           non avrebbe un numero da dire, e senza servizi dopo la call non
           avrebbe da dove scalarlo: in entrambi i casi sparisce.
 
+          **Dal 4 ottobre 2026 la riga non dice la cifra** (R2 del prompt delle
+          vetrine v6, scelta di Simone): il credito si promette e non si
+          quantifica. Il prezzo della call è già scritto in grande qui sopra.
+          Quindi la riga non dipende più dal prezzo, solo dall'esistenza di un
+          servizio da cui scalarlo.
+
           Figma `72-48`: la riga sta **sotto il tasto**, su fondo bianco, e i
           riquadri dei servizi sono usciti dalla scheda (`dopo-la-call.tsx`).
           Il simbolo è il "$" del disegno anche se la valuta è l'euro. Nel
           `72-48` è più grande (12×18 invece di 7,8×12,4): non riscaricato, il
           connettore Figma aveva finito le chiamate — resta quello di prima. */}
-      {prezzo && dopoLaCall.length > 0 && (
+      {dopoLaCall.length > 0 && (
         <p className="mb-6 mt-[27px] flex items-center gap-[15px] text-[12px] leading-[1.25]">
           <span className="relative grid size-[29px] shrink-0 place-items-center">
             <Image
@@ -272,7 +278,7 @@ export function BoxServizio({
             />
           </span>
           <span className="max-w-[307px]">
-            I {prezzo} dell&apos;incontro verranno scalati dal costo del servizio che eventualmente
+            Quello che paghi per l&apos;incontro verrà scalato dal costo del servizio che eventualmente
             sceglierai
           </span>
         </p>
