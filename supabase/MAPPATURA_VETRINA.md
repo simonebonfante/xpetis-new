@@ -1,323 +1,204 @@
-# Mappatura · form Vetrina TD → schema Supabase
+# Mappatura · tool vetrina v6 → schema Supabase
 
-**6 agosto 2026.** Documento di progetto, non di implementazione: dice dove va
-ogni campo prima di scrivere una riga di SQL.
+**4 ottobre 2026.** Sostituisce la mappatura del form `Vetrina TD (2).html` (6
+agosto 2026, ora in `archivio/MAPPATURA_VETRINA_form_vecchio.md`): dal 3
+ottobre i profili dei Travel Designer arrivano dal **tool vetrina v6** di
+Andrea e Alessandro, che esporta un pacchetto `vetrina.json` (formato
+`vetrina-xpetis-v6`) più la cartella `images/`.
 
-Fonti lette:
+Fonti: `xpetis-vetrine-tool/src/components/vetrine/tipi.ts`, `normalizza.ts`,
+`vista.ts`; il pacchetto `vetrina-luca-ferraina/`, compilato in ogni campo. Le
+decisioni e le differenze fra tool e Flusso sono in `VETRINE_V6_FASE0.md`.
+Chi lo applica: `scripts/importa_vetrina.mjs` (lettura e validazione) e
+`td_import_showcase()` nella migration `0055` (scrittura).
 
-- `Vetrina TD (2).html` — il form. Da qui vengono i **campi possibili**, le liste
-  chiuse e il verso degli assi. È questa la fonte della struttura.
-- `vetrina-dennis-milello/vetrina.json` — un'istanza reale, usata per vedere che
-  forma prendono i dati veri. **Non la importiamo ora.**
+## Le quattro categorie
 
-Il JSON è la struttura dati di *ogni* designer: tutti i 25 compileranno lo stesso
-form e produrranno la stessa forma. Quindi lo schema deve avere una casa per ogni
-campo, e per tutti i valori delle liste chiuse.
-
----
-
-## Le quattro scoperte che contano
-
-### 1. Il livello dei paesi non è un campo del form
-
-Ho cercato `livello` fra i campi modificabili: **non c'è.** Esiste solo dentro le
-strutture dati, dove ogni nuova riga paese nasce con `livello: "Base"` e nessuna
-interfaccia permette di cambiarlo. L'esempio interno del form usa `"Esperto"`,
-quindi i due valori previsti erano Base ed Esperto, ma il designer non li vede.
-
-Non è quindi vero che "i designer scrivono Base su tutti i paesi per pigrizia":
-**il form non gli chiede il livello.** Dennis ha 32 paesi tutti Base perché non
-poteva fare altrimenti.
-
-L'unico segnale di rilievo che il form raccoglie è `topDestinazioni`, con
-l'etichetta esplicita *"Scegli fino a 3 tra le destinazioni che hai inserito
-sopra: saranno messe in evidenza"*.
-
-**Conseguenza sulla mappatura, e non è un ripiego:**
-
-```
-topDestinazioni      → td_countries.level = 1   (le punte di diamante)
-tutti gli altri paesi → td_countries.level = 2   (quelli che copre con sicurezza)
-paesi[].livello       → si ignora
-```
-
-Ogni designer avrà quindi al massimo tre paesi di livello 1, che è esattamente
-quello che il Flusso descrive. Il campo `livello` del JSON è morto: non va
-mappato, va documentato come tale.
-
-### 2. I viaggi di gruppo non sono raccolti dal form
-
-`gruppo[]` esiste nella struttura ma **non ha nessun campo modificabile**: nasce
-precompilato dal contenuto di esempio e resta così. Si vede a occhio nel JSON di
-Dennis, dove il primo viaggio di gruppo è "Argentina: Trekking in Patagonia",
-12 giorni, 1.380€ — cioè, parola per parola, l'esempio dentro il form. Non è suo.
-
-Del gruppo il form raccoglie solo due domande: `gruppoHaGia` ("hai già dei viaggi
-di gruppo da proporre?") e `gruppoTempi` ("in quanto tempo saresti pronto a
-inserirli?"). Sono domande di raccolta informazioni, non contenuto di vetrina.
-
-**Quindi: `gruppo[]` non si importa mai** — sarebbero dati finti in vetrina — e la
-sezione "viaggi di gruppo" della vetrina, che il Flusso prevede, oggi non ha
-sorgente. Punto aperto n. 3.
-
-### 3. Il verso degli assi è dichiarato nel form
-
-Il form contiene la definizione esplicita degli estremi (`ASSI_DEF`), sinistra =
-valore 1, destra = valore 4. Confrontato con il mio schema:
-
-| Form | 1 (sinistra) | 4 (destra) | Mio codice | Esito |
-|---|---|---|---|---|
-| `controllo` | Poco controllo | Molto controllo | `planning_involvement` | ✅ |
-| `ritmo` | Slow | Dynamic | `pace` (Lento → Intenso) | ✅ |
-| `scomodita` | Comfort | Wild | `comfort_wild` | ✅ |
-| `luogo` | Estetica curata | Vita reale | `aesthetics` | ⚠️ **nome invertito** |
-| `sociale` | Intimità | Socialità | `social_orientation` | ✅ |
-| `conChi` | 5 opzioni a scelta multipla | | `companions`, 4 opzioni | ⚠️ **manca un valore** |
-
-Il quarto è la trappola: `aesthetics` su scala crescente si legge "più estetica",
-mentre nel form crescere significa **meno** estetica curata e più vita reale. Chi
-scriverà le etichette guardando il nome della colonna le metterà al contrario, e
-nessun test lo vedrà. **Deciso: si rinomina** in un nome direzionale.
-
-`conChi` è a scelta multipla e ha cinque opzioni, non quattro. Il mio schema già
-ammette più valori per l'asse categoriale, quindi cambia solo il seed.
-
-### 4. Il contenuto della vetrina non ha casa
-
-Lo avevo progettato per il matching e per il flusso degli ordini. Della vetrina
-ho una sola colonna, `bio`. Il form invece raccoglie: hero bio, storia,
-manifesto, quattro punti della call, tre viaggi firma con foto, quindici
-itinerari pronti con giorni/prezzo/foto, sei recensioni portate da fuori, anni di
-esperienza, Instagram, copertura legale. **Circa quattro quinti del form non ha
-dove atterrare.** È la parte più corposa delle migration da scrivere.
-
----
-
-## Mappatura campo per campo
-
-Trenta campi modificabili. `→` significa "va in"; **grassetto** = da creare.
-
-### Profilo
-
-| Campo del form | Destinazione | Note |
+| Cat. | Significa | Dove |
 |---|---|---|
-| `nome` | `travel_designers.display_name` | |
-| `fotoProfilo` | `travel_designers.photo_url` | Il JSON contiene un percorso relativo (`images/foto-profilo.jpg`): l'import carica il file su Storage e scrive l'URL |
-| `lingue` | `travel_designers.languages text[]` | Stringa unica separata da virgole, da spezzare |
-| `esperienza` | **`years_experience smallint`** | "15" |
-| `heroBio` | **`hero_bio text`** | Il paragrafo in cima alla vetrina. Diverso da `headline`, che è una riga |
-| `storia` | `travel_designers.bio` | La bio narrativa lunga, con paragrafi separati da `\n\n` |
-| `manifesto` | **`manifesto text`** | Una frase |
-| `instagram` | **`instagram_handle text`** | Con la chiocciola |
-| `coperturaLegale` | **`legal_coverage text`** | Tre valori chiusi. **Guida l'assegnazione dell'agenzia**: "Ho già un'agenzia" significa che `agency_id` va popolato con la sua, "vorrei un partner certificato XPETIS" che va usata la partner |
-| `gruppoHaGia` | **`group_trips_readiness text`** | Tre valori chiusi. Informazione commerciale, non di vetrina |
-| `gruppoTempi` | **`group_trips_timing text`** | Due valori chiusi |
-| `topDestinazioni` | **non è una colonna**: determina `td_countries.level = 1` | Vedi scoperta 1 |
+| **P** pubblico | Il viaggiatore lo vede | colonne lette dalle viste `public_*` |
+| **M** match | Serve al match, il viaggiatore non lo vede mai | tabelle chiuse, solo `match_designers()` |
+| **T** solo team | Lo legge il team da Studio | colonne che nessuna vista nomina |
+| **A** archivio | Nessuna casa nello schema | `td_import_runs.raw`, il JSON grezzo intero di ogni import |
 
-Presenti nella struttura ma **non modificabili nel form**, quindi da non
-mappare: `brand` (costante "XPETIS"), `nomeProfessionale`, `rating` (le stelle si
-calcolano da `td_review_stats`), `competenze` (stringa libera di macro-aree,
-superata dai paesi strutturati), `membro`.
+Il JSON intero va **sempre** in archivio: «A» vuol dire solo che quella chiave
+non ha altra casa. Una chiave che lo script non conosce finisce lì e nel report.
 
-### La consulenza
+## Primo livello
 
-| Campo del form | Destinazione | Note |
+| Chiave | Destinazione | Cat. | Regola dell'import |
+|---|---|---|---|
+| `formato` | `td_import_runs.format` | A | Solo `vetrina-xpetis-v6`; senza (form vecchio) → rifiutato, «riesportalo dal tool v6» |
+| `brand` | — | A | Costante |
+| `nome` | `travel_designers.legal_name` | T | Sempre. Va anche in `display_name` se `nomeProfessionale` è vuoto |
+| `nomeProfessionale` | `travel_designers.display_name` | P | Vince su `nome` quando c'è (D8) |
+| `fotoProfilo` | `travel_designers.photo_url` | P | URL completo (convenzione del seed 0004); file in `td-media/<td>/profilo/` |
+| `competenze` | `travel_designers.expertise_areas` | P | Testo libero |
+| `esperienza` | `travel_designers.years_experience` | P | Intero 0-70, altrimenti report e vuoto |
+| `lingue` | `travel_designers.languages` | P | Spezzata sulle virgole |
+| `instagram` | `travel_designers.instagram_handle` | P | Senza `@`; da un URL instagram.com si estrae l'handle |
+| `storia` | `travel_designers.bio` | P | Paragrafi a riga vuota |
+| `viaggiarePerMe` | `travel_designers.travel_philosophy` | P | «Cosa vuol dire viaggiare per me» |
+| `heroBio` | `travel_designers.hero_bio` | P | Il tool non la mostra; la pagina la usa solo se manca `viaggiarePerMe` |
+| `manifesto` | `travel_designers.manifesto` | P | Idem |
+| `callDescrizione` | `td_services[consultation].text_during_call` | P | Vuota resta vuota (il tool ci metterebbe un testo d'esempio) |
+| `callPunti[]` | `td_service_bullets` della breve | P | |
+| `callPrezzo` | `td_services[consultation].price_cents` | P | `"30"`, `"30€"`, `"30,50"`; il resto report. **Scritto solo se vuoto**, poi solo report |
+| `callPrezzoLibero` | `td_services[consultation].price_is_custom` | P | |
+| `suMisuraPrezzo` | `td_services[custom_itinerary].price_from_cents` | P | Il «da» di vetrina (D5), non un importo incassato. Solo se il su misura è fra i `servizi` |
+| `sessioneOfferta` | `td_services[consultation_deep].is_active` | P | `false` spegne la Sessione esistente |
+| `sessionePrezzo` | `td_services[consultation_deep].price_cents` | P | Come `callPrezzo` |
+| `sessioneDurata` | `…duration_minutes` + `cal_event_type_slug` | P | Deve essere fra `app_config.calcom_minutes_consultation_deep` (60, 90) → `consulenza-xpetis-60`/`-90`; un'altra durata ferma quel servizio, con un avviso |
+| `sessioneDescrizione` | `td_services[consultation_deep].text_during_call` | P | |
+| `sessionePunti[]` | `td_service_bullets` dell'approfondita | P | |
+| `servizi[]` | `td_services.is_active` di `custom_itinerary`, `all_inclusive`, `group_trip`, `private_guiding` | P | Le quattro stringhe di `SERVIZI_DOPO`; una sconosciuta → report |
+| `viaggi[]` | `td_signature_trips` + `td_signature_trip_images` | P | § Viaggi firma |
+| `itinerari[]` | `td_ready_itineraries` + figlie | P | § Itinerari e gruppi |
+| `gruppo[]` | `td_group_trips` + figlie | P | § Itinerari e gruppi |
+| `recensioni[]` | `td_showcase_reviews` | P | § Recensioni |
+| `paesi[]` | `td_countries` + `td_destination_tags` | M | § Paesi |
+| `topDestinazioni` | — | A | I nomi; c'è l'id |
+| `topDestinazioniId` | `td_countries.highlight_position` (1-3) e livello | M | § Paesi |
+| `assi.*` | `td_axis_values` | M | § Assi |
+| `assiLato.*` | `travel_designers.axis_sides` | T | La controprova degli assi |
+| `frasiCard` | `travel_designers.card_phrases` | T | Non usate dal sito (D7) |
+| `frasiCardStato` | `travel_designers.card_phrases_status` | T | |
+| `cardSfondo` | `travel_designers.background_photo_url` | P | Già nella vista, oggi nessuna pagina la mostra (❓ a cosa serva) |
+| `coperturaLegale` | `travel_designers.legal_coverage` | T | Tre valori chiusi; parole diverse dal form → import rifiutato |
+| `gruppoHaGia` | `travel_designers.group_trips_readiness` | T | Idem |
+| `gruppoTempi` | `travel_designers.group_trips_timing` | T | Idem |
+| `membro`, `rating` | — | A | Voto e anzianità vengono da dati veri (D2) |
+
+Mai toccati dall'import, perché non sono del pacchetto: `id`, `slug`, `status`,
+`email` (serve `--email` solo per un designer nuovo), `phone`, `cal_username`,
+`cal_webhook_ok_at`, `agency_id`, `joined_at`. Un designer nuovo nasce `draft`.
+
+## Paesi
+
+| Chiave | Destinazione | Cat. | Regola |
+|---|---|---|---|
+| `id` | `td_countries.country_code` | M | Deve esistere in `geo_countries` (139 stati dal 3 ottobre); uno sconosciuto **ferma il designer** con l'elenco completo |
+| `paese` | — | A | Solo controllo: un nome diverso da quello della tassonomia va nel report |
+| `livello` | `td_countries.level` | M | **1 se il paese è fra le destinazioni in evidenza oppure è «Esperto», altrimenti 2** (decisione del 3 ottobre). Nel match 1 è il paese forte, quello del badge |
+| `aree` | `areas_note` | M | |
+| `temi[]` | `td_destination_tags` (tema) | M | Combacia carattere per carattere con `tags.label_it`, altrimenti report |
+| `temiCustom[]` | `custom_themes` | M | |
+| `contesti[]` | `td_destination_tags` (contesto) | M | Come i temi |
+| `durata` | `typical_duration` | M | Cinque valori chiusi |
+| `budget` | `typical_budget` | M | Cinque valori chiusi |
+
+Il tool, come il form, **non fa scegliere il livello**: anche chi compila tutto
+ha i paesi tutti «Base». Per questo il segnale di rilievo sono le tre
+destinazioni in evidenza (`topDestinazioniId`), che diventano livello 1 e
+conservano la loro posizione. Tutti «Base» e nessuna in evidenza → il report
+avvisa che il designer non prenderà mai il badge e non si potrà pubblicare.
+
+## Assi
+
+La corrispondenza è letta dalle etichette (`quiz_axes.label_min` /
+`label_max`), **mai dal nome del codice**:
+
+| Chiave | Asse | 1 = `label_min` | 4 = `label_max` |
+|---|---|---|---|
+| `controllo` | `planning_involvement` | Poco controllo | Molto controllo |
+| `ritmo` | `pace` | Slow | Dynamic |
+| `scomodita` | `comfort_wild` | Comfort | Wild |
+| `luogo` | `curated_vs_real` | Estetica curata | Vita reale |
+| `sociale` | `social_orientation` | Intimità | Socialità |
+| `conChi[]` | `companions` | una riga per etichetta di `quiz_axis_options` | |
+
+`assiLato` dice a parole da che parte sta ogni valore: 1-2 deve stare dal lato
+di `label_min`, 3-4 da quello di `label_max`. Se non torna, **l'import si ferma**
+con l'asse e i due valori.
+
+## Servizi
+
+| Del tool | `service_type` | Durata e slug |
 |---|---|---|
-| `callPrezzo` | `td_services.price_cents` | **Testo libero:** Dennis scrive `"20"`, l'esempio del form `"30€"`. L'import deve parsare e segnalare ciò che non capisce, mai indovinare |
-| `callPrezzoLibero` | **`td_services.price_is_custom boolean`** | L'etichetta dice "prezzo deciso da me, non un prezzo fisso uguale per tutti" |
-| `callDescrizione` | `td_services.text_during_call` | |
-| `callPunti[]` | **`td_service_bullets(service_id, position, text)`** | Quattro punti ordinati: "cosa è incluso" |
-| `servizi[]` | `td_services.is_active` per tipo | Cinque etichette da mappare sull'enum, vedi sotto |
+| L'Incontro | `consultation` | `app_config.calcom_minutes_consultation` (30) e il primo di `calcom_slugs_consultation` |
+| La Sessione approfondita | `consultation_deep` | Dal pacchetto, se fra le durate ammesse; lo slug ammesso che finisce con quel numero |
+| Itinerario su misura | `custom_itinerary` | — (`price_from_cents` dal `suMisuraPrezzo`) |
+| Itinerario su misura ALL INCLUSIVE | `all_inclusive` | — |
+| Viaggio di gruppo a tua firma | `group_trip` | — |
+| Accompagnamento privato / presenza sul posto | `private_guiding` | — |
 
-Mappatura delle cinque etichette:
+Una breve senza prezzo leggibile nasce **spenta** (il vincolo
+`td_services_bookable_complete` non ammette il contrario) e blocca la
+pubblicazione con «consulenza breve senza prezzo». Una breve già spenta dal
+team l'import non la riaccende.
 
-| Etichetta del form | `service_type` | Nota |
+## Viaggi firma
+
+| Chiave | Destinazione | Regola |
 |---|---|---|
-| Consulenza singola (30 min) | `consultation` | Marcata `locked` nel form: sempre attiva per tutti |
-| Itinerario su misura | `custom_itinerary` | |
-| Itinerario su misura ALL INCLUSIVE | `all_inclusive` | Marcata `locked`: sempre attiva per tutti — conferma il Flusso |
-| Viaggio di gruppo a tua firma | **`group_trip`** (nuovo) | |
-| Accompagnamento privato / presenza sul posto | **`private_guiding`** (nuovo) | |
+| `titolo` | `td_signature_trips.title` | Riconciliazione per titolo. Senza titolo né foto: scartato in silenzio; foto senza titolo: report |
+| `descrizione` | `description` | |
+| `paesi[0]` | `country_code` | Uno solo, come nel tool |
+| `imgs[]` | `td_signature_trip_images` | In `td-media/<td>/firma/` |
 
-Il form non ha un campo per la consulenza approfondita, che il Flusso prevede
-come servizio a sé (oggi la offre un solo TD). Resta nell'enum e la carica il
-team a mano.
+Massimo tre, come nel tool.
 
-### I paesi coperti
+## Itinerari e gruppi
 
-Una riga per paese dichiarato. Otto campi.
+Nel tool hanno la stessa forma (`Voce` + `Dettaglio`), e qui le stesse colonne
+sulle due tabelle più le figlie condivise.
 
-| Campo | Destinazione | Note |
-|---|---|---|
-| `paese` | `td_countries.country_code` | Nome libero da normalizzare sui 129 stati della tassonomia. Provato sul pacchetto reale: **22 voci su 30 agganciano per nome esatto**, 8 no (vedi sotto) |
-| `livello` | — | Campo morto, sempre "Base" |
-| `aree` | **`td_countries.areas_note text`** | Testo libero. A volte è un dettaglio ("Lofoten"), a volte contiene i paesi veri di una voce aggregata ("Croazia, Slovenia, Serbia, Albania, Bosnia, Kosovo" sotto "Balcani") |
-| `temi[]` | `td_destination_tags` con `kind='theme'` | Nove valori chiusi, coincidono col mio seed |
-| `temiCustom[]` | **`td_countries.custom_themes text[]`** | Temi fuori tassonomia scritti dal designer. Non entrano nel match: restano visibili al team, che decide se meritano un tag nuovo |
-| `contesti[]` | `td_destination_tags` con `kind='context'` | Otto valori chiusi. Una etichetta da allineare, vedi sotto |
-| `durata` | **`td_countries.typical_duration text`** | Cinque valori chiusi. Il Flusso tiene durata e budget **fuori dal matching**: si conservano perché il designer li ha dichiarati e servono al team in call |
-| `budget` | **`td_countries.typical_budget text`** | Cinque valori chiusi |
+| Chiave | Destinazione | Cat. | Regola |
+|---|---|---|---|
+| `titolo` | `title` | P | **Chiave della riconciliazione**: stesso titolo, stessa riga, stesso slug, stesso indirizzo. Senza titolo: scartata, report |
+| `giorni` | `duration_label` | P | Testo («10», «13 giorni») |
+| `prezzo` | `price_label` | P | Testo: è vetrina, non una cassa |
+| `img` | — | A | Duplica `foto[0]` |
+| `foto[]` | `td_trip_images` | P | In ordine, la prima è la copertina |
+| `paesi[]` | `td_trip_countries` | P | Ognuno deve esistere in `geo_countries` |
+| `dettaglio.intro` | `intro` | P | |
+| `dettaglio.notti` | `nights` | P | Intero, altrimenti report |
+| `dettaglio.prezzoNote` | `price_note` | P | |
+| `dettaglio.tappePrincipali[]` | `main_stops` | P | |
+| `dettaglio.tappe[]` | `td_trip_stops` (`days_label`, `title`, `description`) | P | |
+| `dettaglio.quotaComprende[]` | `price_includes` | P | |
+| `dettaglio.quotaNonComprende[]` | `price_excludes` | P | |
+| `dettaglio.cosaPortare[]` | `packing_list` | P | |
+| `dettaglio.infoSanitarieVisti` | `health_visa_info` | P | |
+| `dettaglio.puntiFaPerMe.*` | `fit_nature`, `fit_trekking`, `fit_on_the_road`, `fit_city`, `fit_culture`, `fit_chill` | P | Interi 0-5 |
+| `dettaglio.notaXpetis` | `xpetis_note` | T | Mai in pagina |
+| `dettaglio.accontoSaldoCancellazione` | `td_terms_text` | T | Mai in pagina: sui gruppi esce solo `app_config.group_trip_terms_text`, se non è vuota |
+| `dettaglio.date[]` (gruppi) | `td_group_trip_departures` (`starts_on`, `ends_on`, `status`) | P | Date ISO; stato `''`/`confermato`/`ultimiPosti`/`soldOut` → `open`/`confirmed`/`last_seats`/`sold_out` |
+| `dettaglio.partecipantiMin` / `Max` (gruppi) | `participants_min` / `participants_max` | P | Interi; min > max → report |
+| `dettaglio.fasciaEta` (gruppi) | `age_range` | P | |
+| `dettaglio.accompagnatore` (gruppi) | `guide_name` | P | |
+| `date`, `partecipanti*`, `fasciaEta`, `accompagnatore` sugli itinerari | — | A | Il tool li ignora sugli itinerari: report se valorizzati |
 
-### Gli assi
+Una voce sparita dal pacchetto sparisce dal sito, e il suo indirizzo dà 404.
 
-| Campo | Destinazione |
-|---|---|
-| `assi.controllo` | `td_axis_values` asse `planning_involvement` |
-| `assi.ritmo` | asse `pace` |
-| `assi.scomodita` | asse `comfort_wild` |
-| `assi.luogo` | asse **`curated_vs_real`** (rinominato da `aesthetics`) |
-| `assi.sociale` | asse `social_orientation` |
-| `assi.conChi[]` | asse `companions`, una riga per opzione scelta |
+## Recensioni
 
-### Il contenuto di vetrina
+| Chiave | Destinazione | Cat. | Regola |
+|---|---|---|---|
+| `titolo` | `td_showcase_reviews.title` | P | |
+| `nome` | `author_name` | P | Obbligatorio, altrimenti scartata |
+| `stelle` | `stars` | P | 1-5; si vedono sulla singola, non fanno media |
+| `data` | `date_label` | P | Testo |
+| `testo` | `body` | P | Obbligatorio |
+| `anni` | `author_years` | T | «Viaggiatore XPETIS da N anni» su una recensione raccolta fuori da XPETIS non è vero (D3) |
 
-| Campo | Destinazione | Note |
-|---|---|---|
-| `viaggi[]` | **`td_signature_trips(td_id, position, title, description)`** | Tre nel form, ma la struttura ne ammette di più |
-| `viaggi[].imgs[]` | **`td_signature_trip_images(trip_id, position, storage_path)`** | Fino a tre per viaggio |
-| `itinerari[]` | **`td_ready_itineraries(td_id, position, title, duration_label, price_label, image_path)`** | Quindici per Dennis |
-| `recensioni[]` | **`td_showcase_reviews(td_id, position, title, author_name, stars, date_label, body)`** | Punto aperto n. 1 |
-| `gruppo[]` | **non si importa** | Contenuto di esempio, vedi scoperta 2 |
+All'import nascono pubblicate (D3); escono da `public_td_reviews` con
+`source = 'td_declared'` e una dicitura sopra.
 
-Su `itinerari`: `giorni` e `prezzo` sono **testo libero** ("5-7 giorni", "850€").
-Contro la convenzione degli importi in centesimi, qui vanno tenuti come testo:
-non sono prezzi su cui si incassa, sono etichette di vetrina. La convenzione
-`*_cents` vale dove passa del denaro vero.
+## Le foto
 
-### Le immagini
+`td-media/<td>/<profilo|firma|itinerario|gruppo>/<impronta>.<ext>`, dove
+l'impronta è lo SHA-256 del contenuto (16 cifre). Niente del percorso
+originale; lo stesso file ha sempre lo stesso indirizzo, una foto cambiata ne
+prende uno nuovo. Solo percorsi relativi `images/…`: un URL assoluto (il bucket
+del tool ha nel percorso il codice segreto del designer) non si scarica e non
+si linka. jpg, png, webp fino a 15 MB. Al reimport si tolgono dal bucket le
+foto che nessuna riga cita più, solo in quelle quattro cartelle.
 
-Venticinque file per Dennis, fino a 2-6 MB ciascuno, per un totale di circa
-33 MB. Vanno nel bucket `td-media`, già previsto come pubblico.
+## Le liste chiuse
 
-Due conseguenze: il bucket ha oggi un limite di 10 MB per file, che va alzato o
-accompagnato da un ridimensionamento in fase di import; e **1 GB di Storage sul
-piano gratuito di Supabase basta per circa trenta designer**, quindi i 25 profili
-con le foto stanno dentro per un soffio. Ridimensionare le immagini all'import
-non è un vezzo.
-
----
-
-## Le liste chiuse, con i valori esatti
-
-Da mettere nel seed così come sono scritte nel form, perché è con queste stringhe
-che arriveranno i JSON.
-
-**Temi (9)** — coincidono con il mio seed: Food · Cultura, arte e storia ·
-Natura e wildlife · Avventura e outdoor · Spiritualità e benessere · Lusso ·
-Festival ed eventi · Shopping, design e artigianato · Fotografia e creatività
-
-**Contesti (8)** — Città · Borghi e piccoli centri · Montagna · Mare e isole ·
-Deserto · Foresta e giungla · Campagna e aree rurali · **Aree estreme/polari**
-← il mio seed dice "Aree estreme e polari": da allineare, altrimenti quel tag non
-aggancia
-
-**Con chi viaggi (5)** — Viaggiatore solo · Coppia · Famiglia con
-bambini/ragazzi · Gruppo di amici/piccolo gruppo · Gruppo organizzato
-
-**Durata tipica (5)** — Weekend (2–4 gg) · Breve (5–7 gg) · Standard (8–14 gg) ·
-Lungo (15–30 gg) · Esteso (oltre un mese)
-
-**Budget tipico (5)** — Contenuto (<€1.500) · Medio (€1.500–3.500) ·
-Alto (€3.500–7.000) · Premium (€7.000–15.000) · Senza vincolo
-
-**Copertura legale (3)** — Ho già un'agenzia / struttura — non mi serve
-supporto · Non ho un'agenzia — vorrei un partner certificato XPETIS · Non so / ne
-vorrei parlare con voi
-
-**Viaggi di gruppo pronti (3)** — Sì, sono pronti · Sì, ma da definire · No, non
-ancora
-
-**Tempi dei viaggi di gruppo (2)** — Entro il 2026 · Nel 2027
-
----
-
-## Cosa il form non raccoglie
-
-Va caricato dal team, e va nella checklist di onboarding: `slug` della vetrina,
-`email` del designer (è l'indirizzo a cui arrivano i link con token: senza,
-niente ordini), telefono, `cal_username`, l'agenzia da collegare, e la
-consulenza approfondita per chi la offre.
-
----
-
-## Le migration da scrivere
-
-Nell'ordine. Le prime tre sono le correzioni della milestone 0, che vengono prima
-perché sono difetti aperti.
-
-| # | Cosa fa |
-|---|---|
-| 0018 | `match_designers()` in `SECURITY DEFINER` e rimozione di livelli e valori degli assi da `public_td_profiles` |
-| 0019 | Vista delle prenotazioni senza `cal_booking_uid` al posto del `grant select on bookings` |
-| 0020 | Controlli di plausibilità in `td_publish_readiness` |
-| 0021 | Assi: rinomina `aesthetics` → `curated_vs_real`, cinque opzioni per `companions`, etichette dei cinque assi dagli estremi del form, tag "Aree estreme/polari" allineato |
-| 0022 | Colonne di profilo: `hero_bio`, `manifesto`, `instagram_handle`, `years_experience`, `legal_coverage`, `group_trips_readiness`, `group_trips_timing` |
-| 0023 | Colonne di `td_countries`: `areas_note`, `custom_themes`, `typical_duration`, `typical_budget` |
-| 0024 | Due nuovi `service_type` (`group_trip`, `private_guiding`), `td_services.price_is_custom`, tabella `td_service_bullets` |
-| 0025 | `td_signature_trips` e `td_signature_trip_images` |
-| 0026 | `td_ready_itineraries` |
-| 0027 | `td_showcase_reviews` (subordinata al punto aperto n. 1) |
-| 0028 | Viste `public_*` aggiornate per servire la vetrina completa, e limite del bucket `td-media` |
-
-Nota tecnica su 0024: aggiungere valori a un enum e usarli nella stessa
-transazione non si può. Servono due migration, o si passa a una tabella di
-lookup. Lo risolvo scrivendola.
-
-Ogni migration si chiude con `npm run test:schema` verde, e l'harness cresce con
-asserzioni nuove: che `public_td_profiles` non esponga più livelli né assi, che
-la vista delle prenotazioni non contenga l'uid, che i controlli di plausibilità
-respingano un profilo senza livello 1.
-
----
-
-## Punti aperti
-
-Nessuno blocca la scrittura delle migration tranne il primo.
-
-**1. Le recensioni di vetrina — deciso il 6 agosto.** Tabella separata
-`td_showcase_reviews`, distinta da `reviews`. Il form le chiede come recensioni
-esterne ("se hai già qualche recensione sul tuo sito"), quindi il principio
-"solo chi ha comprato può recensire" resta intatto per le recensioni XPETIS.
-Come si mostrano in vetrina, se si distinguono visivamente e se entrano nelle
-medie si decide quando si affronteranno le recensioni (milestone 8). Fino
-ad allora la tabella le conserva e nessuna vista pubblica le espone.
-
-**2. I due servizi in più.** `group_trip` e `private_guiding` entrano nell'enum
-come servizi che un giorno si compreranno, o restano solo contenuto di vetrina?
-Non è urgente — oggi nessuno dei due ha un flusso d'ordine — ma decide se
-diventano valori dell'enum o una lista a parte.
-
-**3. I viaggi di gruppo non hanno sorgente.** Il Flusso prevede la sezione in
-vetrina, il form non la raccoglie. È un buco del form o è voluto? Se serve, o si
-aggiunge al form o li carica il team.
-
-**4. `giorni` e `prezzo` degli itinerari come testo.** Confermi che sono etichette
-di vetrina e non prezzi su cui si incasserà?
-
-**5. La regola `topDestinazioni` → livello 1.** È l'unica lettura possibile dei
-dati che abbiamo, ma è una regola di prodotto: la confermi?
-
-**6. La destinazione non è sempre uno stato.** Emerso caricando la tassonomia:
-sono selezionabili anche le 14 macro-aree e le 20 regioni italiane, mentre
-`match_designers()` accetta un solo stato. Vedi sotto.
-
----
-
-## Le voci paese contro i 129 stati (prova sul pacchetto reale)
-
-Delle 30 voci non vuote di un designer reale, **22 agganciano per nome esatto** e
-8 no. Le otto, con la loro destinazione:
-
-| Voce nel form | Cosa fare | Identificatore |
-|---|---|---|
-| California, Hawaii, Florida, Texas, New York | ricondurre allo stato | `stati_uniti` |
-| Scozia | è una regione estera del Regno Unito nella tassonomia | `regno_unito` |
-| Balcani | scorporare leggendo il campo `aree` | `croazia`, `slovenia`, `serbia`, `albania`, `bosnia_ed_erzegovina`, `kosovo` |
-| Caraibi | scorporare: dei sei nomi solo uno esiste fra i 129 stati | `repubblica_dominicana` |
-
-Più due righe completamente vuote da scartare, e due nomi con lo spazio in coda
-("Perù ", "Vietnam ") da tagliare prima del confronto.
-
-Nota su "Caraibi": il designer elenca sei isole nel campo `aree`, ma cinque non
-sono stati della tassonomia. Non è un errore dell'import: è una copertura che il
-nostro modello non sa rappresentare, e va decisa con una persona.
+Invariate rispetto al form, e da tenere carattere per carattere: temi (9),
+contesti (8, «Aree estreme/polari»), con chi viaggi (5), durata tipica (5),
+budget tipico (5), copertura legale (3), prontezza ai gruppi (3), tempi dei
+gruppi (2). I valori sono nel seed `0001_config.sql` e nei vincoli della
+`0022`-`0023`.

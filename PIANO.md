@@ -804,7 +804,7 @@ riconciliazione mensile, punto aperto in milestone 7.
 | # | Milestone | Stato | Lavoro con me | Lavoro tuo |
 |---|---|---|---|---|
 | 0 | Fondazioni database e correzioni | ✅ **chiusa** | — | — |
-| 1 | Import dei dati reali | 🟡 **a metà** — geografia dentro; le 25 vetrine per ultime, per scelta | 2-3 sessioni | 8-12 h |
+| 1 | Import dei dati reali | 🟡 **quasi** — geografia dentro (139 stati), importatore delle vetrine v6 pronto e provato su Luca; restano l'import dei 25 e la loro correzione | 2-3 sessioni | 8-12 h |
 | 2 | Infrastruttura e accessi | 🟡 **in corso** | 2 sessioni | 7-9 h |
 | 3 | Sito pubblico: ricerca, quiz, match, vetrina | 🟡 **le quattro pagine disegnate ci sono**; restano tre task miei e le domande per Chiara | 1-2 sessioni | — |
 | 4 | Prenotazione e pagamento consulenza | 🟡 **quasi chiusa** — i due ponti, il giro del pagamento e l'orologio sono dentro e provati. Restano le due mail di conferma (impalcatura pronta), il form della prenotazione, il calendario admin e il percorso "slot introvabile" | 2-3 sessioni | 3-4 h |
@@ -1303,34 +1303,89 @@ Decisioni sulla fase 0 (`VETRINE_V6_FASE0.md`), 3 ottobre:
       riferimento del tool v6, migration `0056` (nome corto), prove 167-180
 - [x] **[C]** Fase 4: dati demo → `seed/0006_demo_v6.sql` (Marco completo,
       Giulia minima), harness 1115 → prove 181-191
-- [ ] **[C]** Fase 5: verifica
-- [ ] **[C]** Fase 6: documenti
+- [x] **[C]** Fase 5: verifica (4 ottobre) — harness 1115, build e guardia
+      verdi; **sul database di sviluppo**, in sola lettura: con la chiave
+      publishable le quattro viste della vetrina non hanno colonne chiuse né, sul
+      gruppo del Vietnam di Luca, i valori della nota XPETIS e delle condizioni
+      del designer; `travel_designers` e `td_import_runs` rispondono «permission
+      denied»; il verso degli assi di Luca nel database torna su tutti e cinque
+      con `assiLato`; le tre pagine di Luca a 1512 e 375 px con le foto vere;
+      `/itinerario/1` → 404. Il demo minimo l'ho visto girare in locale (fase
+      3); sul database vero è la prova 191, dopo il seed 0006
+- [x] **[C]** Fase 6: documenti — `supabase/MAPPATURA_VETRINA.md` riscritta per
+      il v6 (la vecchia in `archivio/`), `supabase/README.md` (migration
+      0052-0056, scelte, parametri), `CLAUDE.md` (sorgente dei profili, pagine
+      sul riferimento del tool, struttura del repo, letture pubbliche senza
+      sessione), questa milestone, `REGISTRO.md`
 
-❓ Aperte: il prezzo della proposta di un su misura può stare sotto il «da»
-della vetrina? E le differenze fra tool e Flusso che Claude Code elencherà in
-fase 0 (variante «Dopo la sessione», testo acconto/saldo sui gruppi, «calcolato
-su 2 persone», cuore sulle card, fascia di esperienza, «Aree di competenza»,
-testi).
+**❓ Aperte dopo le vetrine v6 (4 ottobre 2026).** Nessuna blocca; tutte hanno
+un default già in pagina, scritto in `VETRINE_V6_FASE0.md` § 5.
 
-- [ ] **[C]** Importatore fedele dei profili TD, idempotente e rilanciabile: non
+1. **Il prezzo della proposta di un su misura può stare sotto il «da» della
+   vetrina?** Oggi nessun vincolo lega `orders.proposal_price_cents` a
+   `td_services.price_from_cents`.
+2. **Le differenze fra tool e Flusso** con il default di oggi, da confermare o
+   cambiare:
+   - variante «Dopo la sessione» della linguetta Sessione → **non costruita** (D-1);
+   - «Acconto, saldo e cancellazione» sui gruppi → **costruito, spento**:
+     `app_config.group_trip_terms_text` è vuota (D-2). Il testo del tool è nel
+     documento della fase 0;
+   - «a persona, calcolato su 2 persone» e «a persona» → in `app_config`, **da
+     confermare** (D-3);
+   - fascia di esperienza («5-10 anni») → **il numero** (D-5);
+   - «Aree di competenza» → **i paesi**, non il testo `competenze` del tool
+     (D-6; io userei `competenze`);
+   - testi di «Come funziona» e nomi «Incontro» / «Sessione» → **i nostri**
+     (D-7, D-9);
+   - con il solo massimo dei partecipanti → **«fino a N»** (D-18);
+   - «Accompagnato da» senza accompagnatore → **non esce** (il tool ci mette il
+     designer, D-17);
+   - «tappe principali» sulla pagina del gruppo → **non escono**, come nel tool
+     (D-22);
+   - colori degli stati delle partenze → **i tre token nostri**; quelli del tool
+     non hanno corrispondente (D-31);
+   - `joined_at` dei 25 = data dell'import → «Membro XPETIS» non esce per un anno
+     (D-32);
+   - `headline` non esiste nel tool → la card dei risultati perde quella riga
+     (D-14).
+3. **I testi da riscrivere a Gaia**: la dicitura delle recensioni dichiarate
+   (`showcase_declared_reviews_note`), «Prezzo su richiesta», «fino a N
+   persone», i locativi dei cinque paesi nuovi dei Caraibi (`lib/frase.ts`).
+4. **`cardSfondo`**: il tool lo raccoglie, nessuna pagina lo usa. A cosa serve?
+5. **Pulizia**: dopo il primo import vero delle 25, una migration toglie le
+   colonne superate (`image_path` di itinerari e gruppi, `dates_label`,
+   `group_size_label`).
+
+- [x] **[C]** Importatore fedele dei profili TD, idempotente e rilanciabile: non
       normalizza, ma **segnala** ogni voce che non ha saputo agganciare.
+      **Fatto il 3 ottobre sul tool vetrina v6** (`scripts/importa_vetrina.mjs`
+      + `0055`): il paragrafo qui sotto descrive il form vecchio, superato.
       Dal 27 settembre il form ha una chiave in più, `gruppo` → `td_group_trips`
       (0048): `titolo`, `date`, `giorni`, `persone`, `prezzo`, `img` diventano
       `title`, `dates_label`, `duration_label`, `group_size_label`,
       `price_label`, `image_path`, tutti testo. Nel JSON nuovo ci sono anche
       `gruppoHaGia` e `gruppoTempi`, che **non ho mappato**: non erano nel
       prompt e non so cosa significhino (❓ in milestone 3)
-- [ ] **[C]** Coda di correzione per il team: per ogni TD, cosa non è entrato e
-      perché. I due casi che ci aspettano, già visti sui dati veri di un designer
+- [x] **[C]** Coda di correzione per il team: per ogni TD, cosa non è entrato e
+      perché. **È il report dell'importatore**, a video e in
+      `td_import_runs.report` a ogni lancio con `--scrivi`. Il primo dei due casi
+      qui sotto è risolto dalla regola delle destinazioni in evidenza; il secondo
+      (voci che non sono stati) col tool v6 non si presenta più: i paesi arrivano
+      già come id della tassonomia, e uno sconosciuto ferma l'import. I due casi che ci aspettano, già visti sui dati veri di un designer
       reale: **tutti i paesi dichiarati "Base"** (senza correzione quel TD non
       prende mai il badge e finisce sotto a chiunque) e **circa un terzo delle
       voci che non sono stati** (California, Florida, Texas, New York, Hawaii →
       US; Scozia → GB; "Balcani" e "Caraibi" da scorporare)
-- [ ] **[C]** Controllo del verso degli assi: per tre o quattro designer, stampare
+- [x] **[C]** Controllo del verso degli assi: per tre o quattro designer, stampare
       cosa hanno dichiarato nel foglio accanto a cosa dice il database. Un asse
-      girato si vede a occhio in trenta secondi, e nessun'altra prova lo trova
-- [ ] **[S]** Correggere i 25 profili su Studio seguendo la coda (8-12 h) →
-      **S-16**
+      girato si vede a occhio in trenta secondi, e nessun'altra prova lo trova.
+      **Ora lo fa l'importatore a ogni designer**, contro `assiLato`, e si
+      ferma se un asse non torna; per Luca verificato anche sul database vero
+      (4 ottobre)
+- [ ] **[S]** Importare i 25 e completarli seguendo il report (S-16). **Col
+      tool v6 il lavoro è cambiato** (4 ottobre): i paesi arrivano già come id
+      e le destinazioni in evidenza danno il livello, quindi la correzione
+      pesante dei paesi non c'è più. Resta l'operativo, vedi S-16
 
 ---
 
@@ -3333,9 +3388,27 @@ un'impostazione dell'event type se serve.
 
 ### P2 — quando serve
 
-**S-16 · Correzione a mano dei 25 profili importati** (8-12 h con il team)
-Guidata dalla coda di correzione prodotta dall'import. I due casi noti: paesi
-tutti dichiarati "Base" e voci che non sono stati.
+**S-16 · Import e completamento dei 25 profili** (stima rivista: mezz'ora a
+designer, più i casi che il report segnala)
+
+Per ognuno: import a secco, lettura del report, import con `--scrivi`, poi le
+cose che il pacchetto **non può** contenere, poi la pubblicazione.
+
+**Regola d'oro: il contenuto si corregge nel tool, non su Studio.** L'import
+riscrive dal pacchetto tutto il contenuto di vetrina (testi, paesi, assi, voci,
+recensioni): una correzione fatta su Studio a quei campi sparisce al reimport
+successivo. Su Studio si toccano solo i campi che l'import non tocca mai.
+
+| Cosa | Dove | Perché |
+|---|---|---|
+| `cal_username` | Studio | Senza, il profilo non si pubblica; arriva dall'onboarding Cal.com |
+| `phone` | Studio | Il pacchetto non lo contiene |
+| `agency_id` | Studio | Da `legal_coverage`: «Ho già un'agenzia» → la sua; «vorrei un partner certificato» → la partner XPETIS |
+| `joined_at` | Studio, se si vuole | Nasce con la data dell'import: «Membro XPETIS» esce solo dopo un anno. Se il designer è con voi da prima, la data vera |
+| Breve o Sessione senza prezzo o con durata non ammessa | Studio (`td_services`) | Il report lo dice; l'import non indovina prezzi né durate |
+| Paese sconosciuto, nessuna destinazione in evidenza, tag che non combacia, foto con URL assoluto o mancante | **Nel tool**, poi riesportare e reimportare | È contenuto: corretto su Studio, il reimport lo cancellerebbe. Le foto vanno dal pacchetto zip, non dal bucket online del tool |
+| Testi da sistemare (refusi, toni) | Nel tool | Idem |
+| Pubblicazione | Studio: `status = 'published'` | Solo quando `select td_publish_blockers(id) from travel_designers where slug = '<slug>';` è vuoto |
 
 ~~**S-11 · Come custodire le credenziali Stripe delle agenzie**~~ → **deciso il
 27 settembre 2026**: un conto solo, dell'agenzia, chiave ristretta in Vault.

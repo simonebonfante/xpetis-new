@@ -3,6 +3,16 @@
 *3 ottobre 2026. Risposta alla fase 0 di `PROMPT_VETRINE_V6.md` (versione 2).
 Nessun file di codice o di schema è stato toccato: solo letture.*
 
+> **Stato al 4 ottobre 2026: le sei fasi sono fatte.** Decise da Simone il 3
+> ottobre: il livello dei paesi (§ 0.1: in evidenza **o** «Esperto» = 1), la
+> pillola «Personalizzabile» **sì** (D-4), la riga del credito della scheda
+> **senza cifra** (D-13), le icone dal tool (§ 0.3), i dieci paesi nuovi. Le
+> migration vere sono `0052`-`0056` (la tabella del § 2 è di prima: le viste
+> sono finite nella `0054`, l'importatore nella `0055`, e la `0056` aggiunge il
+> nome corto). Le altre differenze del § 5 sono in pagina col loro default e
+> restano domande aperte in `PIANO.md`, milestone 1. La mappatura definitiva è
+> `supabase/MAPPATURA_VETRINA.md`.
+
 Letti: `CLAUDE.md`, `PIANO.md` (milestone 1, deviazioni 9 e 10), le migration
 0007, 0021-0028, 0033, 0038, 0040, 0048, 0051, `MAPPATURA_VETRINA.md`,
 `PUNTI_APERTI.md` (§ correzione profili), il seed 0001, `genera_geo.mjs`,

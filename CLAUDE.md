@@ -11,7 +11,9 @@ gli avanzamenti, milestone per milestone. Non anticipare task non richiesti.
 **Perimetro.** Solo la parte tecnica. Design (Figma), flusso, tassonomia
 geografica e contenuti dei 25 Travel Designer esistono già e arrivano come
 input: non sono lavoro nostro. I profili TD non si scrivono a mano, si
-importano dal JSON prodotto dal form `Vetrina TD (2).html`.
+importano dal pacchetto del **tool vetrina v6** (`vetrina.json` + `images/`,
+formato `vetrina-xpetis-v6`) con `supabase/scripts/importa_vetrina.mjs`. Il form
+`Vetrina TD (2).html` è superato dal 3 ottobre 2026.
 
 ## Cos'è
 
@@ -54,7 +56,7 @@ Colore brand: verde `#1b5e24`. Mobile first su tutte le pagine dei TD.
 ```
 app/            # Next.js 16, App Router
 components/     # header, footer, bottone, badge a stella, suggeritore
-lib/supabase/   # client browser, server (cookie) e admin (chiave secret)
+lib/supabase/   # client browser, server (cookie), pubblico (letture delle viste, senza sessione) e admin (chiave secret)
 public/img,logo # asset esportati dal Figma
 public/fonts/   # Ronzino (Merriweather arriva da next/font)
 scripts/        # scarica-asset-figma.sh (le URL Figma scadono in 7 giorni)
@@ -63,13 +65,18 @@ supabase/
   migrations/   # numerate, si applicano in ordine
   seed/         # config, tassonomia geografica generata, dati finti
   scripts/      # genera_geo.mjs: rigenera il seed geografico da xpetis_destinazioni_v2.json
-  tests/run.mjs # harness: applica tutto su PGlite, ~284 asserzioni
+                # importa_vetrina.mjs: importa un pacchetto del tool vetrina v6 (a secco di default)
+  tests/run.mjs # harness: applica tutto su PGlite, ~1115 asserzioni
+  tests/prova_query.mjs   # ricostruisce il database come l'harness e stampa il risultato di una query
   tests/fixtures/calcom/  # i 7 messaggi VERI di Cal.com, firme incluse
   README.md     # documentazione dello schema e delle decisioni
-  MAPPATURA_VETRINA.md  # form Vetrina TD → schema
+  MAPPATURA_VETRINA.md  # tool vetrina v6 → schema, campo per campo
   MAPPATURA_CALCOM.md   # messaggi Cal.com → schema, da payload veri
-xpetis_destinazioni_v2.json  # la tassonomia geografica, fonte del seed 0002 (188 città)
-archivio/             # file superati, tenuti per memoria: la tassonomia v1 (1.220 città)
+xpetis_destinazioni_v2.json  # la tassonomia geografica, fonte del seed 0002 (139 stati, 188 città)
+xpetis-vetrine-tool/  # il tool vetrina v6 di Andrea e Alessandro: riferimento visivo, il suo codice non si importa
+vetrina-luca-ferraina/  # il pacchetto v6 compilato in ogni campo, banco di prova dell'importatore
+VETRINE_V6_FASE0.md   # piano delle vetrine v6: mappatura, differenze fra tool e Flusso, decisioni
+archivio/             # file superati, tenuti per memoria: la tassonomia v1, la mappatura del form vecchio
 PIANO.md              # stato, decisioni, task, deviazioni, stime
 REGISTRO.md           # una voce per sessione, dalla più recente alla più vecchia
 PUNTI_APERTI.md       # le domande aperte, scritte per il team non tecnico
@@ -124,9 +131,9 @@ Non è una revisione del vecchio: è un altro file.
 |---|---|---|
 | Homepage | `1-14` | **Controllata il 29 settembre, non rifatta**: uguale tranne «Affidarti…» (allineata) e «Come puoi viaggiare con XPETIS», **ristrutturata nel disegno e lasciata com'era** in attesa di una decisione (`PIANO.md`) |
 | Domanda del quiz | `2-2` (e i gemelli `2-36`…`2-192`) | Stesso impianto del file vecchio; in più «Concludi» sull'ultima. ⚠️ Il disegno mette «con chi viaggi» **terza**: vince `sort_order` (sesta, 0049) |
-| Vetrina del designer | **`72-48`** | Revisione di `2-743` (costruita il 28 settembre): cambia solo la fascia hero, «E dopo l'incontro?» fuori dalla scheda della call. Allineata il 29 settembre. `2-743` non si usa più |
-| Viaggio di gruppo | `3-1121` | **Una pagina per viaggio**, costruita il 29 settembre con lo slug della 0051: `/designer/<designer>/viaggio-di-gruppo/<slug>`. Solo le sezioni con sorgente (i sei campi del form); niente «Acquista il posto» |
-| Itinerario pronto da vivere | `3-1386` | Costruita dal file nuovo il 28 settembre. Indirizzo invariato (slug della 0033) |
+| Vetrina del designer | ~~`72-48`~~ → **riferimento: tool v6** | Dal 4 ottobre 2026 rifatta sull'aspetto di `xpetis-vetrine-tool/riferimento/pagine_tool/vetrina.html` (decisione D1 del 3 ottobre). Forma dal tool, comportamento e contenuto dal Flusso |
+| Viaggio di gruppo | ~~`3-1121`~~ → **riferimento: tool v6** | `pagine_tool/gruppo.html`. Una pagina per viaggio, indirizzo invariato (slug della 0051). Partenze vere, solo future; niente «Acquista il posto» |
+| Itinerario pronto da vivere | ~~`3-1386`~~ → **riferimento: tool v6** | `pagine_tool/itinerario.html`. Indirizzo invariato (slug della 0033) |
 | Ricerca / risultati | **da chiedere** | Dal file vecchio. Sul file nuovo c'è un frame «Risultati» (`2-315`) che **nessuno ha indicato**: non si usa finché Simone non lo verifica |
 
 I nodi con un numero sono verificati da Simone (29 settembre). Ricerca va
@@ -152,10 +159,19 @@ asset scadono in 7 giorni, la chiave del file no. Dal 29 settembre lo script
 scarica dal **file nuovo** gli asset di home, quiz, vetrina, viaggio di gruppo
 e itinerario pronto; **dal file vecchio** vengono ancora solo quelli della
 ricerca e le lettere del logo grande del footer (il footer del file nuovo è lo
-stesso disegno, ma quelle lettere non le ho confrontate). Quattro icone del
-riquadro «E dopo l'incontro?» mancano: vedi lo script.
+stesso disegno, ma quelle lettere non le ho confrontate). Le quattro icone del
+riquadro «E dopo l'incontro?» e le stelle di «Questo viaggio fa per me?» non
+vengono dal Figma ma dal tool vetrina v6 (`public/img/dopo-*.svg`,
+`stella-fa-per-me-*.svg`, 4 ottobre 2026): lo script non le riscarica.
 
 ## Decisioni architetturali già prese
+
+**Le letture pubbliche non portano la sessione.** Le viste `public_*` e
+`public_config` si leggono lato server con `clientPubblico()`
+(`lib/supabase/pubblico.ts`): chiave publishable, nessun cookie. Con il client
+dei cookie un token storto del visitatore («JWT issued at future», 4 ottobre
+2026) faceva cadere una pagina pubblica. La sessione serve solo dove serve
+sapere chi è l'utente (header, pagine del viaggiatore).
 
 **Il client non parla mai con le tabelle.** RLS accesa su tutte le tabelle,
 nessuna policy per `anon`, nessun privilegio diretto. Il browser legge soltanto

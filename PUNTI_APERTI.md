@@ -286,6 +286,13 @@ calendario.
 | Creazione dei gruppi WhatsApp                                               | a mano, **a ogni ordine**       | A regime. Le API non permettono di automatizzarlo |
 
 
+> **Aggiornamento del 4 ottobre 2026.** Col tool vetrina v6 il problema
+> descritto qui sotto non c'è più: i paesi arrivano già come voci della
+> tassonomia, e le tre destinazioni in evidenza scelte da ogni designer
+> diventano i suoi paesi forti. Dopo l'import resta solo l'operativo — account
+> Cal.com, telefono, agenzia — e i casi che il report segnala, da correggere
+> nel tool e reimportare. Il dettaglio è in `PIANO.md`, S-16.
+
 **Perché i profili vanno corretti a mano.** Il modulo che i designer hanno
 compilato non chiede il "livello" di una destinazione, quindi tutti i paesi
 risultano dello stesso peso — e un designer così **non comparirebbe mai in cima

@@ -9,6 +9,71 @@ cose. Lo stato corrente, le decisioni aperte e i task stanno in `PIANO.md`.
 
 ---
 
+**4 ottobre 2026 — il doppio calendario, e cosa vuol dire «correggere i 25»**
+
+Simone: sulla vetrina, cliccando prima «Consulenza breve» e poi «Consulenza
+approfondita», i due iframe di Cal.com comparivano uno sotto l'altro. **Difetto
+più vecchio delle vetrine v6**: `prenota-consulenza.tsx` e `lib/cal-embed.ts`
+non erano stati toccati. Cambiando linguetta React teneva vivo lo stesso
+componente e lo stesso riquadro, ne cambiava solo l'`id` (che deriva dal link
+del calendario) e lasciava acceso lo stato «aperto»; il secondo embed si
+montava nello stesso riquadro, e il primo iframe restava lì, perché l'aveva
+inserito Cal.com e React non sa che esiste. Due correzioni: `key={calLink}` sul
+tasto in `box-servizio.tsx`, che a ogni cambio di linguetta lo ricrea da capo
+(riquadro nuovo, si riparte da «Prenota la call»), e lo smontaggio
+dell'embed che svuota il suo riquadro, preso al montaggio e non allo
+smontaggio. Non provato da me nel browser: serve un utente collegato, e lo
+prova Simone.
+
+E una domanda di Simone su «correggere i 25 su Studio», frase rimasta dal form
+vecchio. Col tool la correzione pesante dei paesi non esiste più; resta
+l'operativo (Cal.com, telefono, agenzia, eventualmente `joined_at`) e i casi
+del report. **La regola d'oro**, ora scritta in S-16: il contenuto si corregge
+nel tool e si reimporta, perché l'import riscrive dal pacchetto tutto il
+contenuto e una correzione fatta su Studio sparirebbe al giro dopo.
+
+Ultima, sempre di Simone: la riga del credito nella scheda della call, nel
+design, ha un riquadro suo color **#FAC5BD**. Da noi era nuda sul bianco, e il
+cerchietto attorno alla «$» — un SVG bianco al 28%, disegnato per stare su quel
+rosa — spariva. Aggiunto in `box-servizio.tsx` col valore indicato da Simone
+(il tool lo scrive come primario al 30%, su bianco #F7C3BA), angoli da 10 e il
+padding del tool.
+
+---
+
+**4 ottobre 2026 — vetrine v6: fasi 5 e 6, verifica e documenti. Il ciclo è chiuso**
+
+La verifica l'ho fatta **sul database di sviluppo**, dove Simone aveva già
+applicato le migration e importato e pubblicato Luca, e **solo in lettura**.
+
+- **Cosa legge il browser.** Con la chiave publishable: le colonne di
+  `public_td_showcase`, `public_td_ready_itinerary`, `public_td_group_trip`,
+  `public_td_reviews` e `public_config`, comprese le chiavi dentro i `jsonb`.
+  Nessuna colonna chiusa. Poi i **valori**: su 34 KB di risposte, zero
+  occorrenze della nota XPETIS e delle condizioni che Luca ha scritto sul
+  gruppo del Vietnam, della copertura legale, della controprova degli assi, dei
+  mattoncini delle frasi. Le tabelle (`travel_designers`, `td_import_runs`)
+  rispondono «permission denied».
+- **Il verso degli assi** di Luca, letto con la chiave secret: i cinque valori
+  nel database stanno tutti dal lato che lui ha scelto a parole.
+- **Le pagine**, dal `npm run dev` di Simone con le foto vere: screenshot a
+  1512 e 375 px (dentro un iframe largo 375, perché Chrome headless non scende
+  sotto una sua larghezza minima). L'indirizzo del tool dà 404.
+
+I documenti: `supabase/MAPPATURA_VETRINA.md` **riscritta** per il v6 — quella
+del form è in `archivio/`, dove la tassonomia v1 aspettava compagnia, perché
+racconta decisioni (le destinazioni in evidenza, il verso degli assi) che la
+nuova riprende senza ripetere. `supabase/README.md`: le cinque migration, le
+scelte di schema col loro perché, i parametri nuovi, e tre paragrafi diventati
+falsi (le recensioni dichiarate «non esposte», «Membro XPETIS» senza fonte, i
+gruppi con le date come testo). `CLAUDE.md`: la sorgente dei profili non è più
+il form, le tre pagine hanno come riferimento il tool, la regola nuova sulle
+letture pubbliche senza sessione, la struttura del repo. `PIANO.md`: spuntati
+importatore, coda di correzione e controllo del verso, e le domande che
+restano, ognuna col default già in pagina.
+
+---
+
 **4 ottobre 2026 — vetrine v6: fase 4, i demo**
 
 Nuovo `seed/0006_demo_v6.sql`, convergente, in una transazione. **Marco

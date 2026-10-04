@@ -224,7 +224,13 @@ export function BoxServizio({
       {/* Il tasto apre l'iframe Cal.com del designer in questa stessa pagina
           (deciso il 10 agosto: nessuna pagina di prenotazione disegnata). */}
       {calLink ? (
+        /* `key`: cambiando linguetta (breve ↔ approfondita) il tasto si ricrea
+           da capo invece di cambiare solo il link. Senza, React teneva lo
+           stesso riquadro e lo stato «calendario aperto», e Cal.com ci montava
+           il secondo iframe sotto il primo — che React non toglie, perché non
+           l'ha messo lui. Segnalato da Simone il 4 ottobre 2026. */
         <PrenotaConsulenza
+          key={calLink}
           calLink={calLink}
           utente={utente}
           percorsoVetrina={percorsoVetrina}
@@ -258,8 +264,14 @@ export function BoxServizio({
           Il simbolo è il "$" del disegno anche se la valuta è l'euro. Nel
           `72-48` è più grande (12×18 invece di 7,8×12,4): non riscaricato, il
           connettore Figma aveva finito le chiamate — resta quello di prima. */}
+      {/* Il riquadro rosa (4 ottobre 2026, segnalato da Simone): nel design la
+          riga del credito ha uno sfondo suo, **#FAC5BD**, solo lei, con gli
+          angoli da 10 e il padding del tool (9 × 12, 8 a sinistra). Il tool lo
+          scrive come primario al 30% (`rgba(229,54,25,.3)`, su bianco #F7C3BA):
+          il valore qui è quello indicato da Simone. Senza, il cerchietto
+          attorno alla «$» — bianco al 28% — spariva sulla scheda bianca. */}
       {dopoLaCall.length > 0 && (
-        <p className="mb-6 mt-[27px] flex items-center gap-[15px] text-[12px] leading-[1.25]">
+        <p className="mb-6 mt-[27px] flex items-center gap-3 rounded-[10px] bg-[#fac5bd] py-[9px] pl-2 pr-3 text-[12px] leading-[1.3]">
           <span className="relative grid size-[29px] shrink-0 place-items-center">
             <Image
               src="/img/credito-cerchio.svg"

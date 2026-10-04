@@ -118,6 +118,9 @@ export function montaEmbed(parametri: {
 }): () => void {
   const cal = assicuraCal()
   const ns = spazioDiNomi(parametri.calLink)
+  // Il riquadro, preso adesso e non al momento dello smontaggio: allora lo
+  // stesso selettore potrebbe già indicare un riquadro nuovo.
+  const riquadro = document.querySelector(parametri.selettore)
 
   cal('init', ns, { origin: ORIGINE })
   const api = () => cal.ns?.[ns]
@@ -142,5 +145,10 @@ export function montaEmbed(parametri: {
   return () => {
     api()?.('off', { action: AZIONE_PRENOTATO, callback: ascoltatore })
     api()?.('off', { action: AZIONE_PRENOTATO_LEGACY, callback: ascoltatore })
+    // L'iframe lo inserisce Cal.com, non React: smontare il componente non lo
+    // toglie. Se il riquadro restasse in pagina — un cambio di link senza
+    // ricreare il componente, o il doppio montaggio di React in sviluppo — il
+    // calendario successivo comparirebbe sotto quello vecchio. Si svuota qui.
+    riquadro?.replaceChildren()
   }
 }

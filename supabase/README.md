@@ -17,8 +17,8 @@ Oppure a mano, dal SQL Editor, incollando i file in ordine numerico.
 ## Come verificarlo
 
 C'è un harness che applica tutto su un Postgres 17 in-process (PGlite) e fa
-girare oltre duecento asserzioni sui vincoli, le macchine a stati, i token e
-la superficie pubblica. Non serve un database vero, non serve Docker:
+girare più di mille asserzioni (1115 il 4 ottobre 2026) sui vincoli, le macchine
+a stati, i token, la superficie pubblica e l'importatore delle vetrine. Non serve un database vero, non serve Docker:
 
 ```bash
 cd supabase
@@ -86,6 +86,11 @@ di aver rotto una transizione o aperto per sbaglio una tabella ad `anon`.
 | `0047_all_inclusive.sql` | L'All Inclusive intero: `payment_account()` risponde anche per `deposit` e `balance`, la chiave ristretta dell'agenzia da Vault (`agency_stripe_key`), le regole dell'ordine (`ai_order_rules`: congelamento, acconto calcolato, tempi del saldo, consegna col documento finale), il token monouso dell'agenzia e `agency_decisions`, la pagina e il clic dell'agenzia, la cascata, le due rate nel ponte Stripe (`stripe_checkout_ai`), le pagine del designer e del viaggiatore riemesse con lo smistamento, il documento finale col login (`final_document_for_traveler`), due rami dell'orologio |
 | `0048_tre_event_type_e_gruppi.sql` | Le tre reti sui tre event type (deviazione 10 riscritta): `td_services_one_service_per_slug` (designer + slug unici), `calcom_expected_slugs()` e il ramo nuovo di `td_publish_blockers` sugli slug fuori elenco, il trigger che li vieta su un designer già pubblicato, e `calcom_webhook` riemessa col confronto fra durata dello slot e listino (`calcom_durata_non_combacia`). E `td_group_trips`, i viaggi di gruppo, con la colonna `group_trips` in coda a `public_td_showcase` |
 | `0049_testi_quiz.sql` | Il quiz del viaggiatore da `xpetis_quiz_viaggiatore_.json`: la domanda di ogni asse in `question_it`, le risposte nella colonna nuova `quiz_axis_options.answer_it` (su "con chi viaggi" agganciate alla chiave del form, non al numero), l'ordine nuovo con "con chi viaggi" sesta, e `public_quiz_axes` che in `options` porta la risposta da leggere. Nessun codice, valore o estremo toccato |
+| `0052_vetrina_v6_profilo.sql` | Il profilo del tool vetrina v6: `legal_name` (chiuso), `expertise_areas`, `travel_philosophy`, `axis_sides` / `card_phrases` / `card_phrases_status` (chiusi), `td_countries.highlight_position` (con il vincolo «in evidenza = livello 1»), il paese del viaggio firma, `td_services.price_from_cents` (il «da» del su misura, solo sui servizi dopo la call), gli anni del recensore (chiusi) |
+| `0053_vetrina_v6_viaggi.sql` | Il dettaglio di itinerari pronti e viaggi di gruppo (racconto, notti, quota, valigia, visti, sei punteggi «fa per me», nota XPETIS e condizioni del designer chiuse; per i gruppi partecipanti, fascia d'età, accompagnatore); le tabelle figlie condivise `td_trip_images`, `td_trip_countries`, `td_trip_stops`; le partenze vere `td_group_trip_departures`. Superate e lasciate: `image_path`, `dates_label`, `group_size_label` |
+| `0054_vetrina_v6_viste.sql` | `public_td_showcase` estesa (anni di appartenenza, voto delle sole verificate sopra soglia, paesi e prossima partenza nelle card), le viste nuove `public_td_ready_itinerary`, `public_td_group_trip` (solo partenze future, a Roma), `public_td_reviews` (verificate + dichiarate); `td_publish_blockers` con la breve senza prezzo e la Sessione di durata non ammessa (`calcom_expected_minutes`) |
+| `0055_import_vetrine.sql` | L'importatore lato database: `td_import_runs` (archivio, chiuso) e `td_import_showcase(payload, p_scrivi)` — tutto il designer o niente, prova a secco che scrive e annulla, riconciliazione per titolo, idempotente |
+| `0056_nome_corto.sql` | `public_td_showcase.short_name`: la prima parola del nome, o il nome professionale intero (D8), per le frasi «… con Luca» |
 | `0051_slug_viaggi_di_gruppo.sql` | Lo slug stabile dei viaggi di gruppo (`td_group_trips.slug`, stesse regole della 0033, unico per designer) servito in `public_td_showcase.group_trips`, per la pagina `/designer/<designer>/viaggio-di-gruppo/<slug>`; e `public_quiz_axes` che non ricade più su `label_it` quando manca `answer_it` |
 
 ## La geografia
@@ -286,22 +291,25 @@ degli importi in centesimi. Nel form durata e prezzo sono testo libero
 da quella riga. La convenzione `*_cents` vale dove passa denaro vero —
 consulenze, proposte, acconti, saldi.
 
-`td_showcase_reviews` è **separata da `reviews` e non esposta da nessuna vista**,
-con `is_published` che nasce a falso. Il form le chiede come recensioni esterne
-("se hai già qualche recensione sul tuo sito"), e tenerle qui lascia intatto il
-vincolo che rende impossibili le recensioni finte: su `reviews` ogni riga ha un
-ordine vero dietro. Se e come mostrarle si decide alla milestone 8.
+`td_showcase_reviews` è **separata da `reviews`**: il form le chiede come
+recensioni esterne ("se hai già qualche recensione sul tuo sito"), e tenerle qui
+lascia intatto il vincolo che rende impossibili le recensioni finte — su
+`reviews` ogni riga ha un ordine vero dietro. `is_published` nasce a falso.
+**Dal 3 ottobre 2026 (decisione D3) si mostrano**, con una dicitura che dice che
+le ha raccolte il designer: le espone `public_td_reviews` (0054) con
+`source = 'td_declared'`, l'importatore le pubblica, e non entrano mai nel voto
+medio, che conta solo le verificate.
 
 `public_td_showcase` serve tutto il resto in un colpo solo: campi di profilo,
 paesi coperti per nome, servizi attivi con i punti dei box, viaggi firma con le
 foto in ordine, itinerari pronti.
 
-**Quello che la vista non dice, il sito non lo mostra.** Due esempi veri, dalla
-vetrina: la riga "Membro XPETIS" del Figma vorrebbe `joined_at`, che qui non c'è,
-e la scheda hero elenca le macro-aree mentre la vista dà i paesi. In entrambi i
-casi la pagina mostra meno invece di procurarsi il dato altrove — leggere una
-tabella con la chiave secret sarebbe lecito ma scavalcherebbe la regola. Se un
-campo serve davvero si aggiunge alla vista, con una migration.
+**Quello che la vista non dice, il sito non lo mostra.** Il caso di scuola è
+stata la riga "Membro XPETIS": il disegno voleva `joined_at`, la vista non lo
+dava, e la pagina l'ha tenuta fuori invece di leggerlo con la chiave secret.
+Quando è servita davvero (0054) è entrata nella vista **come anni compiuti**
+(`member_years`), mai come data. Se un campo serve si aggiunge alla vista, con
+una migration, chiedendosi cosa diventa leggibile.
 
 `td_group_trips` (migration 0048) è la gemella di `td_ready_itineraries` per
 la chiave `gruppo` del form nuovo, con due campi in più — `dates_label` e
@@ -314,7 +322,61 @@ per designer, suffisso sulle collisioni): è l'indirizzo della pagina del viaggi
 si scrive, deve aggiornare i viaggi e non cancellarli e reinserirli. ⚠️ **Un
 viaggio di gruppo scade e niente lo nasconde**: con la data come testo il
 database non sa che è passata. Domanda aperta in `PIANO.md`, milestone 3.
-La vista lo espone nella colonna `group_trips`, in coda.
+La vista lo espone nella colonna `group_trips`, in coda. ⚠️ Le due avvertenze qui
+sopra sono **superate dalla 0053-0055**: le partenze sono date vere (e la vista
+mostra solo le future), e l'importatore riconcilia per titolo invece di
+cancellare e reinserire.
+
+### La vetrina v6 (0052-0056, 3-4 ottobre 2026)
+
+Dal 3 ottobre i profili arrivano dal **tool vetrina v6** di Andrea e
+Alessandro, un pacchetto `vetrina.json` + `images/`. La mappatura campo per
+campo è in `MAPPATURA_VETRINA.md`; il piano e le differenze fra tool e Flusso
+in `VETRINE_V6_FASE0.md`. Le scelte di schema, e il perché:
+
+- **`price_from_cents` e non `price_cents`** per il «da 70€» del su misura: su
+  una consulenza `price_cents` è l'importo che la cassa incassa (deviazione 1),
+  e la stessa colonna con il senso «a partire da» su un altro servizio è un
+  errore in attesa. Un vincolo la ammette solo sui servizi dopo la call; nessun
+  vincolo la lega al prezzo della proposta (non è deciso).
+- **Tabelle figlie condivise** fra itinerari e gruppi (`td_trip_images`,
+  `td_trip_countries`, `td_trip_stops`), con due chiavi esterne e
+  `num_nonnulls(...) = 1` come `reviews`: nel tool le due voci hanno la stessa
+  forma, quindi un concetto è una tabella, e importatore e viste hanno un
+  percorso solo. Le partenze, che hanno solo i gruppi, sono una tabella loro,
+  **con date vere**.
+- **Le liste di stringhe** (tappe principali, quota, valigia) sono `text[]`; i
+  sei punteggi «fa per me» sei colonne con `check 0-5`, così il vincolo esiste.
+- **Le colonne chiuse** stanno accanto alle pubbliche, e nessuna vista le
+  nomina: `legal_name`, `axis_sides`, `card_phrases*`, `highlight_position`,
+  `xpetis_note`, `td_terms_text`, `author_years`, più quelle che lo erano già
+  (livelli, assi, copertura legale, prontezza ai gruppi). L'harness lo prova
+  colonna per colonna, anche dentro i `jsonb`, e prova che il **valore** della
+  nota XPETIS non esce.
+- **Il livello dei paesi** (decisione del 3 ottobre): 1 se il paese è fra le
+  tre destinazioni in evidenza scelte dal designer oppure è dichiarato
+  «Esperto», altrimenti 2. Lo applica l'importatore; il vincolo
+  `td_countries_highlight_is_level_1` tiene la metà che il database sa
+  verificare.
+- **`short_name`** (0056) esiste perché la regola D8 — nome professionale intero
+  nelle frasi, altrimenti il primo nome — chiede di sapere se `display_name` è
+  il nome anagrafico, che è chiuso. La vista dà il risultato senza dare il nome.
+- Il voto medio esce **solo dalle recensioni verificate e sopra soglia**
+  (`showcase_rating_min_reviews`, letta da `public_config` perché una vista
+  pubblica tocca solo parametri pubblici).
+
+**L'importatore** è `scripts/importa_vetrina.mjs` più la 0055: lo script legge
+e valida (funzione pura, provata su PGlite), il database scrive tutto il
+designer o niente. La prova a secco è la stessa funzione, che scrive e poi
+annulla con un'eccezione catturata. Riconcilia le voci per titolo (stesso
+titolo, stesso slug), non tocca mai stato, contatti, Cal.com e `joined_at`,
+scrive prezzi e durate delle consulenze solo dove sono vuoti e altrimenti lo
+dice. Ogni lancio con `--scrivi` lascia una riga in `td_import_runs` col JSON
+grezzo intero: è la coda di correzione del team.
+
+**I demo** (seed `0006_demo_v6.sql`, convergente): Marco Rossi è il designer
+completo — ogni caso che le pagine devono saper mostrare —, Giulia Neri quello
+minimo, senza Sessione, itinerari, gruppi e recensioni.
 
 Il seed `0003_demo.sql` popola queste tabelle per i due designer finti: senza
 contenuto la vetrina renderizza vuota e non si vede se funziona. **Le prove
@@ -1321,9 +1383,9 @@ numerico, modificabile a vista da Supabase Studio senza deploy:
 - `orders` — silenzio-conferma 48h, revisione 5 giorni, acconto 30% (`deposit_percent`), validità del link dell'agenzia 7 giorni (`agency_confirm_valid_days`)
 - `reviews` — buon viaggio 3 giorni prima, recensione viaggio 3 giorni dopo, alert sotto le 3 stelle
 - `payments` — su quale conto Stripe incassano una consulenza, un itinerario su misura e le due rate dell'All Inclusive (`consultation_stripe_account`, `custom_itinerary_stripe_account`, `all_inclusive_stripe_account`: `xpetis` in sandbox, `agency` in produzione — il conto è uno solo, dell'agenzia)
-- `showcase` — le stringhe che il sito stampa in pagina: la nota sotto il prezzo degli itinerari
+- `showcase` — le stringhe che il sito stampa in pagina: la nota sotto il prezzo degli itinerari; dalla vetrina v6 i prefissi della nota di prezzo (`ready_itinerary_price_prefix`, `group_trip_price_prefix`), «Prezzo su richiesta» (`showcase_price_on_request`), la dicitura delle recensioni dichiarate (`showcase_declared_reviews_note`, da riscrivere a Gaia), le condizioni dei gruppi (`group_trip_terms_text`, **vuota** finché non si conferma) e la soglia del voto (`showcase_rating_min_reviews` = 1)
 - `contacts` — i recapiti del team (numero WhatsApp), **fuori** dalla superficie pubblica
-- `integrations` — quello che serve a parlare col mondo: l'indirizzo di cancellazione Cal.com, gli slug ammessi dei tre event type (`calcom_slugs_consultation`, `calcom_slugs_consultation_deep`, 0048), le soglie dei due contatori (firme rifiutate, token inventati) e tutta la posta (`email_enabled`, `email_from`, `email_redirect_to`, `email_max_per_tick`, `email_max_attempts`, `site_base_url`). **Fuori** dalla superficie pubblica, e a maggior ragione
+- `integrations` — quello che serve a parlare col mondo: l'indirizzo di cancellazione Cal.com, gli slug ammessi dei tre event type (`calcom_slugs_consultation`, `calcom_slugs_consultation_deep`, 0048) e le loro durate (`calcom_minutes_consultation` = 30, `calcom_minutes_consultation_deep` = 60, 90; 0054-0055), le soglie dei due contatori (firme rifiutate, token inventati) e tutta la posta (`email_enabled`, `email_from`, `email_redirect_to`, `email_max_per_tick`, `email_max_attempts`, `site_base_url`). **Fuori** dalla superficie pubblica, e a maggior ragione
 
 Il sito legge dalla vista `public_config` i gruppi `booking_rules` e `showcase`;
 `matching` è chiuso dalla 0018 (il match è lato server) e i parametri operativi
